@@ -1,21 +1,23 @@
-// app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Instagram,
-  MessageCircle,
-  ArrowRight,
+import { 
+  Instagram, 
+  MessageCircle, 
+  ArrowRight, 
   MapPin,
   Clock,
   Shield,
   ExternalLink,
   Menu,
   X,
-  Filter
+  Filter,
+  CreditCard,
+  Sparkles
 } from 'lucide-react';
 
+// Animation variants
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
@@ -23,9 +25,13 @@ const fadeIn = {
 
 const staggerContainer = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
 };
 
+// Deine echten Vinted-Produkte
 const products = [
   // ── JACKEN ──
   {
@@ -203,115 +209,243 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#D4AF37] selection:text-black">
-      <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
-
-      <nav className={`fixed w-full z-40 transition-all duration-300 ${scrolled ? 'bg-[#0A0A0A]/90 backdrop-blur-md py-4' : 'bg-transparent py-6'}`}>
+      {/* Gold-Grain Overlay */}
+      <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.02] bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjc1IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjMwMCIgaGVpZ2h0PSIzMDAiIGZpbHRlcj0idXJsKCNhKSIgb3BhY2l0eT0iMC4xNSIvPjwvc3ZnPg==')] opacity-5" />
+      
+      {/* Navigation */}
+      <nav className={`fixed w-full z-40 transition-all duration-300 ${scrolled ? 'bg-[#0A0A0A]/95 backdrop-blur-md py-4 border-b border-[#D4AF37]/20' : 'bg-transparent py-6'}`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-bold tracking-tighter">
-            <span className="text-[#D4AF37]">SCND</span>_UNIT
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-3"
+          >
+            {/* Logo */}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#8B7355] flex items-center justify-center text-black font-bold text-lg shadow-lg shadow-[#D4AF37]/20">
+              S
+            </div>
+            <span className="text-2xl font-bold tracking-tighter">
+              <span className="text-[#D4AF37]">SCND</span>_UNIT
+            </span>
           </motion.div>
+
+          {/* Desktop Menu */}
           <div className="hidden md:flex items-center gap-8">
             <a href="#products" className="text-sm uppercase tracking-widest hover:text-[#D4AF37] transition-colors">Inventory</a>
             <a href="#about" className="text-sm uppercase tracking-widest hover:text-[#D4AF37] transition-colors">About</a>
             <a href="#contact" className="text-sm uppercase tracking-widest hover:text-[#D4AF37] transition-colors">Contact</a>
-            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="px-6 py-2 bg-[#D4AF37] text-black text-sm uppercase tracking-widest hover:bg-[#D4AF37]/80 transition-colors font-bold">Shop Vinted</a>
+            <a 
+              href="https://www.vinted.de/member/3138250645-scndunit" 
+              target="_blank"
+              className="px-6 py-2 bg-[#D4AF37] text-black text-sm uppercase tracking-widest hover:bg-[#D4AF37]/80 transition-colors font-bold"
+            >
+              Shop Vinted
+            </a>
           </div>
+
+          {/* Mobile Menu Button */}
           <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X /> : <Menu />}
+            {isMenuOpen ? <X className="text-[#D4AF37]" /> : <Menu />}
           </button>
         </div>
+
+        {/* Mobile Menu */}
         <AnimatePresence>
           {isMenuOpen && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-[#0A0A0A] border-t border-[#1A1A1A]">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden bg-[#0A0A0A] border-t border-[#D4AF37]/20"
+            >
               <div className="flex flex-col p-6 gap-4">
-                <a href="#products" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">Inventory</a>
-                <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">About</a>
-                <a href="#contact" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">Contact</a>
+                <a href="#products" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest hover:text-[#D4AF37]">Inventory</a>
+                <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest hover:text-[#D4AF37]">About</a>
+                <a href="#contact" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest hover:text-[#D4AF37]">Contact</a>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </nav>
 
+      {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Background Grid */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(212,175,55,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(212,175,55,0.03)_1px,transparent_1px)] bg-[size:100px_100px]" />
+        
         <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
-          <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
-            <motion.p variants={fadeIn} className="text-[#D4AF37] text-sm uppercase tracking-[0.3em] mb-4">Bad Kreuznach, DE</motion.p>
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer}
+          >
+            <motion.p variants={fadeIn} className="text-[#D4AF37] text-sm uppercase tracking-[0.3em] mb-4">
+              Bad Kreuznach, DE
+            </motion.p>
+            
             <motion.h1 variants={fadeIn} className="text-6xl md:text-9xl font-bold tracking-tighter mb-6">
               <span className="block">SCND</span>
               <span className="block text-transparent bg-clip-text bg-gradient-to-b from-[#D4AF37] to-[#8B7355]">UNIT</span>
             </motion.h1>
+            
             <motion.div variants={fadeIn} className="flex flex-wrap justify-center gap-4 text-sm uppercase tracking-widest text-gray-400 mb-8">
-              <span>Streetwear</span><span className="text-[#D4AF37]">•</span><span>Vintage</span><span className="text-[#D4AF37]">•</span><span>Y2K</span><span className="text-[#D4AF37]">•</span><span>Gorpcore</span>
+              <span>Streetwear</span>
+              <span className="text-[#D4AF37]">•</span>
+              <span>Vintage</span>
+              <span className="text-[#D4AF37]">•</span>
+              <span>Y2K</span>
+              <span className="text-[#D4AF37]">•</span>
+              <span>Gorpcore</span>
             </motion.div>
+
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="group inline-flex items-center gap-2 px-8 py-4 bg-[#D4AF37] text-black font-bold uppercase tracking-widest hover:bg-[#D4AF37]/80 transition-all">
-                Browse Inventory <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <a 
+                href="https://www.vinted.de/member/3138250645-scndunit"
+                target="_blank"
+                className="group inline-flex items-center gap-2 px-8 py-4 bg-[#D4AF37] text-black font-bold uppercase tracking-widest hover:bg-[#D4AF37]/80 transition-all"
+              >
+                <Sparkles className="w-5 h-5" />
+                Direkt auf Vinted shoppen
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </a>
-              <a href="#products" className="inline-flex items-center gap-2 px-8 py-4 border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all uppercase tracking-widest">View Selection</a>
+              <a 
+                href="#products"
+                className="inline-flex items-center gap-2 px-8 py-4 border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all uppercase tracking-widest"
+              >
+                Kollektion ansehen
+              </a>
             </motion.div>
           </motion.div>
         </div>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="absolute bottom-8 left-1/2 -translate-x-1/2">
-          <div className="w-6 h-10 border-2 border-[#1A1A1A] rounded-full flex justify-center">
-            <motion.div animate={{ y: [0, 12, 0] }} transition={{ duration: 1.5, repeat: Infinity }} className="w-1 h-2 bg-[#D4AF37] rounded-full mt-2" />
+
+        {/* Scroll Indicator */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+        >
+          <div className="w-6 h-10 border-2 border-[#D4AF37]/30 rounded-full flex justify-center">
+            <motion.div 
+              animate={{ y: [0, 12, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="w-1 h-2 bg-[#D4AF37] rounded-full mt-2"
+            />
           </div>
         </motion.div>
       </section>
 
+      {/* Trust Badges */}
       <section className="border-y border-[#D4AF37]/20 bg-[#0A0A0A]">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-            <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Clock className="w-5 h-5 text-[#D4AF37]" />Versand innerhalb 48h</div>
-            <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Shield className="w-5 h-5 text-[#D4AF37]" />Ehrliche Beschreibungen</div>
-            <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><MessageCircle className="w-5 h-5 text-[#D4AF37]" />Schneller Support</div>
+            <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400">
+              <Clock className="w-5 h-5 text-[#D4AF37]" />
+              Versand innerhalb 48h
+            </div>
+            <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400">
+              <Shield className="w-5 h-5 text-[#D4AF37]" />
+              Ehrliche Beschreibungen
+            </div>
+            <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400">
+              <CreditCard className="w-5 h-5 text-[#D4AF37]" />
+              Sicher bezahlen via Vinted
+            </div>
           </div>
         </div>
       </section>
 
+      {/* Products Grid */}
       <section id="products" className="py-24 px-6">
         <div className="max-w-7xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-10">
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">CURRENT_<span className="text-[#D4AF37]">INVENTORY</span></h2>
-            <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mb-10"
+          >
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">
+              CURRENT_<span className="text-[#D4AF37]">INVENTORY</span>
+            </h2>
+            <p className="text-gray-400 uppercase tracking-widest text-sm">
+              Alle Artikel verfügbar auf Vinted • Klick für Details & Kauf
+            </p>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-12 flex-wrap">
+          {/* Filter */}
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            whileInView={{ opacity: 1, y: 0 }} 
+            viewport={{ once: true }} 
+            className="flex items-center gap-3 mb-12 flex-wrap"
+          >
             <Filter className="w-4 h-4 text-[#D4AF37]" />
             {allCategories.map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-2 text-xs uppercase tracking-widest border transition-all ${activeCategory === cat ? 'border-[#D4AF37] text-[#D4AF37] bg-[#D4AF37]/10' : 'border-[#1A1A1A] text-gray-400 hover:border-[#D4AF37] hover:text-[#D4AF37]'}`}>
+              <button 
+                key={cat} 
+                onClick={() => setActiveCategory(cat)}
+                className={`px-4 py-2 text-xs uppercase tracking-widest border transition-all ${
+                  activeCategory === cat 
+                    ? 'border-[#D4AF37] text-[#D4AF37] bg-[#D4AF37]/10' 
+                    : 'border-[#1A1A1A] text-gray-400 hover:border-[#D4AF37] hover:text-[#D4AF37]'
+                }`}
+              >
                 {cat}
               </button>
             ))}
           </motion.div>
 
+          {/* Product Cards */}
           <AnimatePresence mode="wait">
-            <motion.div key={activeCategory} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <motion.div 
+              key={activeCategory} 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              transition={{ duration: 0.2 }} 
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
               {filteredProducts.map((product, index) => (
-                <motion.a key={product.id} href={product.vintedUrl} target="_blank" rel="noopener noreferrer"
-                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
-                  className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#D4AF37] transition-all">
+                <motion.a
+                  key={product.id}
+                  href={product.vintedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.06 }}
+                  className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#D4AF37] transition-all"
+                >
+                  {/* Image Container */}
                   <div className="aspect-[4/5] relative overflow-hidden bg-[#0A0A0A]">
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10" />
-                    <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img 
+                      src={product.image} 
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    {/* Condition Badge */}
                     <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-[#0A0A0A]/80 backdrop-blur text-xs uppercase tracking-widest border border-[#D4AF37] text-[#D4AF37]">
                       {product.condition}
                     </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="min-w-0 pr-2">
-                        <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">{product.category}</p>
-                        <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#D4AF37] transition-colors leading-tight">{product.name}</h3>
-                      </div>
-                      <span className="text-xl font-bold text-[#D4AF37] shrink-0">{product.price}</span>
+                    {/* Price Tag */}
+                    <div className="absolute top-4 right-4 z-20 px-3 py-1 bg-[#D4AF37] text-black font-bold text-sm">
+                      {product.price}
                     </div>
-                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-6">
+                    <div className="mb-3">
+                      <p className="text-xs text-[#D4AF37] uppercase tracking-widest mb-1">{product.category}</p>
+                      <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#D4AF37] transition-colors">
+                        {product.name}
+                      </h3>
+                    </div>
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#0A0A0A]">
                       <span className="text-sm text-gray-400 uppercase tracking-widest">Size {product.size}</span>
                       <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#D4AF37] group-hover:gap-2 transition-all">
-                        View <ExternalLink className="w-4 h-4" />
+                        Auf Vinted kaufen <ExternalLink className="w-4 h-4" />
                       </span>
                     </div>
                   </div>
@@ -321,36 +455,78 @@ export default function Home() {
           </AnimatePresence>
 
           <div className="mt-16 text-center">
-            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank"
-              className="inline-flex items-center gap-2 px-8 py-4 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all uppercase tracking-widest">
-              Alle Artikel auf Vinted <ExternalLink className="w-4 h-4" />
+            <a 
+              href="https://www.vinted.de/member/3138250645-scndunit"
+              target="_blank"
+              className="inline-flex items-center gap-2 px-8 py-4 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all uppercase tracking-widest"
+            >
+              Alle Artikel auf Vinted sehen <ExternalLink className="w-4 h-4" />
             </a>
           </div>
         </div>
       </section>
 
+      {/* About Section */}
       <section id="about" className="py-24 bg-[#1A1A1A] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_49%,rgba(212,175,55,0.03)_50%,transparent_51%)] bg-[length:20px_20px]" />
+        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_49%,rgba(212,175,55,0.02)_50%,transparent_51%)] bg-[length:20px_20px]" />
+        
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid md:grid-cols-2 gap-16 items-center">
-            <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">ABOUT_<span className="text-[#D4AF37]">UNIT</span></h2>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
+                ABOUT_<span className="text-[#D4AF37]">UNIT</span>
+              </h2>
               <div className="space-y-4 text-gray-300 leading-relaxed">
-                <p>SCND UNIT ist ein Curated Reselling-Projekt aus Bad Kreuznach. Wir suchen die besten Vintage-Pieces, Streetwear-Klassiker und Y2K-Schnäppchen – und bringen sie zu dir.</p>
-                <p>Unser Fokus liegt auf ehrlichen Beschreibungen, schnellem Versand (innerhalb 48h) und einem sorgfältig ausgewählten Inventar.</p>
-                <p className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm border-l-2 border-[#D4AF37] pl-4">Kein Fast Fashion – nur Qualität mit Geschichte.</p>
+                <p>
+                  SCND UNIT ist ein Curated Reselling-Projekt aus Bad Kreuznach. Wir suchen die besten Vintage-Pieces, Streetwear-Klassiker und Y2K-Schnäppchen – und bringen sie zu dir.
+                </p>
+                <p>
+                  Unser Fokus liegt auf <span className="text-[#D4AF37]">ehrlichen Beschreibungen</span>, <span className="text-[#D4AF37]">schnellem Versand</span> (innerhalb 48h) und einem sorgfältig ausgewählten Inventar. 
+                </p>
+                <p>
+                  Jeder Kauf läuft über <span className="text-[#D4AF37] font-bold">Vinted</span> – das bedeutet Käuferschutz, sichere Zahlung und verifizierte Transaktionen für dich.
+                </p>
+                <p className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm border-l-2 border-[#D4AF37] pl-4">
+                  Kein Fast Fashion – nur Qualität mit Geschichte.
+                </p>
               </div>
             </motion.div>
-            <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="relative"
+            >
               <div className="aspect-square bg-[#0A0A0A] border border-[#D4AF37]/20 p-8 flex items-center justify-center relative overflow-hidden">
+                {/* Gold-Gradient Background */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 to-transparent" />
+                
                 <div className="text-center relative z-10">
-                  <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#8B7355] flex items-center justify-center text-black font-bold text-4xl shadow-2xl shadow-[#D4AF37]/20">S</div>
+                  <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#8B7355] flex items-center justify-center text-black font-bold text-4xl shadow-2xl shadow-[#D4AF37]/20">
+                    S
+                  </div>
                   <div className="grid grid-cols-2 gap-4 text-sm uppercase tracking-widest">
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors"><span className="block text-2xl font-bold text-[#D4AF37]">100%</span><span className="text-gray-500">Authentic</span></div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors"><span className="block text-2xl font-bold text-[#D4AF37]">48h</span><span className="text-gray-500">Shipping</span></div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors"><span className="block text-2xl font-bold text-[#D4AF37]">DE</span><span className="text-gray-500">Based</span></div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors"><span className="block text-2xl font-bold text-[#D4AF37]">15</span><span className="text-gray-500">Items</span></div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors">
+                      <span className="block text-2xl font-bold text-[#D4AF37]">100%</span>
+                      <span className="text-gray-500">Authentic</span>
+                    </div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors">
+                      <span className="block text-2xl font-bold text-[#D4AF37]">48h</span>
+                      <span className="text-gray-500">Shipping</span>
+                    </div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors">
+                      <span className="block text-2xl font-bold text-[#D4AF37]">DE</span>
+                      <span className="text-gray-500">Based</span>
+                    </div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A] hover:border-[#D4AF37]/50 transition-colors">
+                      <span className="block text-2xl font-bold text-[#D4AF37]">15</span>
+                      <span className="text-gray-500">Items</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -359,37 +535,104 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="contact" className="py-24 px-6">
+      {/* How to Buy Section */}
+      <section className="py-24 px-6 border-y border-[#D4AF37]/20">
         <div className="max-w-4xl mx-auto text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">GET_IN_<span className="text-[#D4AF37]">TOUCH</span></h2>
-            <p className="text-gray-400 mb-12 uppercase tracking-widest">Fragen zu einem Artikel? Schreib uns auf Vinted oder Instagram.</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="group inline-flex items-center justify-center gap-3 px-8 py-4 bg-[#D4AF37] text-black font-bold uppercase tracking-widest hover:bg-[#D4AF37]/80 transition-all">
-                <MessageCircle className="w-5 h-5" />Nachricht auf Vinted
-              </a>
-              <a href="https://www.instagram.com/scnd.unit" target="_blank" className="group inline-flex items-center justify-center gap-3 px-8 py-4 border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all uppercase tracking-widest">
-                <Instagram className="w-5 h-5" />@scnd.unit
-              </a>
-            </div>
-            <div className="mt-16 flex items-center justify-center gap-2 text-sm text-gray-500 uppercase tracking-widest">
-              <MapPin className="w-4 h-4 text-[#D4AF37]" />Bad Kreuznach, Deutschland
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tighter mb-4">
+              SO FUNKTIONIERT'S
+            </h2>
+            <p className="text-gray-400 mb-12 uppercase tracking-widest text-sm">
+              Sicher kaufen über Vinted
+            </p>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="p-6 border border-[#D4AF37]/20 hover:border-[#D4AF37] transition-colors">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#D4AF37] text-black flex items-center justify-center font-bold text-xl">1</div>
+                <h3 className="text-lg font-bold uppercase tracking-widest mb-2">Artikel wählen</h3>
+                <p className="text-gray-400 text-sm">Durchstöbere unsere Kollektion und klick auf "Auf Vinted kaufen"</p>
+              </div>
+              <div className="p-6 border border-[#D4AF37]/20 hover:border-[#D4AF37] transition-colors">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#D4AF37] text-black flex items-center justify-center font-bold text-xl">2</div>
+                <h3 className="text-lg font-bold uppercase tracking-widest mb-2">Auf Vinted kaufen</h3>
+                <p className="text-gray-400 text-sm">Du wirst direkt zum Vinted-Produkt weitergeleitet und kannst sicher bezahlen</p>
+              </div>
+              <div className="p-6 border border-[#D4AF37]/20 hover:border-[#D4AF37] transition-colors">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#D4AF37] text-black flex items-center justify-center font-bold text-xl">3</div>
+                <h3 className="text-lg font-bold uppercase tracking-widest mb-2">Versand</h3>
+                <p className="text-gray-400 text-sm">Wir versenden innerhalb von 48h. Tracking erhältst du über Vinted</p>
+              </div>
             </div>
           </motion.div>
         </div>
       </section>
 
+      {/* Contact */}
+      <section id="contact" className="py-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
+              GET_IN_<span className="text-[#D4AF37]">TOUCH</span>
+            </h2>
+            <p className="text-gray-400 mb-12 uppercase tracking-widest">
+              Fragen? Schreib uns auf Vinted oder Instagram
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a 
+                href="https://www.vinted.de/member/3138250645-scndunit"
+                target="_blank"
+                className="group inline-flex items-center justify-center gap-3 px-8 py-4 bg-[#D4AF37] text-black font-bold uppercase tracking-widest hover:bg-[#D4AF37]/80 transition-all"
+              >
+                <MessageCircle className="w-5 h-5" />
+                Nachricht auf Vinted
+              </a>
+              <a 
+                href="https://www.instagram.com/scnd.unit"
+                target="_blank"
+                className="group inline-flex items-center justify-center gap-3 px-8 py-4 border border-[#D4AF37]/30 hover:border-[#D4AF37] hover:text-[#D4AF37] transition-all uppercase tracking-widest"
+              >
+                <Instagram className="w-5 h-5" />
+                @scnd.unit
+              </a>
+            </div>
+
+            <div className="mt-16 flex items-center justify-center gap-2 text-sm text-gray-500 uppercase tracking-widest">
+              <MapPin className="w-4 h-4 text-[#D4AF37]" />
+              Bad Kreuznach, Deutschland
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
       <footer className="border-t border-[#D4AF37]/20 py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#8B7355] flex items-center justify-center text-black font-bold text-sm">S</div>
-            <span className="text-xl font-bold tracking-tighter"><span className="text-[#D4AF37]">SCND</span>_UNIT</span>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#8B7355] flex items-center justify-center text-black font-bold text-sm">
+              S
+            </div>
+            <span className="text-xl font-bold tracking-tighter">
+              <span className="text-[#D4AF37]">SCND</span>_UNIT
+            </span>
           </div>
+          
           <div className="flex gap-6 text-sm uppercase tracking-widest text-gray-500">
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="hover:text-[#D4AF37] transition-colors">Vinted</a>
             <a href="https://www.instagram.com/scnd.unit" target="_blank" className="hover:text-[#D4AF37] transition-colors">Instagram</a>
           </div>
-          <p className="text-xs text-gray-600 uppercase tracking-widest">© 2025 SCND UNIT • Bad Kreuznach</p>
+
+          <p className="text-xs text-gray-600 uppercase tracking-widest">
+            © 2025 SCND UNIT • Bad Kreuznach
+          </p>
         </div>
       </footer>
     </div>
