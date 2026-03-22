@@ -100,27 +100,6 @@ export default function AdminPage() {
                   {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Laden'}
                 </button>
               </div>
-              {preview && (
-                <div className="space-y-3 mt-4 border-t border-[#FF4400]/20 pt-4">
-                  <p className="text-xs text-[#FF4400] uppercase tracking-widest">Daten bearbeiten</p>
-                  {[
-                    { label: 'Preis', key: 'price', placeholder: 'z.B. 34' },
-                    { label: 'Groesse', key: 'size', placeholder: 'L, M, XL...' },
-                    { label: 'Zustand', key: 'condition', placeholder: 'Gut / Sehr gut' },
-                  ].map(({ label, key, placeholder }) => (
-                    <div key={key} className="bg-[#0A0A0A] p-3 border border-[#FF4400]/20">
-                      <p className="text-xs text-gray-500 mb-1 uppercase tracking-widest">{label}</p>
-                      <input
-                        type="text"
-                        value={(preview as any)[key] ?? ''}
-                        onChange={e => setPreview(p => ({ ...p, [key]: e.target.value }))}
-                        placeholder={placeholder}
-                        className="bg-transparent text-sm font-bold focus:outline-none w-full placeholder-gray-600"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
               {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
 
               <AnimatePresence>
