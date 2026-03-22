@@ -177,23 +177,196 @@ const products = [
     image: "https://images1.vinted.net/t/05_00a99_3fq7YmVQH7r92JMuAXifxHvC/f800/1774031494.webp?s=3d255c9b1c3ede9d927d363c7a1e9f59d66b6f3a",
     vintedUrl: "https://www.vinted.de/items/8441012104"
   },
-  { id: 16, name: "Artikel ansehen", category: "Sweatshirts", price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8329226132" },
-  { id: 17, name: "Artikel ansehen", category: "Sweatshirts", price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8323619467" },
-  { id: 18, name: "Artikel ansehen", category: "Pullover",    price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8417078850" },
-  { id: 19, name: "Artikel ansehen", category: "Pullover",    price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8396015207" },
-  { id: 20, name: "Artikel ansehen", category: "Sweatshirts", price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8414779381" },
-  { id: 21, name: "Artikel ansehen", category: "Sweatshirts", price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8414803706" },
-  { id: 22, name: "Artikel ansehen", category: "Jacken",      price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8448623083" },
-  { id: 23, name: "Artikel ansehen", category: "Sweatshirts", price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8414768409" },
-  { id: 24, name: "Artikel ansehen", category: "Pullover",    price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8417120287" },
-  { id: 25, name: "Artikel ansehen", category: "Jacken",      price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8448527189" },
-  { id: 26, name: "Artikel ansehen", category: "Pullover",    price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8440731520" },
-  { id: 27, name: "Artikel ansehen", category: "Sweatshirts", price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8441002241" },
-  { id: 28, name: "Artikel ansehen", category: "Jacken",      price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8395132293" },
-  { id: 29, name: "Artikel ansehen", category: "Pullover",    price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8417010800" },
-  { id: 30, name: "Artikel ansehen", category: "Jacken",      price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8398245553" },
-  { id: 31, name: "Artikel ansehen", category: "Pullover",    price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8440597862" },
-  { id: 32, name: "Artikel ansehen", category: "Jacken",      price: "–", size: "–", condition: "–", image: "/api/placeholder/400/500", vintedUrl: "https://www.vinted.de/items/8323660018" },
+  {
+    id: 16,
+    name: "Adidas Track Jacket Grau Orange Trefoil Vintage",
+    category: "Jacken",
+    price: "€19",
+    size: "S",
+    condition: "Sehr gut",
+    image: "https://images1.vinted.net/t/04_00abf_7YbNaZTcMox6pitYXHb1JfVM/f800/1774105278.webp?s=971b72dc6cd41e95a71679d02fcd67253792c4d4",
+    vintedUrl: "https://www.vinted.de/items/8448527189"
+  },
+  {
+    id: 17,
+    name: "Tommy Hilfiger Athletics Fleece Sweatshirt Weiß Crewneck",
+    category: "Sweatshirts",
+    price: "€28",
+    size: "L",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/06_004a4_SGRAKNYTRpMj34v7oF43YDtC/f800/1773748888.webp?s=ac945041e3ffdcf2d32dc6efd0611610e6d3b0dd",
+    vintedUrl: "https://www.vinted.de/items/8417120287"
+  },
+  {
+    id: 18,
+    name: "Lacoste Polo Shirt Rosé",
+    category: "Tops",
+    price: "€18",
+    size: "S",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/05_01390_Pg1hP2GnqgYcH5RRiDoRKiGF/f800/1774019111.webp?s=d37ff629d5afc1027d249258ed4ea4ae0283bca7",
+    vintedUrl: "https://www.vinted.de/items/8440731520"
+  },
+  {
+    id: 19,
+    name: "Tommy Hilfiger Polo Shirt Grün Navy Streifen",
+    category: "Tops",
+    price: "€23",
+    size: "XL",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/06_015ba_p2SHGGF5tRtxVmEBchizMM4K/f800/1774031657.webp?s=fc6b00a093c96077a401ee98bb88cf3e3fdae813",
+    vintedUrl: "https://www.vinted.de/items/8441002241"
+  },
+  {
+    id: 20,
+    name: "Nike Park Trackjacket Windbreaker Weiß Blau",
+    category: "Jacken",
+    price: "€45",
+    size: "S",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/01_0149d_Pi635amLLKJ8G9J8vFgXwmUD/f800/1774110116.webp?s=dbe91471c2dfdb2d26b7762da5049ed31326caad",
+    vintedUrl: "https://www.vinted.de/items/8449417132"
+  },
+  {
+    id: 21,
+    name: "Helly Hansen Fleece Quarter Zip Grau Orange Outdoor",
+    category: "Pullover",
+    price: "€25",
+    size: "XXL",
+    condition: "Sehr gut",
+    image: "https://images1.vinted.net/t/05_00f80_irY9g4qnXgHPKNyhKZhBtGKV/f800/1773518023.webp?s=097a875ccde9384360722c3d9e3c5f2ee14fe893",
+    vintedUrl: "https://www.vinted.de/items/8395132293"
+  },
+  {
+    id: 22,
+    name: "Nike Vintage Sweatshirt Big Swoosh Grün Crewneck",
+    category: "Sweatshirts",
+    price: "€34",
+    size: "XL",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/05_01641_LVv5eNLqRADoWxsgH1sh2MVi/f800/1773748132.webp?s=700d6c354687e1173f3442e7d2dbd7a2df52e5a7",
+    vintedUrl: "https://www.vinted.de/items/8417010800"
+  },
+  {
+    id: 23,
+    name: "Nike Vintage Fleece Jacket Grau Thumbholes Athletic Dept",
+    category: "Jacken",
+    price: "€22",
+    size: "XS",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/05_015b6_j3dLkRBcqDkBNqvfCZWqC5Hf/f800/1773571927.webp?s=1c98260b24d469a21ae2ada9e313b498ad7f8536",
+    vintedUrl: "https://www.vinted.de/items/8398245553"
+  },
+  {
+    id: 24,
+    name: "Vintage Starter Green Bay Packers 96/97 Champs Crewneck",
+    category: "Sweatshirts",
+    price: "€33",
+    size: "XL",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/04_0138e_Th8543Q3YYQnnRR1PfXZR3QT/f800/1774018164.webp?s=4eef4ca660ee11d184712b68f34c7d6ea4a3531d",
+    vintedUrl: "https://www.vinted.de/items/8440597862"
+  },
+  {
+    id: 26,
+    name: "Reebok New York Jets Fleece Jacke Grün NFL Vintage",
+    category: "Jacken",
+    price: "€25",
+    size: "XXL",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/03_007ba_6Ex7LXe1ZpJN7RhzMMJ3sZ1N/f800/1773748600.webp?s=fbdfcca8432bd8897e2bb963f8b47fd15f85c268",
+    vintedUrl: "https://www.vinted.de/items/8417078850"
+  },
+  {
+    id: 27,
+    name: "Nike Puffer Jacke Türkis XS",
+    category: "Jacken",
+    price: "€25",
+    size: "XS",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/05_0135f_NGV5Rp1E8o2oVKDyfZrdsPvC/f800/1773062786.webp?s=96bcec68740e0106d8f33a95ca73a282e23d3dc0",
+    vintedUrl: "https://www.vinted.de/items/8352298824"
+  },
+  {
+    id: 28,
+    name: "Nike Windbreaker Jacke Blau Swoosh Vintage",
+    category: "Jacken",
+    price: "€38",
+    size: "L",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/06_01780_iUoK85Pss7d9DfczowRxQRN2/f800/1773706305.webp?s=dcf40dce54cb826d2959e92f24fa0a035a4f885d",
+    vintedUrl: "https://www.vinted.de/items/8414803706"
+  },
+  {
+    id: 29,
+    name: "Lacoste Fleece Jacke Schwarz Vintage Crocodile",
+    category: "Jacken",
+    price: "€25",
+    size: "L",
+    condition: "Zufriedenstellend",
+    image: "https://images1.vinted.net/t/06_0031e_g9uWwjTMgjCnyhFmHYUtGdAY/f800/1772751651.webp?s=8a2e8ec6d39d605d6cdb16909eb2de94bab098f9",
+    vintedUrl: "https://www.vinted.de/items/8323619467"
+  },
+  {
+    id: 30,
+    name: "Helly Hansen Fleece 1/4 Zip Vintage Lila Violett",
+    category: "Pullover",
+    price: "€19",
+    size: "M",
+    condition: "Zufriedenstellend",
+    image: "https://images1.vinted.net/t/06_01cd1_6qbnSHZGDRYnHj5gaTWwLupR/f800/1773705616.webp?s=36df5cd624355f745cf87b4b846c1f70cac6f14a",
+    vintedUrl: "https://www.vinted.de/items/8414793323"
+  },
+  {
+    id: 31,
+    name: "Adidas Fleece Pullover Half Zip Grau Rot Vintage",
+    category: "Pullover",
+    price: "€20",
+    size: "XL",
+    condition: "Zufriedenstellend",
+    image: "https://images1.vinted.net/t/01_02099_LjqYaitr28tJxU1XXV2pWTxw/f800/1772822269.webp?s=bfedb24ac87414a8ac6cbdf48003c1017d3d5d5f",
+    vintedUrl: "https://www.vinted.de/items/8329226132"
+  },
+  {
+    id: 32,
+    name: "NHL Washington Capitals Fleece Sherpa Vintage",
+    category: "Pullover",
+    price: "€22",
+    size: "M",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/06_01994_ZTAGXe1deKUSF8mxBsVj4Gfs/f800/1773499294.webp?s=526701d028e6f005a66174a4c9de1092d25a958e",
+    vintedUrl: "https://www.vinted.de/items/8391936347"
+  },
+  {
+    id: 33,
+    name: "Nike Vintage Fleece Pullover Rot Swoosh Crewneck",
+    category: "Pullover",
+    price: "€29",
+    size: "L",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/05_0128e_Muquhvc4yd3ECMa3jbTzqC8V/f800/1773704829.webp?s=5c2d68463c57c351099b41e5d9bb6dc19eaa70b8",
+    vintedUrl: "https://www.vinted.de/items/8414779381"
+  },
+  {
+    id: 34,
+    name: "Chaps Ralph Lauren Sweatshirt Vintage Faded Grau",
+    category: "Sweatshirts",
+    price: "€26",
+    size: "L",
+    condition: "Gut",
+    image: "https://images1.vinted.net/t/05_01bfc_zekkHsmBD43m1SQymkHsGJNY/f800/1774105800.webp?s=b766563db47939331f168ea3b917b73acd3826fe",
+    vintedUrl: "https://www.vinted.de/items/8448623083"
+  },
+  {
+    id: 35,
+    name: "Helly Hansen Fleece Pullover Vintage Y2K Half Zip",
+    category: "Pullover",
+    price: "€16",
+    size: "XL",
+    condition: "Zufriedenstellend",
+    image: "https://images1.vinted.net/t/05_01efb_eiqNWQqeTyLPHPNBiLXHDZms/f800/1772753053.webp?s=5aa5b9dfa0de9fc6d8626ab262f74630b64df657",
+    vintedUrl: "https://www.vinted.de/items/8323660018"
+  },
 ];
 
 const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category)))];
