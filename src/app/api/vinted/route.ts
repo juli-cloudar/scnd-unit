@@ -1,47 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const { url } = await req.json();
-  if (!url?.includes('vinted.de')) return NextResponse.json({ error: 'Ungültige URL' }, { status: 400 });
-
   try {
-    const res = await fetch(url, {
+    const { url } = await req.json();
+    const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'de-DE,de;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       }
     });
-    const html = await res.text();
+    const html = await response.text();
+    const titleMatch = html.match(/<title>(.*?)<\/title>/);
+    const priceMatch = html.match(/(\d+[.,]?\d*)\s*€/);
+    const ogImageMatch = html.match(/<meta property="og:image" content="(.*?)"/);
+    const jsonLdMatch = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s);
 
-    const nameMatch = html.match(/<title>([^|<]+)/);
-    const name = nameMatch?.[1]?.trim() ?? '';
+    let data: any = {};
+    if (jsonLdMatch) {
+      try { data = JSON.parse(jsonLdMatch[1]); } catch {}
+    }
 
-    const priceMatch = html.match(/(\d+),\d+\s*€/) || html.match(/"price":(\d+\.?\d*)/);
-    const price = priceMatch ? `€${priceMatch[1]}` : '';
+    const imageMatches = [...html.matchAll(/https:\/\/images1\.vinted\.net\/t\/[^"'\s)]+/g)];
+    const uniqueImages = [...new Set(imageMatches.map(m => m[0]))]
+      .map(img => img.replace(/[?&]s=[^&]+/, '').replace(/\/f\d+\//, '/f800/'))
+      .slice(0, 5);
 
-    const sizeMatch = html.match(/"size_title":"([^"]+)"/) || html.match(/"sizeName":"([^"]+)"/);
-    const size = sizeMatch?.[1]?.trim() ?? '';
+    const result = {
+      name: data.name || titleMatch?.[1]?.replace(' - Vinted', '').trim() || '',
+      price: data.offers?.price ? `€${data.offers.price}` : (priceMatch ? `€${priceMatch[1]}` : ''),
+      images: uniqueImages.length > 0 ? uniqueImages : (ogImageMatch ? [ogImageMatch[1]] : []),
+      category: guessCategory(data.name || titleMatch?.[1] || ''),
+      size: extractSize(html),
+      condition: 'Gut'
+    };
 
-    let condition = '';
-    if (html.includes('Neu mit Etikett')) condition = 'Neu mit Etikett';
-    else if (html.includes('Neu ohne Etikett')) condition = 'Neu ohne Etikett';
-    else if (html.includes('Sehr gut')) condition = 'Sehr gut';
-    else if (html.includes('Zufriedenstellend')) condition = 'Zufriedenstellend';
-    else if (html.includes('>Gut<')) condition = 'Gut';
-
-    const imageMatches = [...html.matchAll(/https:\/\/images\d+\.vinted\.net\/[^"'\s]+\.webp/g)];
-    const images = [...new Set(imageMatches.map(m => m[0]))].filter(img => img.includes('/f800/')).slice(0, 5);
-
-    const lower = (url + ' ' + name).toLowerCase();
-    const category =
-      lower.includes('jacke') || lower.includes('jacket') || lower.includes('puffer') || lower.includes('weste') ? 'Jacken' :
-      lower.includes('fleece') || lower.includes('pullover') || lower.includes('troyer') ? 'Pullover' :
-      lower.includes('sweatshirt') || lower.includes('hoodie') || lower.includes('sweater') ? 'Sweatshirts' :
-      lower.includes('hose') || lower.includes('pants') || lower.includes('jeans') ? 'Hosen' : 'Sonstiges';
-
-    return NextResponse.json({ name, price, size, condition, images, category, vintedUrl: url });
+    return NextResponse.json(result);
   } catch {
-    return NextResponse.json({ error: 'Fehler beim Laden' }, { status: 500 });
+    return NextResponse.json({ error: 'Scraping failed' }, { status: 500 });
   }
+}
+
+function guessCategory(title: string): string {
+  const lower = title.toLowerCase();
+  if (lower.includes('jacke') || lower.includes('jacket')) return 'Jacken';
+  if (lower.includes('pullover') || lower.includes('sweater')) return 'Pullover';
+  if (lower.includes('sweatshirt') || lower.includes('hoodie')) return 'Sweatshirts';
+  if (lower.includes('shirt') || lower.includes('polo')) return 'Tops';
+  return 'Sonstiges';
+}
+
+function extractSize(html: string): string {
+  const patterns = [
+    /Größe[:\s]*([SMXL\d]+[\/\dSMXL]*)/i,
+    /size[:\s]*([SMXL\d]+[\/\dSMXL]*)/i,
+    /"size":"([^"]+)"/,
+    /\b([SMXL]{1,3})\b/
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) return match[1];
+  }
+  return '';
 }
