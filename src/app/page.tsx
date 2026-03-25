@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { supabase } from '@/lib/supabase'
 import { ProductClient } from './ProductClient'
+import { ReactElement } from 'react'
 
 interface Product {
   id: number
@@ -32,9 +33,14 @@ async function getProducts(): Promise<Product[]> {
   return data || []
 }
 
-// WICHTIG: Export MUSS eine Komponente sein, nicht nur eine Funktion
-export default async function Page(): Promise<JSX.Element> {
+// Option 1: Mit ReactElement (empfohlen)
+export default async function Page(): Promise<ReactElement> {
   const products = await getProducts()
-  
   return <ProductClient initialProducts={products} />
 }
+
+// Option 2: Oder ganz ohne Type-Annotation (einfacher)
+// export default async function Page() {
+//   const products = await getProducts()
+//   return <ProductClient initialProducts={products} />
+// }
