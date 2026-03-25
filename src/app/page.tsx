@@ -1,10 +1,9 @@
-// src/app/page.tsx - SERVER COMPONENT
 export const revalidate = 0
 export const dynamic = 'force-dynamic'
 
-import { supabase } from '@/lib/supabase'
+// WICHTIG: supabaseServer statt supabase importieren!
+import { supabaseServer } from '@/lib/supabase'
 import { ProductClient } from './ProductClient'
-import { ReactElement } from 'react'
 
 interface Product {
   id: number
@@ -19,7 +18,8 @@ interface Product {
 }
 
 async function getProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
+  // supabaseServer verwenden!
+  const { data, error } = await supabaseServer
     .from('products')
     .select('*')
     .eq('sold', false)
@@ -33,14 +33,7 @@ async function getProducts(): Promise<Product[]> {
   return data || []
 }
 
-// Option 1: Mit ReactElement (empfohlen)
-export default async function Page(): Promise<ReactElement> {
+export default async function Page() {
   const products = await getProducts()
   return <ProductClient initialProducts={products} />
 }
-
-// Option 2: Oder ganz ohne Type-Annotation (einfacher)
-// export default async function Page() {
-//   const products = await getProducts()
-//   return <ProductClient initialProducts={products} />
-// }
