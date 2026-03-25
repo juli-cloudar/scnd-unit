@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get('url');
   if (!url) return NextResponse.json({ error: 'No URL' }, { status: 400 });
+
+  if (!url.includes('vinted.net')) {
+    return NextResponse.json({ error: 'Invalid domain' }, { status: 403 });
+  }
 
   try {
     const response = await fetch(url, {
@@ -11,8 +16,9 @@ export async function GET(req: NextRequest) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://www.vinted.de/',
         'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-      }
+      },
     });
+
     const buffer = await response.arrayBuffer();
     const contentType = response.headers.get('content-type') || 'image/webp';
 

@@ -1,10 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ['192.168.2.55'],
   images: { unoptimized: true },
-  // output: 'export' wurde entfernt, damit API-Routen dynamisch bleiben
 };
 
 export default nextConfig;
-
-

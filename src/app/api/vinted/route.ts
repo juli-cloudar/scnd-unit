@@ -1,65 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 export const dynamic = 'force-dynamic';
+
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+];
 
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      }
-    });
-    const html = await response.text();
-    const titleMatch = html.match(/<title>(.*?)<\/title>/);
-    const priceMatch = html.match(/(\d+[.,]?\d*)\s*€/);
-    const ogImageMatch = html.match(/<meta property="og:image" content="(.*?)"/);
-    const jsonLdMatch = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s);
-
-    let data: any = {};
-    if (jsonLdMatch) {
-      try { data = JSON.parse(jsonLdMatch[1]); } catch {}
+    
+    if (!url || !url.includes('vinted')) {
+      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
     }
 
-    const imageMatches = [...html.matchAll(/https:\/\/images1\.vinted\.net\/t\/[^"'\s)]+/g)];
-    const uniqueImages = [...new Set(imageMatches.map(m => m[0]))]
-      .map(img => img.replace(/[?&]s=[^&]+/, '').replace(/\/f\d+\//, '/f800/'))
+    const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': 'https://www.vinted.de/',
+        'Origin': 'https://www.vinted.de',
+      },
+      redirect: 'manual'
+    });
+
+    if (response.status === 403 || response.status === 429) {
+      return NextResponse.json({ 
+        error: 'Blocked by Vinted',
+        message: 'Vinted blockiert automatische Anfragen.'
+      }, { status: 403 });
+    }
+
+    const html = await response.text();
+    
+    if (html.includes('datadome') || html.includes('captcha')) {
+      return NextResponse.json({ 
+        error: 'Anti-bot detected',
+        message: 'Vinted Anti-Bot erkannt.'
+      }, { status: 403 });
+    }
+
+    const titleMatch = html.match(/<title[^>]*>([^<]*?)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].replace(' - Vinted', '').trim() : '';
+    
+    const priceMatch = html.match(/(\d+[.,]?\d*)\s*€/);
+    const price = priceMatch ? `€${priceMatch[1]}` : '';
+
+    const imgMatches = [...html.matchAll(/https:\/\/images1\.vinted\.net\/t\/([^"'\s)>]+)/g)];
+    const images = [...new Set(imgMatches.map(m => `https://images1.vinted.net/t/${m[1]}`))]
+      .map(url => url.replace(/[?&]s=[^&]+/, '').replace(/\/f\d+\//, '/f800/'))
       .slice(0, 5);
 
-    const result = {
-      name: data.name || titleMatch?.[1]?.replace(' - Vinted', '').trim() || '',
-      price: data.offers?.price ? `€${data.offers.price}` : (priceMatch ? `€${priceMatch[1]}` : ''),
-      images: uniqueImages.length > 0 ? uniqueImages : (ogImageMatch ? [ogImageMatch[1]] : []),
-      category: guessCategory(data.name || titleMatch?.[1] || ''),
-      size: extractSize(html),
+    const sizeMatch = html.match(/Größe[:\s]*([SMXL\d]+)/i) || html.match(/"size":"([^"]+)"/i);
+    const size = sizeMatch ? sizeMatch[1] : '';
+
+    if (!title && images.length === 0) {
+      return NextResponse.json({ 
+        error: 'No data',
+        message: 'Keine Daten gefunden.'
+      }, { status: 422 });
+    }
+
+    return NextResponse.json({
+      name: title,
+      price: price,
+      images: images,
+      size: size,
+      category: 'Sonstiges',
       condition: 'Gut'
-    };
-
-    return NextResponse.json(result);
-  } catch {
-    return NextResponse.json({ error: 'Scraping failed' }, { status: 500 });
+    });
+    
+  } catch (error) {
+    return NextResponse.json({ 
+      error: 'Scraping failed',
+      message: 'Technischer Fehler.'
+    }, { status: 500 });
   }
-}
-
-function guessCategory(title: string): string {
-  const lower = title.toLowerCase();
-  if (lower.includes('jacke') || lower.includes('jacket')) return 'Jacken';
-  if (lower.includes('pullover') || lower.includes('sweater')) return 'Pullover';
-  if (lower.includes('sweatshirt') || lower.includes('hoodie')) return 'Sweatshirts';
-  if (lower.includes('shirt') || lower.includes('polo')) return 'Tops';
-  return 'Sonstiges';
-}
-
-function extractSize(html: string): string {
-  const patterns = [
-    /Größe[:\s]*([SMXL\d]+[\/\dSMXL]*)/i,
-    /size[:\s]*([SMXL\d]+[\/\dSMXL]*)/i,
-    /"size":"([^"]+)"/,
-    /\b([SMXL]{1,3})\b/
-  ];
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match) return match[1];
-  }
-  return '';
 }

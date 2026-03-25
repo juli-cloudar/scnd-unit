@@ -1,3 +1,10 @@
+#!/bin/bash
+
+# Backup erstellen
+cp src/app/admin/page.tsx src/app/admin/page.tsx.backup.$(date +%s)
+
+# Temporäre Datei erstellen
+cat > /tmp/new_admin.tsx << 'EOF'
 'use client';
 import { useState, useEffect } from 'react';
 import { Trash2, ExternalLink, RefreshCw, ShoppingBag, Plus, Check, X, Edit3, Wand2, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
@@ -424,3 +431,9 @@ export default function AdminPage() {
     </div>
   );
 }
+EOF
+
+# Datei verschieben
+mv /tmp/new_admin.tsx src/app/admin/page.tsx
+
+echo "✅ Admin Page aktualisiert!"
