@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Trash2, ExternalLink, RefreshCw, ShoppingBag, Plus, Check, X, Edit3, Wand2, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-
+import { useConfirm } from '@/components/ConfirmDialog';
 interface Product {
   id: number; name: string; category: string; price: string;
   size: string; condition: string; images: string[]; vinted_url: string; sold: boolean;
@@ -214,7 +214,14 @@ export default function AdminPage() {
   };
 
   const removeProduct = async (id: number) => {
-    if (!confirm('Produkt wirklich löschen?')) return;
+    const confirmed = await confirm({
+      title: 'Produkt löschen',
+      message: 'Möchtest du dieses Produkt wirklich unwiderruflich löschen?',
+      confirmText: 'Löschen',
+      cancelText: 'Abbrechen',
+      type: 'danger',
+    });
+    if (!confirmed) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (!error) { setProducts(p => p.filter(x => x.id !== id)); showSuccess('Produkt gelöscht!'); }
   };

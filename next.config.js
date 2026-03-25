@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ['192.168.2.55'],
-  output: 'export',
-  distDir: 'dist',
+  // output: 'export',  // Auskommentiert!
   images: {
     unoptimized: true,
   },
