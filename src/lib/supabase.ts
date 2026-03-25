@@ -7,12 +7,12 @@ export const supabase = createClient(
   {
     db: { schema: 'public' },
     global: {
-      // Cache komplett deaktivieren
+      // 🔧 CACHE-KONFLIKT MIT NEXT.JS APP ROUTER BEHEBEN
       fetch: (url, options = {}) => {
         return fetch(url, {
           ...options,
-          cache: 'no-store',        // Next.js fetch cache
-          next: { revalidate: 0 }, // Next.js App Router
+          cache: 'no-store',        // Browser-Cache deaktivieren
+          next: { revalidate: 0 }, // Next.js Server-Cache deaktivieren
         })
       }
     }
