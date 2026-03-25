@@ -1,100 +1,127 @@
-'use client';
-// Ganz oben in der Datei
-export const revalidate = 0           // Kein ISR-Caching
-export const dynamic = 'force-dynamic' // Immer Server-seitig rendern
-export const fetchCache = 'force-no-store' // Kein fetch-Caching
 
-// Dein Code...
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '@/lib/supabase';
+'use client'
+
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
   Clock, Shield, ExternalLink, Menu, X, Filter
-} from 'lucide-react';
+} from 'lucide-react'
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
-};
+}
+
 const staggerContainer = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-};
+}
 
 interface Product {
-  id: number; name: string; category: string; price: string;
-  size: string; condition: string; images: string[]; vinted_url: string; sold: boolean;
+  id: number
+  name: string
+  category: string
+  price: string
+  size: string
+  condition: string
+  images: string[]
+  vinted_url: string
+  sold: boolean
+}
+
+interface ProductClientProps {
+  initialProducts: Product[]
 }
 
 const proxyImg = (url: string) => {
-  if (!url) return '';
-  if (url.startsWith('/api/')) return url;
-  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
-};
+  if (!url) return ''
+  if (url.startsWith('/api/')) return url
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`
+}
 
 const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string, condition: string }) => {
-  const [current, setCurrent] = useState(0);
-  const [dragStart, setDragStart] = useState<number | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const [current, setCurrent] = useState(0)
+  const [dragStart, setDragStart] = useState<number | null>(null)
+  const [dragging, setDragging] = useState(false)
 
-  const onPointerDown = (e: React.PointerEvent) => { setDragStart(e.clientX); setDragging(false); };
-  const onPointerMove = (e: React.PointerEvent) => { if (dragStart !== null && Math.abs(e.clientX - dragStart) > 8) setDragging(true); };
+  const onPointerDown = (e: React.PointerEvent) => { 
+    setDragStart(e.clientX) 
+    setDragging(false) 
+  }
+  
+  const onPointerMove = (e: React.PointerEvent) => { 
+    if (dragStart !== null && Math.abs(e.clientX - dragStart) > 8) setDragging(true) 
+  }
+  
   const onPointerUp = (e: React.PointerEvent) => {
-    if (dragStart === null) return;
-    const diff = dragStart - e.clientX;
+    if (dragStart === null) return
+    const diff = dragStart - e.clientX
     if (Math.abs(diff) > 40) {
-      e.preventDefault();
-      diff > 0 ? setCurrent(c => (c + 1) % images.length) : setCurrent(c => (c - 1 + images.length) % images.length);
+      e.preventDefault()
+      diff > 0 
+        ? setCurrent(c => (c + 1) % images.length) 
+        : setCurrent(c => (c - 1 + images.length) % images.length)
     }
-    setDragStart(null);
-  };
-  const onClick = (e: React.MouseEvent) => { if (dragging) e.preventDefault(); };
+    setDragStart(null)
+  }
+  
+  const onClick = (e: React.MouseEvent) => { 
+    if (dragging) e.preventDefault() 
+  }
 
   return (
-    <div className="aspect-[3/4] md:aspect-[4/5] relative overflow-hidden bg-[#0A0A0A] cursor-grab active:cursor-grabbing select-none touch-pan-y"
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onClick={onClick}>
+    <div 
+      className="aspect-[3/4] md:aspect-[4/5] relative overflow-hidden bg-[#0A0A0A] cursor-grab active:cursor-grabbing select-none touch-pan-y"
+      onPointerDown={onPointerDown} 
+      onPointerMove={onPointerMove} 
+      onPointerUp={onPointerUp} 
+      onClick={onClick}
+    >
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
-      <img src={proxyImg(images[current])} alt={alt} draggable={false} className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" />
+      <img 
+        src={proxyImg(images[current])} 
+        alt={alt} 
+        draggable={false} 
+        className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" 
+      />
       {condition !== "–" && (
-        <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-[#0A0A0A]/80 backdrop-blur text-xs uppercase tracking-widest border border-[#FF4400] text-[#FF4400] pointer-events-none">{condition}</div>
+        <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-[#0A0A0A]/80 backdrop-blur text-xs uppercase tracking-widest border border-[#FF4400] text-[#FF4400] pointer-events-none">
+          {condition}
+        </div>
       )}
       {images.length > 1 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 items-center">
           {images.map((_, i) => (
-            <button key={i} onClick={(e) => { e.preventDefault(); setCurrent(i); }}
-              className={`rounded-full transition-all duration-200 ${i === current ? 'bg-[#FF4400] w-5 h-2.5' : 'bg-white/40 hover:bg-white/70 w-2.5 h-2.5'}`} />
+            <button 
+              key={i} 
+              onClick={(e) => { e.preventDefault(); setCurrent(i) }}
+              className={`rounded-full transition-all duration-200 ${i === current ? 'bg-[#FF4400] w-5 h-2.5' : 'bg-white/40 hover:bg-white/70 w-2.5 h-2.5'}`} 
+            />
           ))}
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default function Home() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("Alle");
-
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+export function ProductClient({ initialProducts }: ProductClientProps) {
+  const [products, setProducts] = useState<Product[]>(initialProducts)
+  const [loading, setLoading] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+  const [activeCategory, setActiveCategory] = useState("Alle")
 
   useEffect(() => {
-    const load = async () => {
-      const { data, error } = await supabase.from('products').select('*').eq('sold', false).order('id', { ascending: false });
-      if (!error && data) setProducts(data);
-      setLoading(false);
-    };
-    load();
-  }, []);
+    const handleScroll = () => setScrolled(window.scrollY > 50)
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
-  const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category))).sort()];
-  const filteredProducts = activeCategory === "Alle" ? products : products.filter(p => p.category === activeCategory);
+  const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category))).sort()]
+  const filteredProducts = activeCategory === "Alle" 
+    ? products 
+    : products.filter(p => p.category === activeCategory)
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
@@ -276,5 +303,5 @@ export default function Home() {
         </div>
       </footer>
     </div>
-  );
+  )
 }
