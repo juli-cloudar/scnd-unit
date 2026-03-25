@@ -1,5 +1,10 @@
 'use client';
+// Ganz oben in der Datei
+export const revalidate = 0           // Kein ISR-Caching
+export const dynamic = 'force-dynamic' // Immer Server-seitig rendern
+export const fetchCache = 'force-no-store' // Kein fetch-Caching
 
+// Dein Code...
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
