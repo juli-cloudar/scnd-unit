@@ -102,7 +102,7 @@ for (const jsonMatch of jsonLdMatches) {
     };
     const foundPrice = findPrice(jsonData);
     if (foundPrice) {
-      // Format: "32€" statt "32 EUR"
+      // Format: "32" statt "32 EUR"
       price = `${foundPrice.price}${foundPrice.currency === 'EUR' ? '€' : foundPrice.currency}`;
       break;
     }
