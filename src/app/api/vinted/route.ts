@@ -55,57 +55,82 @@ export async function POST(request: Request) {
     const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
     // ── PREIS ───────────────────────────────────────────────────────────────
-    // VERBESSERT: Suche nach dem Hauptpreis (nicht Käuferschutz-Preis)
-    // Vinted Struktur: Hauptpreis steht oft in spezifischen data-Attributen oder als erster Preis
     let price = '';
     
-    // Versuch 1: JSON-LD oder data-Attribute
-    const jsonLdMatch = html.match(/"price":\s*"?(\d+[.,]?\d*)"?/i) || 
-                        html.match(/"price_amount":\s*"?(\d+[.,]?\d*)"?/i);
-    if (jsonLdMatch) {
-      price = `€${jsonLdMatch[1].replace('.', ',')}`;
+    // Versuch 1: JSON-LD structured data (zuverlässigste Methode)
+    const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    for (const jsonMatch of jsonLdMatches) {
+      try {
+        const jsonData = JSON.parse(jsonMatch[1]);
+        // Suche nach offers/price in verschachtelten Strukturen
+        const findPrice = (obj: any): string | null => {
+          if (!obj) return null;
+          if (obj.price && obj.priceCurrency) {
+            return `${obj.price} ${obj.priceCurrency}`;
+          }
+          if (typeof obj === 'object') {
+            for (const key in obj) {
+              const found = findPrice(obj[key]);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        const foundPrice = findPrice(jsonData);
+        if (foundPrice) {
+          price = foundPrice.replace('.', ',');
+          break;
+        }
+      } catch (e) {}
     }
     
-    // Versuch 2: Erster Preis im HTML (hauptpreis ist meist der erste)
+    // Versuch 2: Meta-Tags
     if (!price) {
-      // Suche nach Preis-Pattern, aber überspringe "mit Käuferschutz" Bereiche
-      const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
-      const firstPriceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*€/);
-      if (firstPriceMatch) {
-        price = `€${firstPriceMatch[1].replace('.', ',')}`;
+      const metaPrice = html.match(/<meta[^>]*property="[^"]*price"[^>]*content="([^"]+)"/i) ||
+                       html.match(/<meta[^>]*name="[^"]*price"[^>]*content="([^"]+)"/i);
+      if (metaPrice) {
+        price = metaPrice[1];
       }
     }
     
-    // Versuch 3: Spezifische Vinted-Preis-Klassen oder Struktur
+    // Versuch 3: HTML-Struktur (erster Preis vor "Käuferschutz")
     if (!price) {
-      const specificPriceMatch = html.match(/class="[^"]*price[^"]*"[^>]*>(\d[.,\d\s]*€)/i) ||
-                                html.match(/>(\d{1,3}[.,]\d{2})\s*€\s*</);
-      if (specificPriceMatch) {
-        price = `€${specificPriceMatch[1].replace(/[^0-9,]/g, '').replace('.', ',')}`;
+      const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
+      const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
+      if (priceMatch) {
+        price = `€${priceMatch[1]}`;
       }
     }
 
     // ── GRÖSSE ──────────────────────────────────────────────────────────────
-    const sizePatterns = [
-      /"size[^"]*"[:\s]*"([^"]+)"/i,
-      /Größe[:\s]*<[^>]+>\s*([^<]+)/i,
-      /size[:\s]*<[^>]+>\s*([^<]+)/i,
-      /class="[^"]*size[^"]*"[^{]*>\s*([^<]+)/i,
-      /\b(XS|S|M|L|XL|XXL|XXXL|One Size|Einheitsgröße)\b/i,
-      /(\d{2,3})\s*(?:cm|CM)?\s*[·\/]/,
-    ];
-    
     let size = '';
-    for (const pattern of sizePatterns) {
-      const match = html.match(pattern);
-      if (match?.[1]) {
-        size = match[1].trim().replace(/[·\/]/g, '').trim();
-        if (size && size.length < 20) break;
+    
+    // Versuch 1: JSON-LD oder data-Attribute
+    const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,10})"/i) ||
+                         html.match(/"size_name"[:\s]*"([^"]{1,10})"/i);
+    if (sizeJsonMatch) {
+      size = sizeJsonMatch[1].trim();
+    }
+    
+    // Versuch 2: HTML-Text nach "Größe" oder "Size"
+    if (!size) {
+      const sizeSectionMatch = html.match(/Größe[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i) ||
+                              html.match(/Size[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i) ||
+                              html.match(/class="[^"]*size[^"]*"[^>]*>([^<]{1,15})/i);
+      if (sizeSectionMatch) {
+        size = sizeSectionMatch[1].trim().replace(/[·\/]/g, '').trim();
+      }
+    }
+    
+    // Versuch 3: Standard-Größen im Text finden
+    if (!size) {
+      const standardSizeMatch = html.match(/\b(XS|S|M|L|XL|XXL|XXXL|One Size|Einheitsgröße|UNI)\b/i);
+      if (standardSizeMatch) {
+        size = standardSizeMatch[1];
       }
     }
 
     // ── ZUSTAND ─────────────────────────────────────────────────────────────
-    // VERBESSERT: Spezifischere Suche mit Word-Boundaries
     const condMap: Record<string, string> = {
       'neu mit etikett': 'Neu mit Etikett',
       'neu ohne etikett': 'Neu ohne Etikett',
@@ -119,33 +144,32 @@ export async function POST(request: Request) {
     let condition = '';
     const htmlLower = html.toLowerCase();
     
-    // Suche in strukturierten Bereichen (item-details, condition, etc.)
-    const conditionSection = htmlLower.match(/zustand|condition|item-details|details-list/);
+    // Suche mit Priorität (längere Phrasen zuerst)
+    const sortedConditions = Object.entries(condMap).sort((a, b) => b[0].length - a[0].length);
     
-    for (const [key, val] of Object.entries(condMap)) {
-      // Erst: Exakte Übereinstimmung mit Word-Boundaries
-      const exactPattern = new RegExp(`\\b${key}\\b`, 'i');
-      if (exactPattern.test(htmlLower)) {
-        // Prüfe ob es im richtigen Kontext steht (nicht im Titel/Name)
-        const contextCheck = htmlLower.indexOf(key);
-        const surroundingText = htmlLower.substring(Math.max(0, contextCheck - 50), contextCheck + 50);
-        
-        // Zustand sollte in Details-Bereich sein, nicht im Produkttitel
-        if (surroundingText.includes('zustand') || 
-            surroundingText.includes('condition') ||
-            surroundingText.includes('details') ||
-            surroundingText.includes('·')) {
+    for (const [key, val] of sortedConditions) {
+      // Suche nach exakten Phrasen mit Word-Boundaries oder HTML-Trennern
+      const patterns = [
+        new RegExp(`[>·\\s]${key}[<·\\s]`, 'i'),
+        new RegExp(`Zustand[^<]*${key}`, 'i'),
+        new RegExp(`condition[^<]*${key}`, 'i'),
+        new RegExp(`"${key}"`, 'i'),
+      ];
+      
+      for (const pattern of patterns) {
+        if (pattern.test(html)) {
           condition = val;
           break;
         }
       }
+      if (condition) break;
     }
     
-    // Fallback: Wenn nichts gefunden, suche nach Vinted-typischen Markern
+    // Fallback: Direkte HTML-Suche
     if (!condition) {
-      const vintedCondMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Neu|Sehr gut|Gut|Zufriedenstellend|Schlecht)</i);
-      if (vintedCondMatch) {
-        condition = vintedCondMatch[1];
+      const directMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Neu|Sehr gut|Gut|Zufriedenstellend|Schlecht)</i);
+      if (directMatch) {
+        condition = directMatch[1];
       }
     }
 
@@ -172,6 +196,17 @@ export async function POST(request: Request) {
         break;
       }
     }
+
+    // Debug-Info (optional, zum Testen aktivieren)
+    /*
+    console.log({
+      nameLength: name.length,
+      priceFound: !!price,
+      sizeFound: !!size,
+      conditionFound: !!condition,
+      imageCount: images.length,
+    });
+    */
 
     return NextResponse.json({
       name,
