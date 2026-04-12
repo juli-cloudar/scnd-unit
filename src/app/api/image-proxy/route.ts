@@ -8,50 +8,57 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'URL fehlt' }, { status: 400 });
   }
 
-  // Sicherheit: Nur Vinted-URLs erlauben
-  if (!url.includes('vinted.net') && !url.includes('vinted.de')) {
+  // Sicherheit: Nur Vinted erlauben
+  if (!url.includes('vinted.net')) {
     return NextResponse.json({ error: 'Ungültige Domain' }, { status: 403 });
   }
 
   try {
-    const response = await fetch(url, {
+    // WICHTIG: Die originale URL muss komplett erhalten bleiben (inkl. ?s= Parameter!)
+    const imageResponse = await fetch(url, {
       headers: {
-        'Referer': 'https://www.vinted.de/',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        'Accept-Language': 'de-DE,de;q=0.9',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8',
+        'Referer': 'https://www.vinted.de/',
+        'Origin': 'https://www.vinted.de',
+        'Sec-Fetch-Dest': 'image',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'cross-site',
+        'Cache-Control': 'no-cache',
       },
-      // WICHTIG: Weiterleiten von Cookies nicht erlauben (Sicherheit)
-      credentials: 'omit',
+      // KEIN redirect folgen, sondern manuell behandeln
+      redirect: 'follow',
     });
 
-    if (!response.ok) {
+    if (!imageResponse.ok) {
+      console.error('Vinted Bild Error:', imageResponse.status, url.substring(0, 100));
       return NextResponse.json(
-        { error: 'Bild nicht erreichbar' }, 
-        { status: response.status }
+        { error: `Bild nicht erreichbar: ${imageResponse.status}` }, 
+        { status: 502 }
       );
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const contentType = response.headers.get('Content-Type') || 'image/webp';
-
-    // Sicherheit: Content-Type validieren
-    if (!contentType.startsWith('image/')) {
-      return NextResponse.json({ error: 'Ungültiger Content-Type' }, { status: 400 });
+    const arrayBuffer = await imageResponse.arrayBuffer();
+    
+    // Prüfen ob es wirklich ein Bild ist (nicht HTML-Error-Seite)
+    if (arrayBuffer.byteLength < 100) {
+      return NextResponse.json({ error: 'Ungültiges Bild' }, { status: 502 });
     }
+
+    const contentType = imageResponse.headers.get('content-type') || 'image/webp';
 
     return new NextResponse(arrayBuffer, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+        'Cache-Control': 'public, max-age=3600', // Kurzeres Caching wegen Signatur
         'Access-Control-Allow-Origin': '*',
-        // Performance: Content-Length setzen
-        'Content-Length': arrayBuffer.byteLength.toString(),
+        'Vary': 'Accept',
       },
     });
   } catch (error) {
-    console.error('Bild-Proxy Error:', error);
+    console.error('Image Proxy Error:', error);
     return NextResponse.json(
       { error: 'Bild konnte nicht geladen werden' }, 
       { status: 500 }
