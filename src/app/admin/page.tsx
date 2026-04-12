@@ -618,15 +618,19 @@ function EmployeesTab({ currentUser, toast }: { currentUser: Employee, toast: (m
       setIsAdding(false);
     });
   };
-
-  const deleteEmployee = (id: number, username: string) => {
-    if (!confirm(`${username} wirklich löschen?`)) return;
+const deleteEmployee = (id: number, username: string) => {
+  confirm(`${username} wirklich löschen?`, () => {
     supabase.from('employees').delete().eq('id', id).then(({ error }) => {
-      if (error) { toast('Fehler: ' + error.message, 'error'); return; }
+      if (error) {
+        toast('Fehler: ' + error.message, 'error');
+        return;
+      }
       toast('Mitarbeiter gelöscht', 'info');
       loadEmployees();
     });
-  };
+  });
+};
+
 
   const resetPassword = (id: number) => {
     if (!newPassword) { toast('Bitte neues Passwort eingeben', 'error'); return; }
