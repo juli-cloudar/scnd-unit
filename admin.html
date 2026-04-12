@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCND_UNIT / Admin</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --red: #FF4400;
+    --bg: #0A0A0A;
+    --bg2: #111111;
+    --bg3: #1A1A1A;
+    --bg4: #252525;
+    --border: rgba(255,68,0,0.2);
+    --border-hover: rgba(255,68,0,0.5);
+    --text: #F5F5F5;
+    --muted: #888;
+    --danger: #ef4444;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  .login-box { width: 100%; max-width: 360px; padding: 0 24px; }
+  .login-logo { text-align: center; margin-bottom: 32px; }
+  .login-logo h1 { font-size: 28px; font-weight: 900; letter-spacing: -1px; }
+  .login-logo span { color: var(--red); }
+  .login-logo p { color: var(--muted); font-size: 11px; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
+  .login-card { border: 1px solid var(--border); background: var(--bg2); padding: 24px; }
+  .login-card.error { border-color: rgba(239,68,68,0.5); background: rgba(127,29,29,0.1); }
+  .login-label { display: flex; align-items: center; gap: 8px; color: var(--red); font-size: 11px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 16px; }
+  .login-label svg { width: 14px; height: 14px; }
+  .login-input {
+    width: 100%; background: var(--bg3); border: 1px solid rgba(255,68,0,0.3);
+    padding: 12px 16px; font-size: 13px; color: var(--text); margin-bottom: 12px;
+    font-family: monospace; outline: none; transition: border-color 0.2s;
+  }
+  .login-input:focus { border-color: var(--red); }
+  .error-msg { color: #f87171; font-size: 11px; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 12px; display: none; }
+  .login-card.error .error-msg { display: block; }
+  .btn-login {
+    width: 100%; padding: 12px; background: var(--red); color: white;
+    border: none; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 3px; cursor: pointer; font-family: monospace; transition: opacity 0.2s;
+  }
+  .btn-login:hover { opacity: 0.85; }
+
+  /* SETUP */
+  #setup-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  .setup-box { width: 100%; max-width: 520px; padding: 0 24px; }
+  .setup-card { border: 1px solid var(--border); background: var(--bg2); padding: 24px; }
+  .setup-title { color: var(--red); font-size: 11px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 20px; }
+  .setup-field { margin-bottom: 16px; }
+  .setup-field label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+  .setup-field input {
+    width: 100%; background: var(--bg3); border: 1px solid rgba(255,68,0,0.3);
+    padding: 10px 14px; font-size: 12px; color: var(--text); font-family: monospace;
+    outline: none; transition: border-color 0.2s;
+  }
+  .setup-field input:focus { border-color: var(--red); }
+  .setup-hint { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .setup-hint a { color: var(--red); text-decoration: none; }
+  .btn-setup {
+    width: 100%; padding: 12px; background: var(--red); color: white; border: none;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px;
+    cursor: pointer; font-family: monospace; margin-top: 8px; transition: opacity 0.2s;
+  }
+  .btn-setup:hover { opacity: 0.85; }
+
+  /* MAIN APP */
+  #app { display: none; }
+
+  /* HEADER */
+  .header {
+    border-bottom: 1px solid var(--border); padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; background: var(--bg); z-index: 10;
+  }
+  .header-brand h1 { font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+  .header-brand span { color: var(--red); }
+  .header-brand p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .live-dot { color: #22c55e; }
+  .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn-icon {
+    padding: 8px; border: 1px solid var(--border); color: var(--red);
+    background: transparent; cursor: pointer; transition: background 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-icon:hover { background: rgba(255,68,0,0.1); }
+  .btn-icon svg { width: 16px; height: 16px; }
+  .btn-tab {
+    padding: 8px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 3px; cursor: pointer; font-family: monospace; border: 1px solid var(--border);
+    color: var(--red); background: transparent; transition: all 0.2s;
+  }
+  .btn-tab.active { background: var(--red); color: white; border-color: var(--red); }
+  .btn-tab:hover:not(.active) { background: rgba(255,68,0,0.1); }
+  .btn-logout {
+    padding: 8px 16px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 3px; cursor: pointer; font-family: monospace; border: 1px solid #333;
+    color: var(--muted); background: transparent; transition: all 0.2s;
+  }
+  .btn-logout:hover { color: var(--danger); border-color: rgba(239,68,68,0.3); }
+
+  /* CONTENT */
+  .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* SUCCESS TOAST */
+  .toast {
+    position: fixed; top: 72px; right: 24px; z-index: 100;
+    background: #16a34a; color: white; padding: 10px 16px;
+    font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+    transform: translateX(200%); transition: transform 0.3s; font-family: monospace;
+  }
+  .toast.show { transform: translateX(0); }
+
+  /* FILTERS */
+  .filter-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+  .filter-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-filter {
+    padding: 6px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; cursor: pointer; font-family: monospace;
+    border: 1px solid rgba(255,68,0,0.3); color: var(--muted); background: transparent; transition: all 0.2s;
+  }
+  .btn-filter.active { background: var(--red); color: white; border-color: var(--red); }
+  .btn-filter:hover:not(.active) { color: var(--red); }
+  .live-note { font-size: 11px; color: #22c55e; }
+
+  /* GRID */
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .product-card { position: relative; border: 1px solid var(--border); transition: border-color 0.2s; }
+  .product-card:hover { border-color: var(--border-hover); }
+  .product-card.sold { border-color: rgba(239,68,68,0.3); opacity: 0.5; }
+  .sold-badge {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-15deg);
+    background: var(--danger); color: white; font-size: 10px; font-weight: 700;
+    padding: 4px 12px; text-transform: uppercase; letter-spacing: 2px; z-index: 10;
+    pointer-events: none; white-space: nowrap;
+  }
+  .card-img {
+    aspect-ratio: 3/4; background: var(--bg3); overflow: hidden;
+    position: relative; cursor: pointer;
+  }
+  .card-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
+  .card-img:hover img { transform: scale(1.05); }
+  .img-count {
+    position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.8);
+    padding: 3px 8px; font-size: 10px; font-weight: 700; display: flex; align-items: center; gap: 4px;
+  }
+  .card-hover-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0); transition: background 0.2s;
+    display: flex; align-items: center; justify-content: center; opacity: 0; transition: all 0.2s;
+  }
+  .card-img:hover .card-hover-overlay { background: rgba(0,0,0,0.3); opacity: 1; }
+  .card-hover-label { background: var(--red); color: white; font-size: 10px; font-weight: 700; padding: 4px 12px; text-transform: uppercase; letter-spacing: 2px; }
+  .card-info { padding: 8px; background: var(--bg); }
+  .card-name { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-price { font-size: 11px; color: var(--red); margin-top: 2px; }
+  .card-category { font-size: 11px; color: var(--muted); }
+  .card-actions { display: flex; gap: 4px; margin-top: 8px; }
+  .btn-sold {
+    flex: 1; padding: 4px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; cursor: pointer; font-family: monospace; border: none;
+    display: flex; align-items: center; justify-content: center; gap: 4px; transition: opacity 0.2s;
+  }
+  .btn-sold.mark-sold { background: rgba(239,68,68,0.15); color: #f87171; }
+  .btn-sold.mark-sold:hover { background: rgba(239,68,68,0.25); }
+  .btn-sold.reactivate { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .btn-sold.reactivate:hover { background: rgba(34,197,94,0.25); }
+  .btn-action {
+    padding: 4px 8px; border: 1px solid; cursor: pointer; background: transparent;
+    display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+  }
+  .btn-action svg { width: 12px; height: 12px; }
+  .btn-action.ext { border-color: var(--border); color: var(--red); }
+  .btn-action.ext:hover { background: rgba(255,68,0,0.1); }
+  .btn-action.del { border-color: rgba(239,68,68,0.3); color: #f87171; }
+  .btn-action.del:hover { background: rgba(239,68,68,0.1); }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 80px; color: var(--muted); font-size: 13px; }
+
+  /* IMAGE MODAL */
+  #img-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 50;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  #img-modal.open { display: flex; }
+  .modal-inner { position: relative; max-width: 800px; width: 100%; }
+  .modal-close { position: absolute; top: -40px; right: 0; background: none; border: none; color: white; cursor: pointer; }
+  .modal-close:hover { color: var(--red); }
+  .modal-close svg { width: 24px; height: 24px; }
+  .modal-img-wrap { aspect-ratio: 3/4; max-height: 80vh; background: var(--bg3); position: relative; overflow: hidden; }
+  .modal-img-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  .modal-nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(0,0,0,0.5); border: none; color: white; cursor: pointer;
+    padding: 12px; transition: background 0.2s;
+  }
+  .modal-nav:hover { background: var(--red); }
+  .modal-nav svg { width: 24px; height: 24px; display: block; }
+  .modal-prev { left: 8px; }
+  .modal-next { right: 8px; }
+  .modal-dots { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+  .modal-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.4); border: none; cursor: pointer; transition: background 0.2s; }
+  .modal-dot.active { background: var(--red); }
+  .modal-info { text-align: center; margin-top: 12px; }
+  .modal-info p { font-weight: 700; }
+  .modal-info span { color: var(--red); font-size: 13px; }
+
+  /* ADD PRODUCT */
+  .add-header { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.5px; margin-bottom: 24px; display: flex; align-items: center; gap: 8px; }
+  .add-header svg { width: 20px; height: 20px; color: var(--red); }
+  .panel { background: var(--bg2); border: 1px solid var(--border); padding: 16px; margin-bottom: 16px; }
+  .panel-label { font-size: 11px; color: var(--red); text-transform: uppercase; letter-spacing: 3px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .panel-label svg { width: 12px; height: 12px; }
+  .input-row { display: flex; gap: 8px; }
+  .field-input, .field-select {
+    width: 100%; background: var(--bg3); border: 1px solid rgba(255,68,0,0.3);
+    padding: 10px 14px; font-size: 13px; color: var(--text); font-family: monospace;
+    outline: none; transition: border-color 0.2s;
+  }
+  .field-input:focus, .field-select:focus { border-color: var(--red); }
+  .field-select { cursor: pointer; }
+  .field-select option { background: var(--bg3); }
+  .btn-scrape {
+    padding: 10px 20px; background: var(--red); color: white; border: none;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;
+    cursor: pointer; font-family: monospace; white-space: nowrap; transition: opacity 0.2s;
+  }
+  .btn-scrape:hover:not(:disabled) { opacity: 0.85; }
+  .btn-scrape:disabled { opacity: 0.5; cursor: not-allowed; }
+  .alt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  .btn-alt {
+    padding: 12px; background: var(--bg4); border: 1px solid #333; text-align: left;
+    cursor: pointer; transition: border-color 0.2s; font-family: monospace;
+  }
+  .btn-alt:hover { border-color: var(--border-hover); }
+  .btn-alt-label { color: var(--red); font-size: 11px; font-weight: 700; }
+  .add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 700px) { .add-grid { grid-template-columns: 1fr; } }
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-space { display: flex; flex-direction: column; gap: 12px; }
+  .img-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .img-thumb { position: relative; aspect-ratio: 1; }
+  .img-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .img-thumb-del {
+    position: absolute; top: -4px; right: -4px; width: 18px; height: 18px;
+    background: var(--danger); color: white; border: none; border-radius: 50%;
+    cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .no-images { aspect-ratio: 3/4; background: var(--bg3); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; }
+  .imgs-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .imgs-btns { display: flex; gap: 8px; }
+  .btn-sm { padding: 4px 10px; font-size: 11px; cursor: pointer; font-family: monospace; font-weight: 700; background: var(--bg4); color: var(--muted); border: none; transition: color 0.2s; }
+  .btn-sm:hover { color: var(--red); }
+  .btn-sm-border { padding: 4px 10px; font-size: 11px; cursor: pointer; font-family: monospace; font-weight: 700; border: 1px solid var(--border); color: var(--red); background: transparent; }
+  .btn-sm-border:hover { background: rgba(255,68,0,0.1); }
+  .btn-save {
+    width: 100%; padding: 14px; background: var(--red); color: white; border: none;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 3px;
+    cursor: pointer; font-family: monospace; transition: opacity 0.2s;
+  }
+  .btn-save:hover:not(:disabled) { opacity: 0.85; }
+  .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* CONFIRM */
+  #confirm-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200;
+    display: none; align-items: center; justify-content: center;
+  }
+  #confirm-modal.open { display: flex; }
+  .confirm-box { background: var(--bg2); border: 1px solid rgba(239,68,68,0.3); padding: 24px; max-width: 360px; width: 90%; }
+  .confirm-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .confirm-msg { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  .confirm-btns { display: flex; gap: 8px; }
+  .btn-cancel { flex: 1; padding: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; font-family: monospace; border: 1px solid #333; color: var(--muted); background: transparent; }
+  .btn-confirm-del { flex: 1; padding: 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; cursor: pointer; font-family: monospace; border: none; background: var(--danger); color: white; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1><span>SCND</span>_UNIT</h1>
+      <p>Admin Access</p>
+    </div>
+    <div class="login-card" id="login-card">
+      <div class="login-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Passwort
+      </div>
+      <input type="password" id="pw-input" class="login-input" placeholder="••••••••••••" />
+      <p class="error-msg">Falsches Passwort</p>
+      <button class="btn-login" onclick="tryLogin()">Einloggen</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP (GitHub Config) -->
+<div id="setup-screen" style="display:none">
+  <div class="setup-box">
+    <div class="login-logo" style="margin-bottom:24px">
+      <h1 style="font-size:28px;font-weight:900;letter-spacing:-1px"><span style="color:var(--red)">SCND</span>_UNIT</h1>
+      <p style="color:var(--muted);font-size:11px;letter-spacing:4px;text-transform:uppercase;margin-top:4px">GitHub Setup</p>
+    </div>
+    <div class="setup-card">
+      <div class="setup-title">GitHub Verbindung einrichten</div>
+      <div class="setup-field">
+        <label>GitHub Token (Personal Access Token)</label>
+        <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+        <p class="setup-hint">Erstelle einen Token unter: <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a> → „repo" Rechte aktivieren</p>
+      </div>
+      <div class="setup-field">
+        <label>GitHub Username</label>
+        <input type="text" id="gh-user" placeholder="dein-username" />
+      </div>
+      <div class="setup-field">
+        <label>Repository Name</label>
+        <input type="text" id="gh-repo" placeholder="scnd-unit-shop" />
+      </div>
+      <div class="setup-field">
+        <label>Dateiname (im Repo)</label>
+        <input type="text" id="gh-file" placeholder="shop-data.json" value="shop-data.json" />
+      </div>
+      <button class="btn-setup" onclick="saveGitHubConfig()">Verbindung speichern & testen</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-brand">
+      <h1><span>SCND</span>_UNIT <span style="color:var(--muted);font-size:16px;margin-left:8px">/ Admin</span></h1>
+      <p id="status-line">Laden...</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" onclick="loadProducts()" title="Aktualisieren">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button class="btn-tab active" id="tab-inv" onclick="switchTab('inventory')">Inventar</button>
+      <button class="btn-tab" id="tab-add" onclick="switchTab('add')">+ Hinzufügen</button>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="toast-msg"></span>
+  </div>
+
+  <div class="content">
+    <!-- INVENTORY TAB -->
+    <div id="tab-inventory">
+      <div class="filter-bar">
+        <div class="filter-btns" id="filter-btns"></div>
+        <span class="live-note">✓ Änderungen sofort live</span>
+      </div>
+      <div id="grid-wrap">
+        <div class="loading">Lade Produkte...</div>
+      </div>
+    </div>
+
+    <!-- ADD TAB -->
+    <div id="tab-add-content" style="display:none">
+      <div style="max-width:900px">
+        <div class="add-header">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Neues Produkt
+        </div>
+
+        <div class="panel">
+          <div class="panel-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+            Schritt 1: Vinted URL (Auto-Fill)
+          </div>
+          <div class="input-row">
+            <input id="vinted-url" class="field-input" placeholder="https://www.vinted.de/items/..." />
+            <button class="btn-scrape" id="scrape-btn" onclick="scrapeVinted()">Auto-Fill</button>
+          </div>
+        </div>
+
+        <div class="panel" style="background:var(--bg3);border-color:#333">
+          <div class="panel-label" style="color:var(--muted)">Alternativen</div>
+          <div class="alt-grid">
+            <button class="btn-alt" onclick="pasteFromClipboard()"><div class="btn-alt-label">📋 Aus Zwischenablage</div></button>
+            <button class="btn-alt" onclick="pasteMultiple()"><div class="btn-alt-label">🖼️ Mehrere Bilder</div></button>
+            <button class="btn-alt" onclick="addSingleUrl()"><div class="btn-alt-label">➕ Einzelnes Bild</div></button>
+            <button class="btn-alt" onclick="openVinted()"><div class="btn-alt-label">🔗 Vinted öffnen</div></button>
+          </div>
+        </div>
+
+        <div class="add-grid">
+          <!-- IMAGES -->
+          <div class="panel">
+            <div class="imgs-header">
+              <div class="panel-label" style="margin:0">Bilder (<span id="img-count">0</span>)</div>
+              <div class="imgs-btns">
+                <button class="btn-sm" onclick="pasteFromClipboard()">Paste</button>
+                <button class="btn-sm-border" onclick="addSingleUrl()">+ URL</button>
+              </div>
+            </div>
+            <div id="form-imgs"><div class="no-images">Keine Bilder</div></div>
+          </div>
+
+          <!-- FIELDS -->
+          <div class="panel">
+            <div class="panel-label" style="margin-bottom:16px">Schritt 2: Daten</div>
+            <div class="form-space">
+              <input id="f-name" class="field-input" placeholder="Name" />
+              <div class="form-grid-2">
+                <select id="f-cat" class="field-select">
+                  <option>Jacken</option><option>Pullover</option><option>Sweatshirts</option><option>Tops</option><option>Sonstiges</option>
+                </select>
+                <input id="f-price" class="field-input" placeholder="Preis (z.B. €25)" />
+              </div>
+              <div class="form-grid-2">
+                <input id="f-size" class="field-input" placeholder="Größe" />
+                <select id="f-cond" class="field-select">
+                  <option>Neu</option><option>Sehr gut</option><option value="Gut" selected>Gut</option><option>Zufriedenstellend</option>
+                </select>
+              </div>
+              <input id="f-vurl" class="field-input" placeholder="Vinted URL" />
+              <button class="btn-save" id="save-btn" onclick="addProduct()">Speichern</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- IMAGE MODAL -->
+<div id="img-modal" onclick="closeModal()">
+  <div class="modal-inner" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="modal-img-wrap">
+      <img id="modal-img" src="" alt="" />
+      <button class="modal-nav modal-prev" onclick="modalPrev()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <button class="modal-nav modal-next" onclick="modalNext()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    <div class="modal-dots" id="modal-dots"></div>
+    <div class="modal-info"><p id="modal-name"></p><span id="modal-price"></span></div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title"></div>
+    <div class="confirm-msg" id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="btn-cancel" id="confirm-cancel">Abbrechen</button>
+      <button class="btn-confirm-del" id="confirm-ok">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const ADMIN_PASSWORD = 'scndunit2025';
+
+let GH_TOKEN = '';
+let GH_USER = '';
+let GH_REPO = '';
+let GH_FILE = 'shop-data.json';
+let fileSha = '';
+
+// ─── STATE ─────────────────────────────────────────────────────────────────────
+let products = [];
+let formImages = [];
+let currentFilter = 'Alle';
+let activeTab = 'inventory';
+let modalProduct = null;
+let modalIndex = 0;
+
+// ─── AUTH ──────────────────────────────────────────────────────────────────────
+function tryLogin() {
+  const pw = document.getElementById('pw-input').value;
+  const card = document.getElementById('login-card');
+  if (pw === ADMIN_PASSWORD) {
+    sessionStorage.setItem('admin_auth', '1');
+    showAppOrSetup();
+  } else {
+    card.classList.add('error');
+    document.getElementById('pw-input').value = '';
+    setTimeout(() => card.classList.remove('error'), 2000);
+  }
+}
+document.getElementById('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+
+function showAppOrSetup() {
+  document.getElementById('login-screen').style.display = 'none';
+  // Load saved GitHub config
+  GH_TOKEN = localStorage.getItem('gh_token') || '';
+  GH_USER  = localStorage.getItem('gh_user')  || '';
+  GH_REPO  = localStorage.getItem('gh_repo')  || '';
+  GH_FILE  = localStorage.getItem('gh_file')  || 'shop-data.json';
+
+  if (!GH_TOKEN || !GH_USER || !GH_REPO) {
+    document.getElementById('setup-screen').style.display = 'flex';
+  } else {
+    document.getElementById('app').style.display = 'block';
+    loadProducts();
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem('admin_auth');
+  location.reload();
+}
+
+// On load
+if (sessionStorage.getItem('admin_auth') === '1') {
+  showAppOrSetup();
+}
+
+// ─── SETUP ─────────────────────────────────────────────────────────────────────
+async function saveGitHubConfig() {
+  const token = document.getElementById('gh-token').value.trim();
+  const user  = document.getElementById('gh-user').value.trim();
+  const repo  = document.getElementById('gh-repo').value.trim();
+  const file  = document.getElementById('gh-file').value.trim() || 'shop-data.json';
+  if (!token || !user || !repo) { alert('Bitte alle Felder ausfüllen!'); return; }
+
+  // Test connection
+  try {
+    const res = await fetch(`https://api.github.com/repos/${user}/${repo}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) { alert('Verbindung fehlgeschlagen. Bitte Token und Repo-Name prüfen.'); return; }
+  } catch { alert('Netzwerkfehler beim Testen.'); return; }
+
+  localStorage.setItem('gh_token', token);
+  localStorage.setItem('gh_user', user);
+  localStorage.setItem('gh_repo', repo);
+  localStorage.setItem('gh_file', file);
+  GH_TOKEN = token; GH_USER = user; GH_REPO = repo; GH_FILE = file;
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  loadProducts();
+}
+
+// ─── GITHUB API ────────────────────────────────────────────────────────────────
+function ghHeaders() {
+  return { Authorization: `Bearer ${GH_TOKEN}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+}
+const apiUrl = () => `https://api.github.com/repos/${GH_USER}/${GH_REPO}/contents/${GH_FILE}`;
+
+async function loadProducts() {
+  document.getElementById('grid-wrap').innerHTML = '<div class="loading">Lade Produkte...</div>';
+  document.getElementById('status-line').innerHTML = 'Laden...';
+  try {
+    const res = await fetch(apiUrl(), { headers: ghHeaders() });
+    if (res.status === 404) {
+      // File doesn't exist yet → create empty
+      products = [];
+      fileSha = '';
+      renderInventory();
+      updateStatus();
+      return;
+    }
+    if (!res.ok) throw new Error('GitHub API Fehler: ' + res.status);
+    const data = await res.json();
+    fileSha = data.sha;
+    const content = JSON.parse(atob(data.content.replace(/\n/g, '')));
+    products = content.products || content || [];
+    renderInventory();
+    updateStatus();
+  } catch (e) {
+    document.getElementById('grid-wrap').innerHTML = `<div class="loading" style="color:#f87171">Fehler: ${e.message}</div>`;
+  }
+}
+
+async function saveProducts() {
+  const body = JSON.stringify({ products }, null, 2);
+  const encoded = btoa(unescape(encodeURIComponent(body)));
+  const payload = { message: 'Admin: Produkte aktualisiert', content: encoded };
+  if (fileSha) payload.sha = fileSha;
+
+  const res = await fetch(apiUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(payload) });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+  const data = await res.json();
+  fileSha = data.content.sha;
+}
+
+// ─── INVENTORY ─────────────────────────────────────────────────────────────────
+function updateStatus() {
+  const active = products.filter(p => !p.sold).length;
+  const sold   = products.filter(p =>  p.sold).length;
+  document.getElementById('status-line').innerHTML = `${active} aktiv · ${sold} verkauft <span class="live-dot">● Live</span>`;
+}
+
+function renderInventory() {
+  // Filters
+  const cats = ['Alle', ...Array.from(new Set(products.map(p => p.category))).sort()];
+  const fb = document.getElementById('filter-btns');
+  fb.innerHTML = cats.map(c => `<button class="btn-filter ${c===currentFilter?'active':''}" onclick="setFilter('${c}')">${c}</button>`).join('');
+
+  // Grid
+  const filtered = currentFilter === 'Alle' ? products : products.filter(p => p.category === currentFilter);
+  if (!filtered.length) {
+    document.getElementById('grid-wrap').innerHTML = '<div class="loading">Keine Produkte</div>';
+    return;
+  }
+  document.getElementById('grid-wrap').innerHTML = `<div class="product-grid">${filtered.map(p => cardHTML(p)).join('')}</div>`;
+}
+
+function cardHTML(p) {
+  const img = p.images && p.images[0] ? `<img src="${p.images[0]}" onerror="this.style.opacity=0.3" alt="${p.name}" />` : '';
+  const count = p.images && p.images.length > 1 ? `<div class="img-count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> ${p.images.length}</div>` : '';
+  const sold = p.sold ? '<div class="sold-badge">Verkauft</div>' : '';
+  const soldBtn = p.sold
+    ? `<button class="btn-sold reactivate" onclick="markSold(${p.id},true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Reaktiv.</button>`
+    : `<button class="btn-sold mark-sold" onclick="markSold(${p.id},false)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Verkauft</button>`;
+  return `
+  <div class="product-card ${p.sold?'sold':''}">
+    ${sold}
+    <div class="card-img" onclick='openModal(${p.id})'>
+      ${img}${count}
+      <div class="card-hover-overlay"><span class="card-hover-label">Bilder ansehen</span></div>
+    </div>
+    <div class="card-info">
+      <div class="card-name">${p.name}</div>
+      <div class="card-price">${p.price} · ${p.size}</div>
+      <div class="card-category">${p.category}</div>
+      <div class="card-actions">
+        ${soldBtn}
+        <a href="${p.vinted_url}" target="_blank" class="btn-action ext">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <button class="btn-action del" onclick="removeProduct(${p.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function setFilter(cat) {
+  currentFilter = cat;
+  renderInventory();
+}
+
+async function markSold(id, isSold) {
+  const idx = products.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  products[idx].sold = !isSold;
+  renderInventory(); updateStatus();
+  try {
+    await saveProducts();
+    toast(isSold ? 'Wieder aktiv!' : 'Als verkauft markiert!');
+  } catch (e) { alert('Fehler beim Speichern: ' + e.message); products[idx].sold = isSold; renderInventory(); }
+}
+
+async function removeProduct(id) {
+  const confirmed = await showConfirm('Produkt löschen', 'Möchtest du dieses Produkt wirklich unwiderruflich löschen?');
+  if (!confirmed) return;
+  const idx = products.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  const removed = products.splice(idx, 1)[0];
+  renderInventory(); updateStatus();
+  try {
+    await saveProducts();
+    toast('Produkt gelöscht!');
+  } catch (e) { alert('Fehler: ' + e.message); products.splice(idx, 0, removed); renderInventory(); }
+}
+
+// ─── IMAGE MODAL ───────────────────────────────────────────────────────────────
+function openModal(id) {
+  modalProduct = products.find(p => p.id === id);
+  if (!modalProduct) return;
+  modalIndex = 0;
+  renderModal();
+  document.getElementById('img-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('img-modal').classList.remove('open'); }
+function renderModal() {
+  if (!modalProduct) return;
+  document.getElementById('modal-img').src = modalProduct.images[modalIndex] || '';
+  document.getElementById('modal-name').textContent = modalProduct.name;
+  document.getElementById('modal-price').textContent = modalProduct.price;
+  const dots = document.getElementById('modal-dots');
+  const navPrev = document.querySelector('.modal-prev');
+  const navNext = document.querySelector('.modal-next');
+  if (modalProduct.images.length > 1) {
+    dots.innerHTML = modalProduct.images.map((_, i) => `<button class="modal-dot ${i===modalIndex?'active':''}" onclick="setModalIndex(${i})"></button>`).join('');
+    navPrev.style.display = navNext.style.display = 'block';
+  } else {
+    dots.innerHTML = '';
+    navPrev.style.display = navNext.style.display = 'none';
+  }
+}
+function modalPrev() { if (!modalProduct) return; modalIndex = (modalIndex - 1 + modalProduct.images.length) % modalProduct.images.length; renderModal(); }
+function modalNext() { if (!modalProduct) return; modalIndex = (modalIndex + 1) % modalProduct.images.length; renderModal(); }
+function setModalIndex(i) { modalIndex = i; renderModal(); }
+
+// ─── ADD PRODUCT ───────────────────────────────────────────────────────────────
+function renderFormImages() {
+  const el = document.getElementById('form-imgs');
+  document.getElementById('img-count').textContent = formImages.length;
+  if (!formImages.length) { el.innerHTML = '<div class="no-images">Keine Bilder</div>'; return; }
+  el.innerHTML = `<div class="img-grid">${formImages.map((img, i) => `
+    <div class="img-thumb">
+      <img src="${img}" onerror="this.style.opacity=0.3" />
+      <button class="img-thumb-del" onclick="removeFormImg(${i})">×</button>
+    </div>`).join('')}</div>`;
+}
+function removeFormImg(i) { formImages.splice(i, 1); renderFormImages(); }
+
+async function scrapeVinted() {
+  const url = document.getElementById('vinted-url').value.trim();
+  if (!url.includes('vinted')) { alert('Bitte gültige Vinted URL eingeben'); return; }
+  const btn = document.getElementById('scrape-btn');
+  btn.textContent = '...'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/vinted', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+    const data = await res.json();
+    if (!res.ok) {
+      alert('Auto-Fill nicht verfügbar. Bitte manuell eintragen.\n\n' + (data.message || ''));
+      document.getElementById('f-vurl').value = url;
+    } else {
+      if (data.name)  document.getElementById('f-name').value  = data.name;
+      if (data.price) document.getElementById('f-price').value = data.price;
+      if (data.size)  document.getElementById('f-size').value  = data.size;
+      document.getElementById('f-vurl').value = url;
+      if (data.images && data.images.length) { formImages = data.images.map(cleanImg); renderFormImages(); toast(`${formImages.length} Bilder geladen!`); }
+    }
+  } catch { alert('Netzwerkfehler. Bitte manuell eintragen.'); document.getElementById('f-vurl').value = url; }
+  finally { btn.textContent = 'Auto-Fill'; btn.disabled = false; }
+}
+
+function cleanImg(url) { return url.replace(/[?&]s=[^&]+/, '').replace(/\/f\d+\//, '/f800/').replace(/\\/g, '').trim(); }
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text.includes('vinted.net')) { formImages.push(cleanImg(text.trim())); renderFormImages(); toast('Bild eingefügt!'); }
+    else alert('Keine gültige Vinted-Bild-URL in Zwischenablage.');
+  } catch { alert('Zugriff verweigert. Bitte manuell einfügen.'); }
+}
+
+function pasteMultiple() {
+  const input = prompt('Füge Bild-URLs ein (eine pro Zeile):');
+  if (!input) return;
+  const urls = input.split('\n').map(u => u.trim()).filter(u => u.length > 10).map(cleanImg);
+  formImages.push(...urls.slice(0, 10));
+  renderFormImages();
+  toast(`${urls.length} Bilder hinzugefügt!`);
+}
+
+function addSingleUrl() {
+  const url = prompt('Bild-URL eingeben:');
+  if (url && url.startsWith('http')) { formImages.push(cleanImg(url)); renderFormImages(); }
+}
+
+function openVinted() {
+  const url = document.getElementById('vinted-url').value.trim();
+  const match = url.match(/items\/(\d+)/);
+  if (match) window.open(`https://www.vinted.de/items/${match[1]}`, '_blank');
+  else if (url) window.open(url, '_blank');
+  else alert('Bitte zuerst eine Vinted URL eingeben.');
+}
+
+async function addProduct() {
+  const name  = document.getElementById('f-name').value.trim();
+  const cat   = document.getElementById('f-cat').value;
+  const price = document.getElementById('f-price').value.trim();
+  const size  = document.getElementById('f-size').value.trim();
+  const cond  = document.getElementById('f-cond').value;
+  const vurl  = document.getElementById('f-vurl').value.trim();
+
+  if (!name || !price || !vurl) { alert('Name, Preis und Vinted URL sind Pflicht!'); return; }
+  if (!formImages.length) { alert('Mindestens 1 Bild benötigt!'); return; }
+
+  const newId = products.length ? Math.max(...products.map(p => p.id)) + 1 : 1;
+  const newProduct = {
+    id: newId, name, category: cat,
+    price: price.startsWith('€') ? price : `€${price}`,
+    size: size || '–', condition: cond,
+    images: [...formImages], vinted_url: vurl, sold: false
+  };
+
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'Speichert...'; btn.disabled = true;
+  try {
+    products.push(newProduct);
+    await saveProducts();
+    // Reset form
+    formImages = [];
+    ['f-name','f-price','f-size','f-vurl','vinted-url'].forEach(id => document.getElementById(id).value = '');
+    renderFormImages();
+    switchTab('inventory');
+    renderInventory(); updateStatus();
+    toast('Produkt gespeichert!');
+  } catch (e) {
+    products.pop();
+    alert('Fehler beim Speichern: ' + e.message);
+  } finally { btn.textContent = 'Speichern'; btn.disabled = false; }
+}
+
+// ─── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-inventory').style.display      = tab === 'inventory' ? 'block' : 'none';
+  document.getElementById('tab-add-content').style.display    = tab === 'add'       ? 'block' : 'none';
+  document.getElementById('tab-inv').classList.toggle('active', tab === 'inventory');
+  document.getElementById('tab-add').classList.toggle('active', tab === 'add');
+}
+
+// ─── TOAST ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── CONFIRM ───────────────────────────────────────────────────────────────────
+function showConfirm(title, msg) {
+  return new Promise(resolve => {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').textContent   = msg;
+    document.getElementById('confirm-modal').classList.add('open');
+    const ok = document.getElementById('confirm-ok');
+    const cancel = document.getElementById('confirm-cancel');
+    const cleanup = (val) => {
+      document.getElementById('confirm-modal').classList.remove('open');
+      ok.onclick = cancel.onclick = null;
+      resolve(val);
+    };
+    ok.onclick     = () => cleanup(true);
+    cancel.onclick = () => cleanup(false);
+  });
+}
+</script>
+</body>
+</html>
