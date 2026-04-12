@@ -618,116 +618,15 @@ function EmployeesTab({ currentUser, toast }: { currentUser: Employee, toast: (m
       setIsAdding(false);
     });
   };
-import { useState } from "react";
 
-// 🔹 State für Dialog
-const [deleteDialog, setDeleteDialog] = useState<{
-  open: boolean;
-  id: number | null;
-  username: string;
-}>({
-  open: false,
-  id: null,
-  username: "",
-});
-
-// 🔹 Statt confirm() -> Dialog öffnen
-const deleteEmployee = (id: number, username: string) => {
-  setDeleteDialog({ open: true, id, username });
-};
-
-// 🔹 Löschen bestätigen
-const confirmDelete = () => {
-  if (!deleteDialog.id) return;
-
-  supabase
-    .from("employees")
-    .delete()
-    .eq("id", deleteDialog.id)
-    .then(({ error }) => {
-      if (error) {
-        toast("Fehler: " + error.message, "error");
-        return;
-      }
-      toast("Mitarbeiter gelöscht", "info");
+  const deleteEmployee = (id: number, username: string) => {
+    if (!confirm(`${username} wirklich löschen?`)) return;
+    supabase.from('employees').delete().eq('id', id).then(({ error }) => {
+      if (error) { toast('Fehler: ' + error.message, 'error'); return; }
+      toast('Mitarbeiter gelöscht', 'info');
       loadEmployees();
     });
-
-  setDeleteDialog({ open: false, id: null, username: "" });
-};
-
-// 🔹 Abbrechen
-const cancelDelete = () => {
-  setDeleteDialog({ open: false, id: null, username: "" });
-};
-
-return (
-  <>
-    {/* 🔹 Dein restlicher Code hier */}
-
-    {/* 🔥 DIALOG */}
-    {deleteDialog.open && (
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          background: "rgba(0,0,0,0.6)",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          zIndex: 1000,
-        }}
-      >
-        <div
-          style={{
-            background: "black",
-            color: "white",
-            padding: "20px",
-            borderRadius: "10px",
-            border: "1px solid rgba(255, 68, 0, 0.3)",
-            minWidth: "300px",
-            textAlign: "center",
-          }}
-        >
-          <p>{deleteDialog.username} wirklich löschen?</p>
-
-          <div style={{ marginTop: "15px" }}>
-            <button
-              onClick={confirmDelete}
-              style={{
-                marginRight: "10px",
-                padding: "8px 16px",
-                background: "rgba(255, 68, 0, 0.8)",
-                border: "none",
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
-              Löschen
-            </button>
-
-            <button
-              onClick={cancelDelete}
-              style={{
-                padding: "8px 16px",
-                background: "transparent",
-                border: "1px solid rgba(255, 68, 0, 0.3)",
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
-  </>
-);
-
+  };
 
   const resetPassword = (id: number) => {
     if (!newPassword) { toast('Bitte neues Passwort eingeben', 'error'); return; }
