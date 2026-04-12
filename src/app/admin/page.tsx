@@ -189,12 +189,11 @@ function AdminDashboard() {
     if (!formData.name || !formData.price || !formData.vinted_url) { alert('Name, Preis und Vinted URL sind Pflicht!'); return; }
     if (formData.images.length === 0) { alert('Mindestens 1 Bild benötigt!'); return; }
     const newId = Math.max(...products.map(p => p.id), 0) + 1;
-  // ÄNDERE DIESE ZEILE (ca. Zeile 143):
 const newProduct = { 
   id: newId, 
   name: formData.name, 
   category: formData.category, 
-  price: formData.price.replace(/^/, ''), // 
+  price: formData.price.startsWith('€') ? formData.price : `€${formData.price}`, // € hinzufügen falls nicht vorhanden
   size: formData.size || '–', 
   condition: formData.condition, 
   images: formData.images, 
