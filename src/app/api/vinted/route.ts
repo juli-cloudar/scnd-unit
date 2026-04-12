@@ -78,19 +78,16 @@ export async function POST(request: Request) {
       }
     }
 
-// ── PREIS ───────────────────────────────────────────────────────────────
+// ── PREIS (nur Zahl, kein €-Zeichen) ─────────────────────────────────────
 let price = '';
 const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
 for (const jsonMatch of jsonLdMatches) {
   try {
     const jsonData = JSON.parse(jsonMatch[1]);
-    const findPrice = (obj: any): { price: string; currency: string } | null => {
+    const findPrice = (obj: any): string | null => {
       if (!obj) return null;
-      if (obj.price && obj.priceCurrency) {
-        return { 
-          price: obj.price.toString().replace('.', ','), 
-          currency: obj.priceCurrency 
-        };
+      if (obj.price) {
+        return obj.price.toString().replace('.', ',');
       }
       if (typeof obj === 'object') {
         for (const key in obj) {
@@ -102,8 +99,7 @@ for (const jsonMatch of jsonLdMatches) {
     };
     const foundPrice = findPrice(jsonData);
     if (foundPrice) {
-      // Format: "32" statt "32 EUR"
-      price = `${foundPrice.price}${foundPrice.currency === 'EUR' ? '€' : foundPrice.currency}`;
+      price = foundPrice; // Nur "32", nicht "32€"
       break;
     }
   } catch (e) {}
@@ -113,7 +109,7 @@ if (!price) {
   const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
   const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
   if (priceMatch) {
-    price = `${priceMatch[1]}€`;
+    price = priceMatch[1]; // Nur "32", nicht "32€"
   }
 }
     // ── ZUSTAND ─────────────────────────────────────────────────────────────
