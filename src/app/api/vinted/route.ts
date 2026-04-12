@@ -23,6 +23,7 @@ export async function POST(request: Request) {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
         'Cache-Control': 'no-cache',
+        'Referer': 'https://www.vinted.de/',
       },
     });
 
@@ -33,51 +34,93 @@ export async function POST(request: Request) {
     const html = await response.text();
 
     // ── BILDER ──────────────────────────────────────────────────────────────
-    // Vollständige URL inkl. ?s= Parameter behalten (nötig für Vinted CDN)
-    const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+\.webp(?:\?[^"'\s<>]*)?/g)];
+    // WICHTIG: Nur die f800 URLs extrahieren und aufbereiten
+    const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
     const seen = new Set<string>();
     const images: string[] = [];
+    
     for (const m of imgMatches) {
-      const fullUrl = m[0];
-      // Nur f800 (hohe Qualität), keine Duplikate
+      let fullUrl = m[0];
+      
+      // Nur Thumbnails mit f800 (hohe Qualität)
+      if (!fullUrl.includes('/f800/')) continue;
+      
+      // URL bereinigen - manchmal sind sie URL-encoded
+      fullUrl = fullUrl.replace(/&amp;/g, '&');
+      
+      // Basis-URL ohne Query-Parameter für Deduplizierung
       const base = fullUrl.split('?')[0];
-      if (fullUrl.includes('/f800/') && !seen.has(base)) {
+      
+      if (!seen.has(base)) {
         seen.add(base);
-        images.push(fullUrl); // Mit ?s= Parameter!
+        // WICHTIG: Vinted Bilder brauchen manchmal einen gültigen Referer
+        // Wir geben die direkte CDN-URL zurück, Client muss ggf. Proxy verwenden
+        images.push(fullUrl);
       }
     }
 
     // ── NAME ────────────────────────────────────────────────────────────────
-    const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/);
-    const titleMatch = html.match(/<title>\s*([^|<]+)/);
+    const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
+    const titleMatch = html.match(/<title>\s*([^|<]+)/i);
     const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
     // ── PREIS ───────────────────────────────────────────────────────────────
-    // Ersten Preis nehmen (nicht den mit Käuferschutz)
-    const priceMatch = html.match(/(\d+[.,]\d+)\s*€\s*<\/[a-z]+>\s*(?![\d])/);
-    const priceMatch2 = html.match(/(\d{1,3}[.,]\d{2})\s*€/);
-    const rawPrice = priceMatch?.[1] || priceMatch2?.[1] || '';
-    const price = rawPrice ? `€${rawPrice}` : '';
+    // Verschiedene Preis-Formate abdecken
+    const pricePatterns = [
+      /(\d{1,3}(?:[.,]\d{2})?)\s*€/,
+      /€\s*(\d{1,3}(?:[.,]\d{2})?)/,
+      /(\d{1,3}[.,]\d{2})\s*EUR/i,
+    ];
+    
+    let price = '';
+    for (const pattern of pricePatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        price = `€${match[1].replace('.', ',')}`;
+        break;
+      }
+    }
 
     // ── GRÖSSE ──────────────────────────────────────────────────────────────
-    // Aus Breadcrumb oder Produktdetails
-    const sizeMatch = html.match(/(?:Größe|size)[^:]*:\s*([^\s<,·]+)/i) ||
-                      html.match(/\b(XS|S|M|L|XL|XXL|XXXL|One Size|\d{2,3})\b(?=\s*\/|\s*·|\s*<)/);
-    const size = sizeMatch?.[1]?.trim() || '';
+    // VERBESSERT: Mehr Pattern für Vinted-HTML-Struktur
+    const sizePatterns = [
+      /"size[^"]*"[:\s]*"([^"]+)"/i,           // JSON-LD oder data-Attribute
+      /Größe[:\s]*<[^>]+>\s*([^<]+)/i,         // Direktes HTML
+      /size[:\s]*<[^>]+>\s*([^<]+)/i,          // Englisch
+      /class="[^"]*size[^"]*"[^{]*>\s*([^<]+)/i, // CSS Klasse
+      /\b(XS|S|M|L|XL|XXL|XXXL|One Size|Einheitsgröße)\b/i, // Standardgrößen
+      /(\d{2,3})\s*(?:cm|CM)?\s*[·\/]/,        // Numerische Größen mit Trenner
+    ];
+    
+    let size = '';
+    for (const pattern of sizePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        size = match[1].trim();
+        // Bereinigen
+        size = size.replace(/·|\//g, '').trim();
+        if (size && size.length < 20) break; // Plausibilitätscheck
+      }
+    }
 
     // ── ZUSTAND ─────────────────────────────────────────────────────────────
     const condMap: Record<string, string> = {
+      'neu mit etikett': 'Neu mit Etikett',
       'neu': 'Neu',
       'sehr gut': 'Sehr gut',
       'gut': 'Gut',
       'zufriedenstellend': 'Zufriedenstellend',
       'schlecht': 'Schlecht',
     };
+    
     let condition = '';
+    const htmlLower = html.toLowerCase();
     for (const [key, val] of Object.entries(condMap)) {
-      if (html.toLowerCase().includes(`·${key}·`) || 
-          html.toLowerCase().includes(`·${key}<`) ||
-          html.toLowerCase().includes(`>${key}<`)) {
+      // Suche nach Zustand in verschiedenen Kontexten
+      if (htmlLower.includes(key) || 
+          htmlLower.includes(`>${key}<`) ||
+          htmlLower.includes(`"${key}"`) ||
+          htmlLower.includes(`'${key}'`)) {
         condition = val;
         break;
       }
@@ -85,30 +128,33 @@ export async function POST(request: Request) {
 
     // ── KATEGORIE ───────────────────────────────────────────────────────────
     const catMap: Record<string, string> = {
-      'jacke': 'Jacken',
-      'jacket': 'Jacken',
-      'mantel': 'Jacken',
-      'coat': 'Jacken',
-      'pullover': 'Pullover',
-      'hoodie': 'Pullover',
-      'strickjacke': 'Pullover',
-      'sweatshirt': 'Sweatshirts',
-      'sweat': 'Sweatshirts',
-      'crewneck': 'Sweatshirts',
-      'top': 'Tops',
-      'shirt': 'Tops',
-      't-shirt': 'Tops',
-      'crop': 'Tops',
+      'jacke': 'Jacken', 'jacket': 'Jacken', 'mantel': 'Jacken', 'coat': 'Jacken',
+      'pullover': 'Pullover', 'hoodie': 'Pullover', 'strickjacke': 'Pullover', 'sweater': 'Pullover',
+      'sweatshirt': 'Sweatshirts', 'sweat': 'Sweatshirts', 'crewneck': 'Sweatshirts',
+      'top': 'Tops', 'shirt': 'Tops', 't-shirt': 'Tops', 'tshirt': 'Tops', 'crop': 'Tops',
+      'kleid': 'Kleider', 'dress': 'Kleider',
+      'rock': 'Röcke', 'skirt': 'Röcke',
+      'hose': 'Hosen', 'pants': 'Hosen', 'jeans': 'Hosen',
+      'schuhe': 'Schuhe', 'shoes': 'Schuhe', 'sneaker': 'Schuhe',
+      'tasche': 'Taschen', 'bag': 'Taschen',
     };
+    
     let category = 'Sonstiges';
     const nameLower = name.toLowerCase();
     const urlLower = url.toLowerCase();
+    
     for (const [key, val] of Object.entries(catMap)) {
       if (nameLower.includes(key) || urlLower.includes(key)) {
         category = val;
         break;
       }
     }
+
+    // Debug-Info für Entwicklung
+    const debug = {
+      imageCount: images.length,
+      htmlSnippet: html.substring(0, 500).replace(/\s+/g, ' '),
+    };
 
     return NextResponse.json({
       name,
@@ -117,9 +163,11 @@ export async function POST(request: Request) {
       condition,
       category,
       images: images.slice(0, 10),
+      // debug, // Nur zum Testen aktivieren
     }, { headers: CORS });
 
   } catch (e) {
+    console.error('Scraper Error:', e);
     return NextResponse.json({ message: 'Fehler: ' + String(e) }, { status: 500, headers: CORS });
   }
 }
