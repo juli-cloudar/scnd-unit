@@ -1,3 +1,4 @@
+// app/api/scrape-vinted/route.ts
 import { NextResponse } from 'next/server';
 
 const CORS = {
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
     const html = await response.text();
 
-    // ── BILDER ──────────────────────────────────────────────────────────────
+    // ── BILDER EXTRAKTION (URLs für Proxy) ──────────────────────────────────
     const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
     const seen = new Set<string>();
     const images: string[] = [];
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
       const base = fullUrl.split('?')[0];
       if (!seen.has(base)) {
         seen.add(base);
-        images.push(fullUrl);
+        // WICHTIG: URL für deinen Proxy encoden
+        images.push(`/api/image-proxy?url=${encodeURIComponent(fullUrl)}`);
       }
     }
 
@@ -56,13 +58,10 @@ export async function POST(request: Request) {
 
     // ── PREIS ───────────────────────────────────────────────────────────────
     let price = '';
-    
-    // Versuch 1: JSON-LD structured data (zuverlässigste Methode)
     const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
     for (const jsonMatch of jsonLdMatches) {
       try {
         const jsonData = JSON.parse(jsonMatch[1]);
-        // Suche nach offers/price in verschachtelten Strukturen
         const findPrice = (obj: any): string | null => {
           if (!obj) return null;
           if (obj.price && obj.priceCurrency) {
@@ -84,16 +83,6 @@ export async function POST(request: Request) {
       } catch (e) {}
     }
     
-    // Versuch 2: Meta-Tags
-    if (!price) {
-      const metaPrice = html.match(/<meta[^>]*property="[^"]*price"[^>]*content="([^"]+)"/i) ||
-                       html.match(/<meta[^>]*name="[^"]*price"[^>]*content="([^"]+)"/i);
-      if (metaPrice) {
-        price = metaPrice[1];
-      }
-    }
-    
-    // Versuch 3: HTML-Struktur (erster Preis vor "Käuferschutz")
     if (!price) {
       const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
       const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
@@ -104,25 +93,18 @@ export async function POST(request: Request) {
 
     // ── GRÖSSE ──────────────────────────────────────────────────────────────
     let size = '';
-    
-    // Versuch 1: JSON-LD oder data-Attribute
     const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,10})"/i) ||
                          html.match(/"size_name"[:\s]*"([^"]{1,10})"/i);
     if (sizeJsonMatch) {
       size = sizeJsonMatch[1].trim();
     }
-    
-    // Versuch 2: HTML-Text nach "Größe" oder "Size"
     if (!size) {
       const sizeSectionMatch = html.match(/Größe[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i) ||
-                              html.match(/Size[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i) ||
-                              html.match(/class="[^"]*size[^"]*"[^>]*>([^<]{1,15})/i);
+                              html.match(/Size[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i);
       if (sizeSectionMatch) {
         size = sizeSectionMatch[1].trim().replace(/[·\/]/g, '').trim();
       }
     }
-    
-    // Versuch 3: Standard-Größen im Text finden
     if (!size) {
       const standardSizeMatch = html.match(/\b(XS|S|M|L|XL|XXL|XXXL|One Size|Einheitsgröße|UNI)\b/i);
       if (standardSizeMatch) {
@@ -142,13 +124,9 @@ export async function POST(request: Request) {
     };
     
     let condition = '';
-    const htmlLower = html.toLowerCase();
-    
-    // Suche mit Priorität (längere Phrasen zuerst)
     const sortedConditions = Object.entries(condMap).sort((a, b) => b[0].length - a[0].length);
     
     for (const [key, val] of sortedConditions) {
-      // Suche nach exakten Phrasen mit Word-Boundaries oder HTML-Trennern
       const patterns = [
         new RegExp(`[>·\\s]${key}[<·\\s]`, 'i'),
         new RegExp(`Zustand[^<]*${key}`, 'i'),
@@ -163,14 +141,6 @@ export async function POST(request: Request) {
         }
       }
       if (condition) break;
-    }
-    
-    // Fallback: Direkte HTML-Suche
-    if (!condition) {
-      const directMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Neu|Sehr gut|Gut|Zufriedenstellend|Schlecht)</i);
-      if (directMatch) {
-        condition = directMatch[1];
-      }
     }
 
     // ── KATEGORIE ───────────────────────────────────────────────────────────
@@ -197,24 +167,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // Debug-Info (optional, zum Testen aktivieren)
-    /*
-    console.log({
-      nameLength: name.length,
-      priceFound: !!price,
-      sizeFound: !!size,
-      conditionFound: !!condition,
-      imageCount: images.length,
-    });
-    */
-
     return NextResponse.json({
       name,
       price,
       size,
       condition,
       category,
-      images: images.slice(0, 10),
+      images: images.slice(0, 5), // Proxy-URLs
     }, { headers: CORS });
 
   } catch (e) {
