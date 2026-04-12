@@ -78,7 +78,7 @@ export default function ManagementPanel() {
       setAuthMode('admin');
       setCurrentUser({ 
         id: 0, 
-        username: 'Julian', 
+        username: 'MasterControl', 
         role: 'Admin', 
         password: '',
         login_count: 0,
