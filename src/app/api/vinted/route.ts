@@ -34,27 +34,17 @@ export async function POST(request: Request) {
     const html = await response.text();
 
     // ── BILDER ──────────────────────────────────────────────────────────────
-    // WICHTIG: Nur die f800 URLs extrahieren und aufbereiten
     const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
     const seen = new Set<string>();
     const images: string[] = [];
     
     for (const m of imgMatches) {
       let fullUrl = m[0];
-      
-      // Nur Thumbnails mit f800 (hohe Qualität)
       if (!fullUrl.includes('/f800/')) continue;
-      
-      // URL bereinigen - manchmal sind sie URL-encoded
       fullUrl = fullUrl.replace(/&amp;/g, '&');
-      
-      // Basis-URL ohne Query-Parameter für Deduplizierung
       const base = fullUrl.split('?')[0];
-      
       if (!seen.has(base)) {
         seen.add(base);
-        // WICHTIG: Vinted Bilder brauchen manchmal einen gültigen Referer
-        // Wir geben die direkte CDN-URL zurück, Client muss ggf. Proxy verwenden
         images.push(fullUrl);
       }
     }
@@ -65,47 +55,60 @@ export async function POST(request: Request) {
     const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
     // ── PREIS ───────────────────────────────────────────────────────────────
-    // Verschiedene Preis-Formate abdecken
-    const pricePatterns = [
-      /(\d{1,3}(?:[.,]\d{2})?)\s*€/,
-      /€\s*(\d{1,3}(?:[.,]\d{2})?)/,
-      /(\d{1,3}[.,]\d{2})\s*EUR/i,
-    ];
-    
+    // VERBESSERT: Suche nach dem Hauptpreis (nicht Käuferschutz-Preis)
+    // Vinted Struktur: Hauptpreis steht oft in spezifischen data-Attributen oder als erster Preis
     let price = '';
-    for (const pattern of pricePatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        price = `€${match[1].replace('.', ',')}`;
-        break;
+    
+    // Versuch 1: JSON-LD oder data-Attribute
+    const jsonLdMatch = html.match(/"price":\s*"?(\d+[.,]?\d*)"?/i) || 
+                        html.match(/"price_amount":\s*"?(\d+[.,]?\d*)"?/i);
+    if (jsonLdMatch) {
+      price = `€${jsonLdMatch[1].replace('.', ',')}`;
+    }
+    
+    // Versuch 2: Erster Preis im HTML (hauptpreis ist meist der erste)
+    if (!price) {
+      // Suche nach Preis-Pattern, aber überspringe "mit Käuferschutz" Bereiche
+      const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
+      const firstPriceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*€/);
+      if (firstPriceMatch) {
+        price = `€${firstPriceMatch[1].replace('.', ',')}`;
+      }
+    }
+    
+    // Versuch 3: Spezifische Vinted-Preis-Klassen oder Struktur
+    if (!price) {
+      const specificPriceMatch = html.match(/class="[^"]*price[^"]*"[^>]*>(\d[.,\d\s]*€)/i) ||
+                                html.match(/>(\d{1,3}[.,]\d{2})\s*€\s*</);
+      if (specificPriceMatch) {
+        price = `€${specificPriceMatch[1].replace(/[^0-9,]/g, '').replace('.', ',')}`;
       }
     }
 
     // ── GRÖSSE ──────────────────────────────────────────────────────────────
-    // VERBESSERT: Mehr Pattern für Vinted-HTML-Struktur
     const sizePatterns = [
-      /"size[^"]*"[:\s]*"([^"]+)"/i,           // JSON-LD oder data-Attribute
-      /Größe[:\s]*<[^>]+>\s*([^<]+)/i,         // Direktes HTML
-      /size[:\s]*<[^>]+>\s*([^<]+)/i,          // Englisch
-      /class="[^"]*size[^"]*"[^{]*>\s*([^<]+)/i, // CSS Klasse
-      /\b(XS|S|M|L|XL|XXL|XXXL|One Size|Einheitsgröße)\b/i, // Standardgrößen
-      /(\d{2,3})\s*(?:cm|CM)?\s*[·\/]/,        // Numerische Größen mit Trenner
+      /"size[^"]*"[:\s]*"([^"]+)"/i,
+      /Größe[:\s]*<[^>]+>\s*([^<]+)/i,
+      /size[:\s]*<[^>]+>\s*([^<]+)/i,
+      /class="[^"]*size[^"]*"[^{]*>\s*([^<]+)/i,
+      /\b(XS|S|M|L|XL|XXL|XXXL|One Size|Einheitsgröße)\b/i,
+      /(\d{2,3})\s*(?:cm|CM)?\s*[·\/]/,
     ];
     
     let size = '';
     for (const pattern of sizePatterns) {
       const match = html.match(pattern);
-      if (match && match[1]) {
-        size = match[1].trim();
-        // Bereinigen
-        size = size.replace(/·|\//g, '').trim();
-        if (size && size.length < 20) break; // Plausibilitätscheck
+      if (match?.[1]) {
+        size = match[1].trim().replace(/[·\/]/g, '').trim();
+        if (size && size.length < 20) break;
       }
     }
 
     // ── ZUSTAND ─────────────────────────────────────────────────────────────
+    // VERBESSERT: Spezifischere Suche mit Word-Boundaries
     const condMap: Record<string, string> = {
       'neu mit etikett': 'Neu mit Etikett',
+      'neu ohne etikett': 'Neu ohne Etikett',
       'neu': 'Neu',
       'sehr gut': 'Sehr gut',
       'gut': 'Gut',
@@ -115,14 +118,34 @@ export async function POST(request: Request) {
     
     let condition = '';
     const htmlLower = html.toLowerCase();
+    
+    // Suche in strukturierten Bereichen (item-details, condition, etc.)
+    const conditionSection = htmlLower.match(/zustand|condition|item-details|details-list/);
+    
     for (const [key, val] of Object.entries(condMap)) {
-      // Suche nach Zustand in verschiedenen Kontexten
-      if (htmlLower.includes(key) || 
-          htmlLower.includes(`>${key}<`) ||
-          htmlLower.includes(`"${key}"`) ||
-          htmlLower.includes(`'${key}'`)) {
-        condition = val;
-        break;
+      // Erst: Exakte Übereinstimmung mit Word-Boundaries
+      const exactPattern = new RegExp(`\\b${key}\\b`, 'i');
+      if (exactPattern.test(htmlLower)) {
+        // Prüfe ob es im richtigen Kontext steht (nicht im Titel/Name)
+        const contextCheck = htmlLower.indexOf(key);
+        const surroundingText = htmlLower.substring(Math.max(0, contextCheck - 50), contextCheck + 50);
+        
+        // Zustand sollte in Details-Bereich sein, nicht im Produkttitel
+        if (surroundingText.includes('zustand') || 
+            surroundingText.includes('condition') ||
+            surroundingText.includes('details') ||
+            surroundingText.includes('·')) {
+          condition = val;
+          break;
+        }
+      }
+    }
+    
+    // Fallback: Wenn nichts gefunden, suche nach Vinted-typischen Markern
+    if (!condition) {
+      const vintedCondMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Neu|Sehr gut|Gut|Zufriedenstellend|Schlecht)</i);
+      if (vintedCondMatch) {
+        condition = vintedCondMatch[1];
       }
     }
 
@@ -150,12 +173,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Debug-Info für Entwicklung
-    const debug = {
-      imageCount: images.length,
-      htmlSnippet: html.substring(0, 500).replace(/\s+/g, ' '),
-    };
-
     return NextResponse.json({
       name,
       price,
@@ -163,7 +180,6 @@ export async function POST(request: Request) {
       condition,
       category,
       images: images.slice(0, 10),
-      // debug, // Nur zum Testen aktivieren
     }, { headers: CORS });
 
   } catch (e) {
