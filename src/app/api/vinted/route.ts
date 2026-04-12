@@ -1,16 +1,80 @@
-// app/api/scrape-vinted/route.ts
 import { NextResponse } from 'next/server';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// OPTIONS Handler (CORS Preflight)
+// ═══════════════════════════════════════════════════════════════════════════
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GET Handler - Image Proxy
+// ═══════════════════════════════════════════════════════════════════════════
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const url = searchParams.get('url');
+
+  if (!url) {
+    return NextResponse.json({ error: 'URL fehlt' }, { status: 400 });
+  }
+
+  // Nur Vinted erlauben
+  if (!url.includes('vinted.net')) {
+    return NextResponse.json({ error: 'Ungültige Domain' }, { status: 403 });
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+        'Referer': 'https://www.vinted.de/',
+        'Origin': 'https://www.vinted.de',
+      },
+    });
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: `Bild nicht erreichbar: ${response.status}` }, 
+        { status: 502 }
+      );
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    
+    if (arrayBuffer.byteLength < 1000) {
+      return NextResponse.json({ error: 'Ungültiges Bild' }, { status: 502 });
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/webp';
+
+    return new NextResponse(arrayBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (error) {
+    console.error('Image Proxy Error:', error);
+    return NextResponse.json(
+      { error: 'Bild konnte nicht geladen werden' }, 
+      { status: 500 }
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POST Handler - Vinted Scraper
+// ═══════════════════════════════════════════════════════════════════════════
 export async function POST(request: Request) {
   try {
     const { url } = await request.json();
@@ -34,7 +98,7 @@ export async function POST(request: Request) {
 
     const html = await response.text();
 
-    // ── BILDER EXTRAKTION (URLs für Proxy) ──────────────────────────────────
+    // ── BILDER ──────────────────────────────────────────────────────────────
     const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
     const seen = new Set<string>();
     const images: string[] = [];
@@ -46,8 +110,7 @@ export async function POST(request: Request) {
       const base = fullUrl.split('?')[0];
       if (!seen.has(base)) {
         seen.add(base);
-        // WICHTIG: URL für deinen Proxy encoden
-        images.push(`/api/image-proxy?url=${encodeURIComponent(fullUrl)}`);
+        images.push(`/api/vinted?url=${encodeURIComponent(fullUrl)}`);
       }
     }
 
@@ -56,16 +119,19 @@ export async function POST(request: Request) {
     const titleMatch = html.match(/<title>\s*([^|<]+)/i);
     const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
-    // ── PREIS ───────────────────────────────────────────────────────────────
+    // ── PREIS (korrigiert: 32€ statt 32 EUR) ────────────────────────────────
     let price = '';
     const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
     for (const jsonMatch of jsonLdMatches) {
       try {
         const jsonData = JSON.parse(jsonMatch[1]);
-        const findPrice = (obj: any): string | null => {
+        const findPrice = (obj: any): { price: string; currency: string } | null => {
           if (!obj) return null;
           if (obj.price && obj.priceCurrency) {
-            return `${obj.price} ${obj.priceCurrency}`;
+            return { 
+              price: obj.price.toString().replace('.', ','), 
+              currency: obj.priceCurrency 
+            };
           }
           if (typeof obj === 'object') {
             for (const key in obj) {
@@ -77,17 +143,17 @@ export async function POST(request: Request) {
         };
         const foundPrice = findPrice(jsonData);
         if (foundPrice) {
-          price = foundPrice.replace('.', ',');
+          price = `${foundPrice.price}${foundPrice.currency === 'EUR' ? '€' : foundPrice.currency}`;
           break;
         }
       } catch (e) {}
     }
-    
+
     if (!price) {
       const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
       const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
       if (priceMatch) {
-        price = `€${priceMatch[1]}`;
+        price = `${priceMatch[1]}€`;
       }
     }
 
@@ -173,7 +239,7 @@ export async function POST(request: Request) {
       size,
       condition,
       category,
-      images: images.slice(0, 5), // Proxy-URLs
+      images: images.slice(0, 5),
     }, { headers: CORS });
 
   } catch (e) {
