@@ -223,7 +223,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                           <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">{product.category}</p>
                           <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">{product.name}</h3>
                         </div>
-                        <span className="text-xl font-bold text-[#FF4400] shrink-0">{product.price}</span>
+                        <span className="text-xl font-bold text-[#FF4400] shrink-0">€{product.price}</span>
                       </div>
                       <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
                         <span className="text-sm text-gray-400 uppercase tracking-widest">{product.size !== "–" ? `Size ${product.size}` : ""}</span>
