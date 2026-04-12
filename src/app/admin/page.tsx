@@ -738,3 +738,4 @@ function LogsTab() {
 async function logActivity(employeeId: number, username: string, action: string, details: string = '') {
   await supabase.from('activity_logs').insert({ employee_id: employeeId, username, action, details, timestamp: new Date().toISOString() });
 }
+}
