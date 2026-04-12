@@ -1,9 +1,19 @@
-/* =================== CUSTOM ALERTS / DIALOGS =================== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Ersetzt den Browser confirm() Dialog */
+/* Dein bisheriger Code bleibt darunter erhalten */
+/* =================== CUSTOM ALERTS / DIALOGS =================== */
 dialog, [role="dialog"] {
   background: #0A0A0A;
   border: 1px solid rgba(255, 68, 0, 0.3);
   color: #F5F5F5;
   font-family: monospace;
+}
+
+/* Optional: Damit der Hintergrund immer dunkel ist */
+body {
+  background-color: #0A0A0A;
+  color: #F5F5F5;
+  margin: 0;
 }
