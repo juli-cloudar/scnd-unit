@@ -1,0 +1,9 @@
+/* =================== CUSTOM ALERTS / DIALOGS =================== */
+
+/* Ersetzt den Browser confirm() Dialog */
+dialog, [role="dialog"] {
+  background: #0A0A0A;
+  border: 1px solid rgba(255, 68, 0, 0.3);
+  color: #F5F5F5;
+  font-family: monospace;
+}
