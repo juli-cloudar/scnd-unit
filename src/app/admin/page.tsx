@@ -4,7 +4,8 @@ import {
   Trash2, ExternalLink, RefreshCw, ShoppingBag, Plus, Check, X, 
   Wand2, ChevronLeft, ChevronRight, ImageIcon, Lock, Users, 
   Settings, Package, BarChart3, Shield, Eye, EyeOff, Download,
-  Clock, LogOut, Edit3, UserPlus, Search, Filter, MoreVertical
+  Clock, LogOut, Edit3, UserPlus, Search, Filter, MoreVertical,
+  Key, Save
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -60,7 +61,6 @@ interface ActivityLog {
 
 // =================== KONSTANTEN ===================
 const ADMIN_PASSWORD = 'mastercontrol01010';
-const EMPLOYEE_PASSWORD = 'mitarbeiter2025';
 
 // =================== MAIN COMPONENT ===================
 export default function ManagementPanel() {
@@ -68,8 +68,6 @@ export default function ManagementPanel() {
   const [authMode, setAuthMode] = useState<'admin' | 'employee' | null>(null);
   const [checking, setChecking] = useState(true);
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
-  
-  // Tabs: inventory, add, analytics, employees, settings, logs
   const [activeTab, setActiveTab] = useState('inventory');
 
   useEffect(() => {
@@ -78,10 +76,22 @@ export default function ManagementPanel() {
     if (savedAuth === 'admin') {
       setAuthed(true);
       setAuthMode('admin');
-      setCurrentUser({ id: 0, username: 'Admin', role: 'Admin', permissions: {
-        canAddProducts: true, canEditProducts: true, canDeleteProducts: true,
-        canViewStats: true, canManageEmployees: true
-      }} as Employee);
+      setCurrentUser({ 
+        id: 0, 
+        username: 'Admin', 
+        role: 'Admin', 
+        password: '',
+        login_count: 0,
+        total_work_hours: 0,
+        online: true,
+        permissions: {
+          canAddProducts: true, 
+          canEditProducts: true, 
+          canDeleteProducts: true,
+          canViewStats: true, 
+          canManageEmployees: true
+        }
+      });
     } else if (savedAuth === 'employee' && savedUser) {
       setAuthed(true);
       setAuthMode('employee');
@@ -101,20 +111,17 @@ export default function ManagementPanel() {
   if (checking) return null;
   
   if (!authed) {
-    return <LoginScreen 
-      onLogin={(mode, user) => {
-        setAuthed(true);
-        setAuthMode(mode);
-        setCurrentUser(user);
-        sessionStorage.setItem('scnd_auth', mode);
-        if (user) sessionStorage.setItem('scnd_user', JSON.stringify(user));
-      }} 
-    />;
+    return <LoginScreen onLogin={(mode, user) => {
+      setAuthed(true);
+      setAuthMode(mode);
+      setCurrentUser(user);
+      sessionStorage.setItem('scnd_auth', mode);
+      if (user) sessionStorage.setItem('scnd_user', JSON.stringify(user));
+    }} />;
   }
 
   return (
     <div className="min-h-screen font-sans bg-[#0A0A0A] text-[#F5F5F5]">
-      {/* HEADER */}
       <header className="border-b border-[#FF4400]/30 px-6 py-4 sticky top-0 bg-[#0A0A0A]/95 backdrop-blur z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -133,8 +140,7 @@ export default function ManagementPanel() {
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            {/* NAVIGATION */}
+          <div className="flex items-center gap-2 flex-wrap">
             {currentUser?.permissions.canViewStats && (
               <button onClick={()=>setActiveTab('analytics')} 
                 className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
@@ -186,7 +192,6 @@ export default function ManagementPanel() {
         </div>
       </header>
 
-      {/* MAIN CONTENT */}
       <main className="max-w-7xl mx-auto p-6">
         {activeTab==='inventory' && <InventoryTab user={currentUser} />}
         {activeTab==='add' && <AddTab user={currentUser} />}
@@ -210,14 +215,12 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
     setLoading(true);
     setError('');
 
-    // Admin Login
     if (input === ADMIN_PASSWORD) {
       onLogin('admin', null);
       setLoading(false);
       return;
     }
 
-    // Employee Login
     const { data, error } = await supabase
       .from('employees')
       .select('*')
@@ -296,6 +299,7 @@ function InventoryTab({ user }: { user: Employee | null }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Alle');
   const [search, setSearch] = useState('');
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => { loadProducts(); }, []);
 
@@ -314,7 +318,7 @@ function InventoryTab({ user }: { user: Employee | null }) {
     const { error } = await supabase.from('products').update({ sold: !currentSold }).eq('id', id);
     if (!error) {
       setProducts(p => p.map(x => x.id === id ? { ...x, sold: !currentSold } : x));
-      logActivity(user.id, user.username, 'Produktstatus geändert', `ID: ${id}, Status: ${!currentSold ? 'verkauft' : 'aktiv'}`);
+      logActivity(user.id, user.username, 'Produktstatus geändert', `ID: ${id}`);
     }
   };
 
@@ -331,6 +335,19 @@ function InventoryTab({ user }: { user: Employee | null }) {
     }
   };
 
+  const updateProduct = async (product: Product) => {
+    if (!user?.permissions.canEditProducts) {
+      alert('Keine Berechtigung!');
+      return;
+    }
+    const { error } = await supabase.from('products').update(product).eq('id', product.id);
+    if (!error) {
+      setProducts(p => p.map(x => x.id === product.id ? product : x));
+      setEditingProduct(null);
+      logActivity(user.id, user.username, 'Produkt bearbeitet', product.name);
+    }
+  };
+
   const categories = ['Alle', ...Array.from(new Set(products.map(p => p.category))).sort()];
   const filtered = products.filter(p => {
     const matchesCategory = filter === 'Alle' || p.category === filter;
@@ -338,6 +355,64 @@ function InventoryTab({ user }: { user: Employee | null }) {
                          p.price.includes(search);
     return matchesCategory && matchesSearch;
   });
+
+  if (editingProduct) {
+    return (
+      <div className="max-w-2xl mx-auto bg-[#111] border border-[#FF4400]/30 p-6">
+        <h3 className="text-lg font-bold text-[#FF4400] mb-4">Produkt bearbeiten</h3>
+        <div className="space-y-4">
+          <input 
+            value={editingProduct.name} 
+            onChange={e => setEditingProduct({...editingProduct, name: e.target.value})}
+            className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3"
+            placeholder="Name"
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <input 
+              value={editingProduct.price} 
+              onChange={e => setEditingProduct({...editingProduct, price: e.target.value})}
+              className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3"
+              placeholder="Preis"
+            />
+            <input 
+              value={editingProduct.size} 
+              onChange={e => setEditingProduct({...editingProduct, size: e.target.value})}
+              className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3"
+              placeholder="Größe"
+            />
+          </div>
+          <select 
+            value={editingProduct.category}
+            onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}
+            className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3"
+          >
+            <option>Jacken</option><option>Pullover</option><option>Sweatshirts</option>
+            <option>Tops</option><option>Sonstiges</option>
+          </select>
+          <input 
+            value={editingProduct.vinted_url} 
+            onChange={e => setEditingProduct({...editingProduct, vinted_url: e.target.value})}
+            className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3"
+            placeholder="Vinted URL"
+          />
+          <div className="flex gap-2">
+            <button 
+              onClick={() => updateProduct(editingProduct)}
+              className="flex-1 py-3 bg-[#FF4400] text-white font-bold uppercase"
+            >
+              <Save className="w-4 h-4 inline mr-2"/> Speichern
+            </button>
+            <button 
+              onClick={() => setEditingProduct(null)}
+              className="flex-1 py-3 border border-gray-600 text-gray-400 uppercase"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -384,7 +459,7 @@ function InventoryTab({ user }: { user: Employee | null }) {
                   <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rotate-[-15deg] uppercase tracking-widest">Verkauft</span>
                 </div>
               )}
-              <div className="aspect-[3/4] bg-[#1A1A1A] overflow-hidden">
+              <div className="aspect-[3/4] bg-[#1A1A1A] overflow-hidden relative">
                 <img 
                   src={p.images?.[0] ? (p.images[0].startsWith('/api/') ? p.images[0] : `/api/image-proxy?url=${encodeURIComponent(p.images[0])}`) : ''} 
                   alt={p.name} 
@@ -398,17 +473,25 @@ function InventoryTab({ user }: { user: Employee | null }) {
               </div>
               <div className="p-2 bg-[#0A0A0A]">
                 <p className="text-xs font-bold truncate">{p.name}</p>
-                <p className="text-xs text-[#FF4400] mt-0.5">€{p.price.replace(/^€/, '')} · {p.size}</p>
+                <p className="text-xs text-[#FF4400] mt-0.5">€{p.price?.replace(/^€/, '')} · {p.size}</p>
                 <div className="flex gap-1 mt-2">
                   {user?.permissions.canEditProducts && (
-                    <button 
-                      onClick={() => markSold(p.id, p.sold)} 
-                      className={`flex-1 py-1 text-xs font-bold uppercase flex items-center justify-center gap-1 ${
-                        p.sold ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
-                      }`}
-                    >
-                      <ShoppingBag className="w-3 h-3"/>{p.sold ? 'Reaktiv.' : 'Verkauft'}
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => setEditingProduct(p)} 
+                        className="px-2 py-1 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                      >
+                        <Edit3 className="w-3 h-3"/>
+                      </button>
+                      <button 
+                        onClick={() => markSold(p.id, p.sold)} 
+                        className={`flex-1 py-1 text-xs font-bold uppercase flex items-center justify-center gap-1 ${
+                          p.sold ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
+                        }`}
+                      >
+                        <ShoppingBag className="w-3 h-3"/>{p.sold ? 'Reaktiv.' : 'Verkauft'}
+                      </button>
+                    </>
                   )}
                   <a href={p.vinted_url} target="_blank" className="px-2 py-1 border border-[#FF4400]/30 text-[#FF4400]">
                     <ExternalLink className="w-3 h-3"/>
@@ -471,7 +554,7 @@ function AddTab({ user }: { user: Employee | null }) {
     const newProduct = {
       name: formData.name,
       category: formData.category,
-      price: formData.price.replace(/^€/, ''), // € entfernen
+      price: formData.price.replace(/^€/, ''),
       size: formData.size || '–',
       condition: formData.condition,
       images: formData.images,
@@ -590,41 +673,77 @@ function AddTab({ user }: { user: Employee | null }) {
 // =================== ANALYTICS TAB ===================
 function AnalyticsTab() {
   const [stats, setStats] = useState({ total: 0, sold: 0, active: 0, revenue: 0 });
+  const [employeeStats, setEmployeeStats] = useState<Employee[]>([]);
 
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
-    const { data } = await supabase.from('products').select('*');
-    if (data) {
-      const sold = data.filter(p => p.sold).length;
+    const { data: products } = await supabase.from('products').select('*');
+    if (products) {
+      const sold = products.filter(p => p.sold).length;
       setStats({
-        total: data.length,
+        total: products.length,
         sold: sold,
-        active: data.length - sold,
-        revenue: data.filter(p => p.sold).reduce((acc, p) => acc + (parseFloat(p.price) || 0), 0)
+        active: products.length - sold,
+        revenue: products.filter(p => p.sold).reduce((acc, p) => acc + (parseFloat(p.price) || 0), 0)
       });
     }
+
+    const { data: employees } = await supabase.from('employees').select('*').order('login_count', { ascending: false });
+    if (employees) setEmployeeStats(employees);
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div className="bg-[#111] border border-[#FF4400]/20 p-6 text-center">
-        <div className="text-4xl font-bold text-[#FF4400] mb-2">{stats.total}</div>
-        <div className="text-xs uppercase text-gray-500">Gesamt Produkte</div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-[#111] border border-[#FF4400]/20 p-6 text-center">
+          <div className="text-4xl font-bold text-[#FF4400] mb-2">{stats.total}</div>
+          <div className="text-xs uppercase text-gray-500">Gesamt Produkte</div>
+        </div>
+        <div className="bg-[#111] border border-green-500/20 p-6 text-center">
+          <div className="text-4xl font-bold text-green-500 mb-2">{stats.active}</div>
+          <div className="text-xs uppercase text-gray-500">Aktiv</div>
+        </div>
+        <div className="bg-[#111] border border-red-500/20 p-6 text-center">
+          <div className="text-4xl font-bold text-red-500 mb-2">{stats.sold}</div>
+          <div className="text-xs uppercase text-gray-500">Verkauft</div>
+        </div>
+        <div className="bg-[#111] border border-yellow-400/20 p-6 text-center">
+          <div className="text-4xl font-bold text-yellow-400 mb-2">€{stats.revenue.toFixed(2)}</div>
+          <div className="text-xs uppercase text-gray-500">Geschätzter Umsatz</div>
+        </div>
       </div>
-      <div className="bg-[#111] border border-green-500/20 p-6 text-center">
-        <div className="text-4xl font-bold text-green-500 mb-2">{stats.active}</div>
-        <div className="text-xs uppercase text-gray-500">Aktiv</div>
-      </div>
-      <div className="bg-[#111] border border-red-500/20 p-6 text-center">
-        <div className="text-4xl font-bold text-red-500 mb-2">{stats.sold}</div>
-        <div className="text-xs uppercase text-gray-500">Verkauft</div>
-      </div>
-      <div className="bg-[#111] border border-yellow-400/20 p-6 text-center">
-        <div className="text-4xl font-bold text-yellow-400 mb-2">€{stats.revenue.toFixed(2)}</div>
-        <div className="text-xs uppercase text-gray-500">Geschätzter Umsatz</div>
+
+      <div className="bg-[#111] border border-[#FF4400]/20 p-6">
+        <h3 className="text-lg font-bold text-[#FF4400] mb-4">Mitarbeiter Aktivität</h3>
+        <table className="w-full text-sm">
+          <thead className="border-b border-[#FF4400]/30">
+            <tr>
+              <th className="text-left py-2">Username</th>
+              <th className="text-left py-2">Rolle</th>
+              <th className="text-left py-2">Logins</th>
+              <th className="text-left py-2">Arbeitsstunden</th>
+              <th className="text-left py-2">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employeeStats.map(emp => (
+              <tr key={emp.id} className="border-b border-[#FF4400]/10">
+                <td className="py-3 font-bold">{emp.username}</td>
+                <td className="py-3">{emp.role}</td>
+                <td className="py-3">{emp.login_count}</td>
+                <td className="py-3">{emp.total_work_hours}h</td>
+                <td className="py-3">
+                  <span className={emp.online ? 'text-green-500' : 'text-gray-500'}>
+                    {emp.online ? '● Online' : '○ Offline'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -637,6 +756,8 @@ function EmployeesTab({ currentUser }: { currentUser: Employee }) {
     username: '', password: '', role: 'Mitarbeiter' as const,
     permissions: { canAddProducts: false, canEditProducts: false, canDeleteProducts: false, canViewStats: false, canManageEmployees: false }
   });
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => { loadEmployees(); }, []);
 
@@ -673,6 +794,18 @@ function EmployeesTab({ currentUser }: { currentUser: Employee }) {
     await supabase.from('employees').delete().eq('id', id);
     loadEmployees();
     logActivity(currentUser.id, currentUser.username, 'Mitarbeiter gelöscht', username);
+  };
+
+  const resetPassword = async (id: number) => {
+    if (!newPassword) {
+      alert('Bitte neues Passwort eingeben');
+      return;
+    }
+    await supabase.from('employees').update({ password: newPassword }).eq('id', id);
+    setNewPassword('');
+    setEditingEmployee(null);
+    loadEmployees();
+    logActivity(currentUser.id, currentUser.username, 'Passwort zurückgesetzt', `ID: ${id}`);
   };
 
   const updatePermissions = async (id: number, permissions: any) => {
@@ -738,6 +871,36 @@ function EmployeesTab({ currentUser }: { currentUser: Employee }) {
         </button>
       </div>
 
+      {/* Passwort ändern Modal */}
+      {editingEmployee && (
+        <div className="bg-[#111] border border-blue-500/30 p-6">
+          <h3 className="text-lg font-bold text-blue-400 mb-4 flex items-center gap-2">
+            <Key className="w-5 h-5"/> Passwort ändern für {editingEmployee.username}
+          </h3>
+          <div className="flex gap-2">
+            <input 
+              type="password"
+              placeholder="Neues Passwort"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"
+            />
+            <button 
+              onClick={() => resetPassword(editingEmployee.id)}
+              className="px-6 py-3 bg-blue-500 text-white font-bold uppercase text-xs"
+            >
+              Speichern
+            </button>
+            <button 
+              onClick={() => {setEditingEmployee(null); setNewPassword('');}}
+              className="px-6 py-3 border border-gray-600 text-gray-400 uppercase text-xs"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mitarbeiter Liste */}
       <div className="bg-[#111] border border-[#FF4400]/20 overflow-hidden">
         <table className="w-full text-sm">
@@ -775,12 +938,20 @@ function EmployeesTab({ currentUser }: { currentUser: Employee }) {
                   {emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}
                 </td>
                 <td className="px-4 py-3">
-                  <button 
-                    onClick={() => deleteEmployee(emp.id, emp.username)}
-                    className="text-red-400 hover:text-red-300"
-                  >
-                    <Trash2 className="w-4 h-4"/>
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEditingEmployee(emp)}
+                      className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold uppercase"
+                    >
+                      <Key className="w-3 h-3"/>
+                    </button>
+                    <button 
+                      onClick={() => deleteEmployee(emp.id, emp.username)}
+                      className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-bold uppercase"
+                    >
+                      <Trash2 className="w-3 h-3"/>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -843,4 +1014,3 @@ async function logActivity(employeeId: number, username: string, action: string,
     timestamp: new Date().toISOString()
   });
 }
-
