@@ -585,6 +585,7 @@ function AnalyticsTab() {
 // =================== EMPLOYEES TAB ===================
 function EmployeesTab({ currentUser, toast }: { currentUser: Employee, toast: (msg: string, type?: ToastType) => void }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const { confirmOptions, confirm, closeConfirm } = useConfirm();
   const [isAdding, setIsAdding] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [newPassword, setNewPassword] = useState('');
