@@ -124,22 +124,7 @@ export default function ManagementPanel() {
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [activeTab, setActiveTab] = useState('inventory');
   const { toasts, addToast, removeToast } = useToast();
-return (
-    <div className="min-h-screen font-sans bg-[#0A0A0A] text-[#F5F5F5]">
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
-      {confirmOptions && <ConfirmDialog options={confirmOptions} onClose={closeConfirm} />}
-      {/* ... rest */}
-      <main className="max-w-7xl mx-auto p-6">
-        {activeTab==='inventory' && <InventoryTab user={currentUser} toast={addToast} confirm={confirm} />}
-        {activeTab==='add' && <AddTab user={currentUser} toast={addToast} />}
-        {activeTab==='analytics' && <AnalyticsTab />}
-        {activeTab==='employees' && currentUser?.permissions.canManageEmployees && 
-          <EmployeesTab currentUser={currentUser} toast={addToast} confirm={confirm} />}
-        {activeTab==='logs' && currentUser?.role === 'Admin' && <LogsTab />}
-      </main>
-    </div>
-  );
-}
+
   useEffect(() => {
     const savedAuth = sessionStorage.getItem('scnd_auth');
     const savedUser = sessionStorage.getItem('scnd_user');
