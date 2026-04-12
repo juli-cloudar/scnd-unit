@@ -288,13 +288,13 @@ function InventoryTab({ user, toast }: { user: Employee | null, toast: (msg: str
 
   const removeProduct = (id: number) => {
     if (!user?.permissions.canDeleteProducts) { toast('Keine Berechtigung!', 'error'); return; }
-   confirm('Produkt wirklich löschen?', () => {
-  supabase.from('products').delete().eq('id', id).then(({ error }) => {
-    if (error) { toast('Fehler: ' + error.message, 'error'); return; }
-    setProducts(p => p.filter(x => x.id !== id));
-    toast('Produkt gelöscht', 'info');  // ← diese Nachricht fehlte vorher
-  });
-});
+    if (!confirm('Produkt wirklich löschen?')) return;
+    supabase.from('products').delete().eq('id', id).then(({ error }) => {
+      if (error) { toast('Fehler: ' + error.message, 'error'); return; }
+      setProducts(p => p.filter(x => x.id !== id));
+      toast('Produkt gelöscht', 'info');
+    });
+  };
 
   const updateProduct = (product: Product) => {
     if (!user?.permissions.canEditProducts) { toast('Keine Berechtigung!', 'error'); return; }
@@ -620,13 +620,13 @@ function EmployeesTab({ currentUser, toast }: { currentUser: Employee, toast: (m
   };
 
   const deleteEmployee = (id: number, username: string) => {
-    confirm(`${username} wirklich löschen?`, () => {
-  supabase.from('employees').delete().eq('id', id).then(({ error }) => {
-    if (error) { toast('Fehler: ' + error.message, 'error'); return; }
-    toast('Mitarbeiter gelöscht', 'info');
-    loadEmployees();
-  });
-});
+    if (!confirm(`${username} wirklich löschen?`)) return;
+    supabase.from('employees').delete().eq('id', id).then(({ error }) => {
+      if (error) { toast('Fehler: ' + error.message, 'error'); return; }
+      toast('Mitarbeiter gelöscht', 'info');
+      loadEmployees();
+    });
+  };
 
   const resetPassword = (id: number) => {
     if (!newPassword) { toast('Bitte neues Passwort eingeben', 'error'); return; }
@@ -737,5 +737,4 @@ function LogsTab() {
 // =================== HILFSFUNKTIONEN ===================
 async function logActivity(employeeId: number, username: string, action: string, details: string = '') {
   await supabase.from('activity_logs').insert({ employee_id: employeeId, username, action, details, timestamp: new Date().toISOString() });
-}
 }
