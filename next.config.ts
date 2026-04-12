@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Entferne oder kommentiere output: export aus
-  // output: 'export',
-  
   images: {
-    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.vinted.net',
+      },
+    ],
   },
 };
 
