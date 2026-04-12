@@ -194,7 +194,7 @@ const newProduct = {
   id: newId, 
   name: formData.name, 
   category: formData.category, 
-  price: formData.price.replace(/^€/, ''), // ← € entfernen falls vorhanden
+  price: formData.price.replace(/^/, ''), // 
   size: formData.size || '–', 
   condition: formData.condition, 
   images: formData.images, 
