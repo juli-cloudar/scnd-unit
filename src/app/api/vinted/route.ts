@@ -1,4 +1,3 @@
-// app/api/scrape-vinted/route.ts
 import { NextResponse } from 'next/server';
 
 const CORS = {
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
 
     const html = await response.text();
 
-    // ── BILDER EXTRAKTION (URLs für Proxy) ──────────────────────────────────
+    // ── BILDER ──────────────────────────────────────────────────────────────
     const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
     const seen = new Set<string>();
     const images: string[] = [];
@@ -46,8 +45,7 @@ export async function POST(request: Request) {
       const base = fullUrl.split('?')[0];
       if (!seen.has(base)) {
         seen.add(base);
-        // WICHTIG: URL für deinen Proxy encoden
-        images.push(`/api/image-proxy?url=${encodeURIComponent(fullUrl)}`);
+        images.push(fullUrl);
       }
     }
 
@@ -56,63 +54,80 @@ export async function POST(request: Request) {
     const titleMatch = html.match(/<title>\s*([^|<]+)/i);
     const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
-    
-    // ── GRÖSSE ──────────────────────────────────────────────────────────────
+    // ── PREIS ───────────────────────────────────────────────────────────────
+    let price = '';
+    const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+    for (const jsonMatch of jsonLdMatches) {
+      try {
+        const jsonData = JSON.parse(jsonMatch[1]);
+        const findPrice = (obj: any): string | null => {
+          if (!obj) return null;
+          if (obj.price) {
+            return obj.price.toString().replace('.', ',');
+          }
+          if (typeof obj === 'object') {
+            for (const key in obj) {
+              const found = findPrice(obj[key]);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+        const foundPrice = findPrice(jsonData);
+        if (foundPrice) {
+          price = foundPrice;
+          break;
+        }
+      } catch (e) {}
+    }
+
+    if (!price) {
+      const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
+      const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
+      if (priceMatch) {
+        price = priceMatch[1];
+      }
+    }
+
+    // ── GRÖSSE (VERBESSERT) ─────────────────────────────────────────────────
     let size = '';
-    const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,10})"/i) ||
-                         html.match(/"size_name"[:\s]*"([^"]{1,10})"/i);
+    
+    // Versuch 1: JSON-LD
+    const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,15})"/i) ||
+                         html.match(/"size_name"[:\s]*"([^"]{1,15})"/i);
     if (sizeJsonMatch) {
       size = sizeJsonMatch[1].trim();
     }
+    
+    // Versuch 2: HTML Struktur (Vinted spezifisch)
     if (!size) {
-      const sizeSectionMatch = html.match(/Größe[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i) ||
-                              html.match(/Size[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i);
-      if (sizeSectionMatch) {
-        size = sizeSectionMatch[1].trim().replace(/[·\/]/g, '').trim();
-      }
-    }
-    if (!size) {
-      const standardSizeMatch = html.match(/\b(XS|S|M|L|XL|XXL|XXXL|One Size|Einheitsgröße|UNI)\b/i);
-      if (standardSizeMatch) {
-        size = standardSizeMatch[1];
-      }
-    }
-
-// ── PREIS (nur Zahl, kein €-Zeichen) ─────────────────────────────────────
-let price = '';
-const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
-for (const jsonMatch of jsonLdMatches) {
-  try {
-    const jsonData = JSON.parse(jsonMatch[1]);
-    const findPrice = (obj: any): string | null => {
-      if (!obj) return null;
-      if (obj.price) {
-        return obj.price.toString().replace('.', ',');
-      }
-      if (typeof obj === 'object') {
-        for (const key in obj) {
-          const found = findPrice(obj[key]);
-          if (found) return found;
+      // Suche nach Größe in verschiedenen HTML-Patterns
+      const sizePatterns = [
+        /Größe[:\s]*<[^>]+>\s*([^<]{1,15}?)\s*<\/[^>]+>/i,
+        /Größe[:\s]*([^<\n]{1,15}?)(?=<|\n|·|\/|$)/i,
+        /size[:\s]*<[^>]+>\s*([^<]{1,15}?)\s*<\/[^>]+>/i,
+        /class="[^"]*size[^"]*"[^>]*>([^<]{1,15})/i,
+        /data-testid="size"[^>]*>([^<]+)/i,
+      ];
+      
+      for (const pattern of sizePatterns) {
+        const match = html.match(pattern);
+        if (match?.[1]) {
+          size = match[1].trim().replace(/[·\/]/g, '').trim();
+          if (size && size.length < 20) break;
         }
       }
-      return null;
-    };
-    const foundPrice = findPrice(jsonData);
-    if (foundPrice) {
-      price = foundPrice; // Nur "32", nicht "32€"
-      break;
     }
-  } catch (e) {}
-}
+    
+    // Versuch 3: Standard-Größen im Text finden (nach "Größe" oder "Size")
+    if (!size) {
+      const sizeContextMatch = html.match(/(?:Größe|Size)[^a-zA-Z0-9]{0,5}(XS|S|M|L|XL|XXL|XXXL|One Size|UNI|\d{2,3}\s*(?:cm|CM)?)\b/i);
+      if (sizeContextMatch) {
+        size = sizeContextMatch[1].trim();
+      }
+    }
 
-if (!price) {
-  const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
-  const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
-  if (priceMatch) {
-    price = priceMatch[1]; // Nur "32", nicht "32€"
-  }
-}
-    // ── ZUSTAND ─────────────────────────────────────────────────────────────
+    // ── ZUSTAND (VERBESSERT) ────────────────────────────────────────────────
     const condMap: Record<string, string> = {
       'neu mit etikett': 'Neu mit Etikett',
       'neu ohne etikett': 'Neu ohne Etikett',
@@ -124,23 +139,40 @@ if (!price) {
     };
     
     let condition = '';
+    const htmlLower = html.toLowerCase();
+    
+    // Suche mit Priorität (längere Phrasen zuerst)
     const sortedConditions = Object.entries(condMap).sort((a, b) => b[0].length - a[0].length);
     
     for (const [key, val] of sortedConditions) {
-      const patterns = [
-        new RegExp(`[>·\\s]${key}[<·\\s]`, 'i'),
-        new RegExp(`Zustand[^<]*${key}`, 'i'),
-        new RegExp(`condition[^<]*${key}`, 'i'),
-        new RegExp(`"${key}"`, 'i'),
-      ];
-      
-      for (const pattern of patterns) {
-        if (pattern.test(html)) {
-          condition = val;
-          break;
+      // Erst: Exakte Übereinstimmung mit Word-Boundaries
+      const exactPattern = new RegExp(`\\b${key}\\b`, 'i');
+      if (exactPattern.test(htmlLower)) {
+        // Prüfe ob es im richtigen Kontext steht (Zustand/Condition Bereich)
+        const contextPatterns = [
+          new RegExp(`Zustand[^<]{0,50}${key}`, 'i'),
+          new RegExp(`condition[^<]{0,50}${key}`, 'i'),
+          new RegExp(`class="[^"]*condition[^"]*"[^>]*>[^<]*${key}`, 'i'),
+          new RegExp(`data-testid="condition"[^>]*>[^<]*${key}`, 'i'),
+          new RegExp(`>[\\s\\w]*${key}[\\s\\w]*<`, 'i'),
+        ];
+        
+        for (const pattern of contextPatterns) {
+          if (pattern.test(html)) {
+            condition = val;
+            break;
+          }
         }
+        if (condition) break;
       }
-      if (condition) break;
+    }
+    
+    // Fallback: Suche nach Vinted-typischen Markern
+    if (!condition) {
+      const vintedCondMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Neu|Sehr gut|Gut|Zufriedenstellend|Schlecht)</i);
+      if (vintedCondMatch) {
+        condition = vintedCondMatch[1];
+      }
     }
 
     // ── KATEGORIE ───────────────────────────────────────────────────────────
@@ -173,7 +205,7 @@ if (!price) {
       size,
       condition,
       category,
-      images: images.slice(0, 5), // Proxy-URLs
+      images: images.slice(0, 10),
     }, { headers: CORS });
 
   } catch (e) {
