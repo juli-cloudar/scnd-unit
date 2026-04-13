@@ -1,6 +1,13 @@
 // src/app/api/vinted/route.ts
 import { NextResponse } from 'next/server';
 
+// ⭐⭐⭐ DAS HINZUFÜGEN ⭐⭐⭐
+export const runtime = 'nodejs';
+export const preferredRegion = 'auto';
+// ⭐⭐⭐
+
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
