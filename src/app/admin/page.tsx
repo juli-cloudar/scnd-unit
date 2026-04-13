@@ -310,32 +310,46 @@ function VintedToolsTab({ user, toast, confirm }: {
   const [autoRemove, setAutoRemove] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-  // Bulk Scrape - ganzen Account importieren (NEU)
+  // ═══════════════════════════════════════════════════════════
+  // NEU - EINFÜGEN
+  // ═══════════════════════════════════════════════════════════
+  // Bulk Scrape - ganzen Account importieren
   const scrapeBulk = async () => {
     if (!profileUrl) {
       toast('Bitte Profil-URL oder Username eingeben', 'error');
       return;
     }
 
+    // Username aus URL extrahieren (Frontend-seitig)
+    let username = profileUrl;
+    if (profileUrl.includes('vinted')) {
+      // Extrahiere aus https://www.vinted.de/member/123456-username 
+      const match = profileUrl.match(/member\/\d+-([^/?]+)/) || 
+                    profileUrl.match(/member\/([^/?]+)/);
+      if (match) username = match[1];
+    }
+    // Entferne @ falls vorhanden
+    username = username.replace(/^@/, '');
+
     setLoading(true);
     setResult(null);
     setProgress({ current: 0, total: 0 });
 
     try {
-      // Schritt 1: URLs holen
+      // Schritt 1: URLs holen (quick mode)
       const quickRes = await fetch('/api/vinted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           mode: 'bulk', 
-          profileUrl,
+          username,  // ← KORRIGIERT: username statt profileUrl
           quick: true 
         }),
       });
 
       const quickData = await quickRes.json();
       if (!quickRes.ok) {
-        toast(quickData.message || 'Fehler', 'error');
+        toast(quickData.message || 'Fehler beim Finden der Items', 'error');
         setLoading(false);
         return;
       }
@@ -349,7 +363,7 @@ function VintedToolsTab({ user, toast, confirm }: {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           mode: 'bulk', 
-          profileUrl,
+          username,  // ← KORRIGIERT
           autoRemove 
         }),
       });
@@ -392,91 +406,7 @@ function VintedToolsTab({ user, toast, confirm }: {
       setProgress({ current: 0, total: 0 });
     }
   };
-
-  // Status Check - alle Produkte prüfen
-  const checkStatus = async () => {
-    setLoading(true);
-    setResult(null);
-
-    try {
-      const { data: products, error } = await supabase.from('products').select('*').eq('sold', false);
-      if (error) {
-        toast('Fehler beim Laden der Produkte', 'error');
-        setLoading(false);
-        return;
-      }
-
-      if (!products || products.length === 0) {
-        toast('Keine aktiven Produkte gefunden', 'info');
-        setLoading(false);
-        return;
-      }
-
-      setProgress({ current: 0, total: products.length });
-      toast(`Prüfe ${products.length} Produkte...`, 'info');
-
-      const soldItems: any[] = [];
-      const reservedItems: any[] = [];
-
-      for (let i = 0; i < products.length; i++) {
-        const product = products[i];
-        try {
-          const res = await fetch('/api/vinted', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: 'single', url: product.vinted_url }),
-          });
-
-          const data = await res.json();
-
-          if (data.status === 'sold') {
-            soldItems.push({ ...product, ...data });
-            if (autoRemove) {
-              await supabase.from('products').update({ sold: true }).eq('id', product.id);
-            }
-          } else if (data.status === 'reserved') {
-            reservedItems.push({ ...product, ...data });
-          }
-
-          setProgress(prev => ({ ...prev, current: i + 1 }));
-          await new Promise(r => setTimeout(r, 500));
-        } catch (e) {
-          console.error(`Fehler bei Produkt ${product.id}:`, e);
-        }
-      }
-
-      const resultData = {
-        timestamp: new Date().toISOString(),
-        summary: {
-          total: products.length,
-          checked: products.length,
-          sold: soldItems.length,
-          reserved: reservedItems.length,
-          available: products.length - soldItems.length - reservedItems.length,
-          autoRemoved: autoRemove ? soldItems.length : 0,
-        },
-        soldItems: soldItems.map(s => ({ id: s.id, name: s.name, url: s.vinted_url })),
-        reservedItems: reservedItems.map(r => ({ id: r.id, name: r.name, url: r.vinted_url })),
-        message: autoRemove && soldItems.length > 0
-          ? `✅ ${products.length} geprüft, ${soldItems.length} als verkauft markiert`
-          : `✅ ${products.length} geprüft, ${soldItems.length} verkauft, ${reservedItems.length} reserviert`,
-      };
-
-      setResult(resultData);
-      toast(resultData.message, soldItems.length > 0 ? 'info' : 'success');
-      
-      if (soldItems.length > 0 || reservedItems.length > 0) {
-        logActivity(user!.id, user!.username, 'Status Check', `${soldItems.length} verkauft, ${reservedItems.length} reserviert`);
-      }
-
-    } catch (e) {
-      toast('Fehler beim Status-Check: ' + String(e), 'error');
-    } finally {
-      setLoading(false);
-      setProgress({ current: 0, total: 0 });
-    }
-  };
-
+  // ═══════════════════════════════════════════════════════════
   // Einzelnes Item checken
   const checkSingleItem = async () => {
     if (!url) {
