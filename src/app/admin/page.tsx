@@ -295,9 +295,8 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
     </div>
   );
 }
-
-// =================== VINTED TOOLS TAB ===================
-// Ersetze die bestehende VintedToolsTab Funktion in src/app/admin/page.tsx
+// Ersetze VintedToolsTab + füge ResultDisplay danach ein
+// in src/app/admin/page.tsx
 
 function VintedToolsTab({ user, toast, confirm }: {
   user: Employee | null,
@@ -305,104 +304,174 @@ function VintedToolsTab({ user, toast, confirm }: {
   confirm: (msg: string, onConfirm: () => void) => void
 }) {
   const [activeSubTab, setActiveSubTab] = useState<'bulk' | 'status'>('bulk');
-
-  // ── BULK STATE ───────────────────────────────────────────────────────────────
-  // Voreingestellter Account-Link – kann vom User überschrieben werden
-  const [profileUrl, setProfileUrl] = useState('https://www.vinted.de/member/3138250645-scndunit');
   const [autoRemove, setAutoRemove] = useState(false);
+
+  // ── BULK STATE ──
+  const [profileUrl, setProfileUrl] = useState('https://www.vinted.de/member/3138250645-scndunit');
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, batch: 0, totalBatches: 0, skippedDupes: 0 });
   const [bulkResult, setBulkResult] = useState<any>(null);
 
-  // ── STATUS/SINGLE STATE ──────────────────────────────────────────────────────
+  // ── STATUS STATE ──
   const [singleUrl, setSingleUrl] = useState('');
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusProgress, setStatusProgress] = useState({ current: 0, total: 0 });
   const [statusResult, setStatusResult] = useState<any>(null);
   const [singleResult, setSingleResult] = useState<any>(null);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // BULK IMPORT – Account importieren
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
+  // BULK IMPORT
+  // ═══════════════════════════════════════════════════════
   const scrapeBulk = async () => {
     if (!profileUrl) { toast('Bitte Profil-URL eingeben', 'error'); return; }
 
     setBulkLoading(true);
     setBulkResult(null);
-    setBulkProgress({ current: 0, total: 0 });
+    setBulkProgress({ current: 0, total: 0, batch: 0, totalBatches: 0, skippedDupes: 0 });
 
     try {
-      // Schritt 1: Quick-Scan – nur Anzahl der Items ermitteln
+      // ── Schritt 1: Quick-Scan – alle URLs + Anzahl holen ──
       const quickRes = await fetch('/api/vinted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'bulk', profileUrl, quick: true }),
       });
       const quickData = await quickRes.json();
+      if (!quickRes.ok) { toast(quickData.message || 'Fehler beim Laden', 'error'); setBulkLoading(false); return; }
 
-      if (!quickRes.ok) {
-        toast(quickData.message || 'Fehler beim Finden der Items', 'error');
+      const allVintedUrls: string[] = quickData.itemUrls;
+      const totalItems = allVintedUrls.length;
+
+      // ── Schritt 2: Bereits vorhandene URLs aus Supabase laden ──
+      const { data: existingProducts } = await supabase.from('products').select('vinted_url');
+      const existingUrls = new Set<string>(
+        (existingProducts || []).map((p: any) => {
+          // Normalisieren: URL ohne Query-Params und ohne trailing slash
+          try { return new URL(p.vinted_url).pathname.replace(/\/$/, ''); } catch { return p.vinted_url; }
+        })
+      );
+
+      // ── Schritt 3: Nur neue URLs scrapen ──
+      const newUrls = allVintedUrls.filter(u => {
+        try { return !existingUrls.has(new URL(u).pathname.replace(/\/$/, '')); } catch { return !existingUrls.has(u); }
+      });
+
+      const dupeCount = totalItems - newUrls.length;
+
+      if (newUrls.length === 0) {
+        toast(`Alle ${totalItems} Items bereits in der Datenbank – nichts zu importieren`, 'info');
+        setBulkResult({
+          summary: { total: totalItems, available: 0, sold: 0, reserved: 0, errors: 0, dupes: dupeCount },
+          soldItems: [],
+          message: `✅ Alle ${totalItems} Items bereits vorhanden – keine Duplikate importiert`,
+        });
         setBulkLoading(false);
         return;
       }
 
-      setBulkProgress({ current: 0, total: quickData.totalItems });
-      toast(`${quickData.totalItems} Items gefunden – starte Import…`, 'info');
+      toast(`${totalItems} Items gefunden · ${dupeCount} bereits vorhanden · ${newUrls.length} neu`, 'info');
 
-      // Schritt 2: Vollständiges Scraping
-      const res = await fetch('/api/vinted', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'bulk', profileUrl, autoRemove }),
-      });
-      const data = await res.json();
-      setBulkResult(data);
+      const BATCH_SIZE = 5;
+      const totalBatches = Math.ceil(newUrls.length / BATCH_SIZE);
+      setBulkProgress({ current: 0, total: newUrls.length, batch: 0, totalBatches, skippedDupes: dupeCount });
 
-      // Schritt 3: In Supabase speichern
-      if (data.items?.added?.length > 0) {
-        let savedCount = 0;
-        for (const item of data.items.added) {
-          const newProduct = {
-            name: item.name,
-            category: item.category || 'Sonstiges',
-            price: (item.price || '0').replace(/^€/, '').replace(',', '.'),
-            size: item.size || '–',
-            condition: item.condition || 'Gut',
-            images: item.images || [],
-            vinted_url: item.url,
-            sold: false,
-          };
-          const { error } = await supabase.from('products').insert(newProduct);
-          if (!error) savedCount++;
-          setBulkProgress(prev => ({ ...prev, current: prev.current + 1 }));
+      // ── Schritt 4: Batch-Loop über NUR neue URLs ──
+      let totalAdded = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
+      const allSoldItems: any[] = [];
+      let offset = 0;
+      let batchNum = 0;
+
+      while (offset < newUrls.length) {
+        batchNum++;
+        setBulkProgress(prev => ({ ...prev, batch: batchNum }));
+
+        // Batch der neuen URLs direkt übergeben (kein erneuter getAllUserItems-Call)
+        const batchUrls = newUrls.slice(offset, offset + BATCH_SIZE);
+
+        // Scrape direkt via items array (kein profileUrl nötig)
+        const res = await fetch('/api/vinted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // urls-Array übergeben → API scrapt diese direkt
+          body: JSON.stringify({ mode: 'bulk', urls: batchUrls, profileUrl, autoRemove, offset }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) { toast(`Fehler Batch ${batchNum}: ${data.message}`, 'error'); break; }
+
+        // Speichern – nochmal auf Duplikate prüfen (Race condition)
+        if (data.items?.added?.length > 0) {
+          for (const item of data.items.added) {
+            // Doppelte Sicherheitsprüfung direkt vor dem Insert
+            const { data: existing } = await supabase
+              .from('products')
+              .select('id')
+              .eq('vinted_url', item.url)
+              .maybeSingle();
+
+            if (existing) continue; // bereits vorhanden → überspringen
+
+            const newProduct = {
+              name: item.name,
+              category: item.category || 'Sonstiges',
+              price: (item.price || '0').replace(/^€/, '').replace(',', '.'),
+              size: item.size || '–',
+              condition: item.condition || 'Gut',
+              images: item.images || [],
+              vinted_url: item.url,
+              sold: false,
+            };
+            const { error } = await supabase.from('products').insert(newProduct);
+            if (!error) totalAdded++;
+          }
         }
-        toast(`${savedCount} von ${data.items.added.length} Items gespeichert`, 'success');
-        logActivity(user!.id, user!.username, 'Bulk Import', `${savedCount} Items von ${profileUrl}`);
-      } else {
-        toast('Keine neuen verfügbaren Items gefunden', 'info');
+
+        totalSkipped += data.items?.skipped?.length || 0;
+        totalErrors  += data.summary?.errors || 0;
+        if (data.soldItems) allSoldItems.push(...data.soldItems);
+
+        const processedSoFar = Math.min(offset + BATCH_SIZE, newUrls.length);
+        setBulkProgress(prev => ({ ...prev, current: processedSoFar }));
+
+        if (data.pagination?.isLastBatch || data.pagination?.nextOffset === null) break;
+        offset = data.pagination.nextOffset;
+
+        await new Promise(r => setTimeout(r, 400));
       }
 
-      if (data.items?.skipped?.length > 0) {
-        toast(`${data.items.skipped.length} verkaufte Items übersprungen`, 'info');
-      }
+      const finalResult = {
+        summary: {
+          total: totalItems,
+          available: totalAdded,
+          sold: totalSkipped,
+          reserved: 0,
+          errors: totalErrors,
+          dupes: dupeCount,
+        },
+        soldItems: allSoldItems,
+        message: `✅ Fertig: ${totalAdded} neu gespeichert · ${dupeCount} bereits vorhanden übersprungen · ${totalSkipped} verkauft`,
+      };
+      setBulkResult(finalResult);
+      toast(finalResult.message, 'success');
+      logActivity(user!.id, user!.username, 'Bulk Import', `${totalAdded} neu, ${dupeCount} Duplikate übersprungen`);
 
     } catch (e) {
-      toast('Fehler beim Bulk-Import: ' + String(e), 'error');
+      toast('Fehler: ' + String(e), 'error');
     } finally {
       setBulkLoading(false);
-      setBulkProgress({ current: 0, total: 0 });
+      setBulkProgress({ current: 0, total: 0, batch: 0, totalBatches: 0, skippedDupes: 0 });
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
   // EINZELNES ITEM PRÜFEN
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
   const checkSingleItem = async () => {
     if (!singleUrl) { toast('Bitte URL eingeben', 'error'); return; }
-
     setStatusLoading(true);
     setSingleResult(null);
-
     try {
       const res = await fetch('/api/vinted', {
         method: 'POST',
@@ -411,13 +480,11 @@ function VintedToolsTab({ user, toast, confirm }: {
       });
       const data = await res.json();
       setSingleResult(data);
-
       if (data.status === 'sold') {
         toast('⚠️ Item ist VERKAUFT!', 'error');
         if (autoRemove) {
-          const { data: products } = await supabase
-            .from('products').select('*').ilike('vinted_url', `%${singleUrl}%`);
-             if (products && products.length > 0) {
+          const { data: products } = await supabase.from('products').select('*').ilike('vinted_url', `%${singleUrl}%`);
+          if (products && products.length > 0) {
             await supabase.from('products').update({ sold: true }).eq('id', products[0].id);
             toast('Produkt als verkauft markiert', 'success');
           }
@@ -434,22 +501,17 @@ function VintedToolsTab({ user, toast, confirm }: {
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
   // ALLE PRODUKTE PRÜFEN
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
   const checkAllStatus = async () => {
     setStatusLoading(true);
     setStatusResult(null);
     setSingleResult(null);
-
     try {
-      const { data: products, error } = await supabase
-        .from('products').select('*').eq('sold', false);
-
-      if (error) { toast('Fehler beim Laden der Produkte', 'error'); setStatusLoading(false); return; }
-      if (!products || products.length === 0) {
-        toast('Keine aktiven Produkte gefunden', 'info'); setStatusLoading(false); return;
-      }
+      const { data: products, error } = await supabase.from('products').select('*').eq('sold', false);
+      if (error) { toast('Fehler beim Laden', 'error'); setStatusLoading(false); return; }
+      if (!products || products.length === 0) { toast('Keine aktiven Produkte', 'info'); setStatusLoading(false); return; }
 
       setStatusProgress({ current: 0, total: products.length });
       toast(`Prüfe ${products.length} Produkte…`, 'info');
@@ -466,30 +528,24 @@ function VintedToolsTab({ user, toast, confirm }: {
             body: JSON.stringify({ mode: 'single', url: product.vinted_url }),
           });
           const data = await res.json();
-
           if (data.status === 'sold') {
             soldItems.push({ ...product, ...data });
-            if (autoRemove) {
-              await supabase.from('products').update({ sold: true }).eq('id', product.id);
-            }
+            if (autoRemove) await supabase.from('products').update({ sold: true }).eq('id', product.id);
           } else if (data.status === 'reserved') {
             reservedItems.push({ ...product, ...data });
           }
-        } catch (e) {
-          console.error(`Fehler bei Produkt ${product.id}:`, e);
-        }
+        } catch {}
         setStatusProgress(prev => ({ ...prev, current: i + 1 }));
         await new Promise(r => setTimeout(r, 500));
       }
 
       const result = {
-        timestamp: new Date().toISOString(),
         summary: {
           total: products.length,
+          available: products.length - soldItems.length - reservedItems.length,
           sold: soldItems.length,
           reserved: reservedItems.length,
-          available: products.length - soldItems.length - reservedItems.length,
-          autoRemoved: autoRemove ? soldItems.length : 0,
+          errors: 0,
         },
         soldItems: soldItems.map(s => ({ id: s.id, name: s.name, url: s.vinted_url })),
         reservedItems: reservedItems.map(r => ({ id: r.id, name: r.name, url: r.vinted_url })),
@@ -497,40 +553,32 @@ function VintedToolsTab({ user, toast, confirm }: {
           ? `✅ ${products.length} geprüft – ${soldItems.length} als verkauft markiert`
           : `✅ ${products.length} geprüft – ${soldItems.length} verkauft, ${reservedItems.length} reserviert`,
       };
-
       setStatusResult(result);
       toast(result.message, soldItems.length > 0 ? 'info' : 'success');
-
       if (soldItems.length > 0 || reservedItems.length > 0) {
-        logActivity(user!.id, user!.username, 'Status Check',
-          `${soldItems.length} verkauft, ${reservedItems.length} reserviert`);
+        logActivity(user!.id, user!.username, 'Status Check', `${soldItems.length} verkauft, ${reservedItems.length} reserviert`);
       }
     } catch (e) {
-      toast('Fehler beim Status-Check: ' + String(e), 'error');
+      toast('Fehler: ' + String(e), 'error');
     } finally {
       setStatusLoading(false);
       setStatusProgress({ current: 0, total: 0 });
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
   // RENDER
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════
   return (
     <div className="space-y-6">
-
       {/* Sub-Navigation */}
       <div className="flex gap-2 border-b border-[#FF4400]/30 pb-4">
         <button onClick={() => setActiveSubTab('bulk')}
-          className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'bulk'
-            ? 'bg-green-600 text-white'
-            : 'border border-green-600/30 text-green-500 hover:bg-green-600/10'}`}>
+          className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'bulk' ? 'bg-green-600 text-white' : 'border border-green-600/30 text-green-500 hover:bg-green-600/10'}`}>
           <Globe className="w-4 h-4 inline mr-1"/>Bulk Import
         </button>
         <button onClick={() => setActiveSubTab('status')}
-          className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'status'
-            ? 'bg-blue-600 text-white'
-            : 'border border-blue-600/30 text-blue-500 hover:bg-blue-600/10'}`}>
+          className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'status' ? 'bg-blue-600 text-white' : 'border border-blue-600/30 text-blue-500 hover:bg-blue-600/10'}`}>
           <RefreshCw className="w-4 h-4 inline mr-1"/>Status Check
         </button>
       </div>
@@ -546,18 +594,18 @@ function VintedToolsTab({ user, toast, confirm }: {
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
           <input type="checkbox" checked={autoRemove} onChange={e => setAutoRemove(e.target.checked)} className="sr-only peer"/>
-          <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+          <div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"/>
         </label>
       </div>
 
-      {/* ── BULK IMPORT TAB ── */}
+      {/* ── BULK TAB ── */}
       {activeSubTab === 'bulk' && (
         <div className="bg-[#111] border border-green-500/30 p-6 space-y-4">
           <h3 className="text-lg font-bold text-green-400 flex items-center gap-2">
             <Globe className="w-5 h-5"/>Vinted Account Import
           </h3>
           <p className="text-xs text-gray-500 uppercase tracking-wide">
-            Alle verfügbaren Items eines Accounts werden importiert und in der Datenbank gespeichert.
+            Neue Items werden importiert · Duplikate automatisch übersprungen
           </p>
 
           <div className="flex gap-2">
@@ -568,42 +616,45 @@ function VintedToolsTab({ user, toast, confirm }: {
               placeholder="https://www.vinted.de/member/..."
               className="flex-1 bg-[#1A1A1A] border border-green-500/30 px-4 py-3 text-sm font-mono"
             />
-            <button
-              onClick={scrapeBulk}
-              disabled={bulkLoading}
-              className="px-6 py-3 bg-green-600 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50 whitespace-nowrap"
-            >
+            <button onClick={scrapeBulk} disabled={bulkLoading}
+              className="px-6 py-3 bg-green-600 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50 whitespace-nowrap">
               {bulkLoading
-                ? `⏳ ${bulkProgress.current}/${bulkProgress.total}`
+                ? `⏳ ${bulkProgress.batch}/${bulkProgress.totalBatches}`
                 : '📦 Importieren'}
             </button>
           </div>
 
-          {/* Fortschrittsbalken */}
+          {/* Fortschritt */}
           {bulkLoading && bulkProgress.total > 0 && (
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Verarbeite Items…</span>
-                <span>{Math.round((bulkProgress.current / bulkProgress.total) * 100)}%</span>
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">
+                  {bulkProgress.current} / {bulkProgress.total} neue Items
+                  {bulkProgress.skippedDupes > 0 && (
+                    <span className="text-gray-600 ml-2">· {bulkProgress.skippedDupes} Duplikate übersprungen</span>
+                  )}
+                </span>
+                <span className="text-gray-500">
+                  {Math.round((bulkProgress.current / bulkProgress.total) * 100)}%
+                </span>
               </div>
               <div className="w-full bg-gray-800 rounded-full h-2">
-                <div
-                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
-                />
+                <div className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}/>
               </div>
+              <p className="text-xs text-gray-600 text-center">
+                Batch {bulkProgress.batch} von {bulkProgress.totalBatches} · 5 Items pro Batch
+              </p>
             </div>
           )}
 
-          {/* Ergebnis Bulk */}
           {bulkResult && <ResultDisplay result={bulkResult} />}
         </div>
       )}
 
-      {/* ── STATUS CHECK TAB ── */}
+      {/* ── STATUS TAB ── */}
       {activeSubTab === 'status' && (
         <div className="space-y-4">
-
           {/* Einzelnes Item */}
           <div className="bg-[#111] border border-blue-500/30 p-6 space-y-3">
             <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2">
@@ -618,23 +669,18 @@ function VintedToolsTab({ user, toast, confirm }: {
                 onKeyDown={e => e.key === 'Enter' && checkSingleItem()}
                 className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"
               />
-              <button
-                onClick={checkSingleItem}
-                disabled={statusLoading}
-                className="px-5 py-3 bg-blue-600 text-white text-xs font-bold uppercase disabled:opacity-50"
-              >
+              <button onClick={checkSingleItem} disabled={statusLoading}
+                className="px-5 py-3 bg-blue-600 text-white text-xs font-bold uppercase disabled:opacity-50">
                 {statusLoading && !statusProgress.total ? '…' : '🔍 Check'}
               </button>
             </div>
-
-            {/* Einzelergebnis */}
             {singleResult && (
-              <div className={`p-4 border rounded text-sm ${
+              <div className={`p-4 border text-sm rounded ${
                 singleResult.status === 'available' ? 'border-green-500/50 bg-green-950/20' :
                 singleResult.status === 'sold'      ? 'border-red-500/50 bg-red-950/20' :
                                                       'border-yellow-500/50 bg-yellow-950/20'
               }`}>
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-1">
                   <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded ${
                     singleResult.status === 'available' ? 'bg-green-500 text-white' :
                     singleResult.status === 'sold'      ? 'bg-red-500 text-white' :
@@ -642,49 +688,30 @@ function VintedToolsTab({ user, toast, confirm }: {
                   }`}>{singleResult.status}</span>
                   {singleResult.name && <span className="font-bold truncate">{singleResult.name}</span>}
                 </div>
-                {singleResult.price && <p className="text-xs text-gray-400">Preis: €{singleResult.price} · Größe: {singleResult.size}</p>}
-                {singleResult.message && <p className="text-xs text-gray-500 mt-1">{singleResult.message}</p>}
+                {singleResult.price && <p className="text-xs text-gray-400">€{singleResult.price} · {singleResult.size}</p>}
               </div>
             )}
           </div>
 
-          {/* Alle Produkte */}
+          {/* Alle prüfen */}
           <div className="bg-[#111] border border-blue-500/30 p-6 space-y-3">
             <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2">
               <RefreshCw className="w-5 h-5"/>Alle Produkte prüfen
             </h3>
-            <p className="text-xs text-gray-500">
-              Prüft alle aktiven Produkte in der Datenbank auf Verfügbarkeit bei Vinted.
-            </p>
-
-            <button
-              onClick={checkAllStatus}
-              disabled={statusLoading}
-              className="w-full py-4 bg-blue-600 text-white text-sm font-bold uppercase disabled:opacity-50 flex items-center justify-center gap-2"
-            >
+            <p className="text-xs text-gray-500">Prüft alle aktiven Produkte in der Datenbank.</p>
+            <button onClick={checkAllStatus} disabled={statusLoading}
+              className="w-full py-4 bg-blue-600 text-white text-sm font-bold uppercase disabled:opacity-50 flex items-center justify-center gap-2">
               <RefreshCw className={`w-5 h-5 ${statusLoading && statusProgress.total ? 'animate-spin' : ''}`}/>
               {statusLoading && statusProgress.total
                 ? `Prüfe… ${statusProgress.current}/${statusProgress.total}`
                 : '🔄 Alle Produkte checken'}
             </button>
-
-            {/* Fortschrittsbalken */}
             {statusLoading && statusProgress.total > 0 && (
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Checking…</span>
-                  <span>{Math.round((statusProgress.current / statusProgress.total) * 100)}%</span>
-                </div>
-                <div className="w-full bg-gray-800 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${(statusProgress.current / statusProgress.total) * 100}%` }}
-                  />
-                </div>
+              <div className="w-full bg-gray-800 rounded-full h-2">
+                <div className="bg-blue-600 h-2 rounded-full transition-all"
+                  style={{ width: `${(statusProgress.current / statusProgress.total) * 100}%` }}/>
               </div>
             )}
-
-            {/* Ergebnis Status-Check */}
             {statusResult && <ResultDisplay result={statusResult} />}
           </div>
         </div>
@@ -693,57 +720,49 @@ function VintedToolsTab({ user, toast, confirm }: {
   );
 }
 
-// ── RESULT DISPLAY HELPER ─────────────────────────────────────────────────────
+// ── RESULT DISPLAY ────────────────────────────────────────────────────────────
 function ResultDisplay({ result }: { result: any }) {
   return (
-    <div className="border border-[#FF4400]/20 bg-[#0A0A0A] p-4 space-y-4 mt-2">
-      {result.message && (
-        <p className="text-sm text-gray-300 font-medium">{result.message}</p>
-      )}
-
+    <div className="border border-[#FF4400]/20 bg-[#0A0A0A] p-4 space-y-4 mt-2 rounded">
+      {result.message && <p className="text-sm text-gray-300 font-medium">{result.message}</p>}
       {result.summary && (
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {[
-            { label: 'Gesamt',     value: result.summary.total,     color: 'text-blue-400',   border: 'border-blue-500/30' },
-            { label: 'Verfügbar',  value: result.summary.available, color: 'text-green-400',  border: 'border-green-500/30' },
-            { label: 'Verkauft',   value: result.summary.sold,      color: 'text-red-400',    border: 'border-red-500/30' },
-            { label: 'Reserviert', value: result.summary.reserved,  color: 'text-yellow-400', border: 'border-yellow-500/30' },
-            { label: 'Fehler',     value: result.summary.errors || 0, color: 'text-gray-400', border: 'border-gray-600/30' },
+            { label: 'Gesamt',      value: result.summary.total,       color: 'text-blue-400',   border: 'border-blue-500/30' },
+            { label: 'Neu',         value: result.summary.available,   color: 'text-green-400',  border: 'border-green-500/30' },
+            { label: 'Verkauft',    value: result.summary.sold,        color: 'text-red-400',    border: 'border-red-500/30' },
+            { label: 'Reserviert',  value: result.summary.reserved ?? 0,  color: 'text-yellow-400', border: 'border-yellow-500/30' },
+            { label: 'Duplikate',   value: result.summary.dupes ?? 0,    color: 'text-gray-400',   border: 'border-gray-600/30' },
+            { label: 'Fehler',      value: result.summary.errors ?? 0,   color: 'text-orange-400', border: 'border-orange-600/30' },
           ].map(s => (
             <div key={s.label} className={`border ${s.border} p-2 text-center`}>
-              <div className={`text-2xl font-bold ${s.color}`}>{s.value ?? 0}</div>
+              <div className={`text-xl font-bold ${s.color}`}>{s.value ?? 0}</div>
               <div className="text-xs text-gray-500 uppercase">{s.label}</div>
             </div>
           ))}
         </div>
       )}
-
       {result.soldItems?.length > 0 && (
         <div>
-          <h4 className="text-xs uppercase font-bold text-red-400 mb-2">
-            🚨 Verkaufte Items ({result.soldItems.length})
-          </h4>
+          <h4 className="text-xs uppercase font-bold text-red-400 mb-2">🚨 Verkaufte Items ({result.soldItems.length})</h4>
           <div className="bg-red-950/20 border border-red-500/20 p-3 max-h-48 overflow-y-auto space-y-2">
             {result.soldItems.map((item: any, i: number) => (
               <div key={i} className="text-xs border-b border-red-500/10 pb-1 last:border-0">
                 <p className="text-gray-300 font-medium">{item.name || 'Unbekannt'}</p>
-                <a href={item.url} target="_blank" rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-[#FF4400] truncate block">{item.url}</a>
+                <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#FF4400] truncate block">{item.url}</a>
               </div>
             ))}
           </div>
         </div>
       )}
-
       <details>
         <summary className="cursor-pointer text-xs text-gray-600 hover:text-gray-400 uppercase">Rohdaten</summary>
-        <pre className="mt-2 bg-black p-3 text-xs text-gray-500 overflow-x-auto max-h-48">
-          {JSON.stringify(result, null, 2)}
-        </pre>
+        <pre className="mt-2 bg-black p-3 text-xs text-gray-500 overflow-x-auto max-h-48">{JSON.stringify(result, null, 2)}</pre>
       </details>
     </div>
   );
 }
+
 // =================== INVENTORY TAB (bestehend) ===================
 function InventoryTab({ user, toast, confirm }: {
   user: Employee | null,
