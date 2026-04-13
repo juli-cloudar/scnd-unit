@@ -417,7 +417,7 @@ function VintedToolsTab({ user, toast, confirm }: {
         if (autoRemove) {
           const { data: products } = await supabase
             .from('products').select('*').ilike('vinted_url', `%${singleUrl}%`);
-          if (products?.length > 0) {
+             if (products && products.length > 0) {
             await supabase.from('products').update({ sold: true }).eq('id', products[0].id);
             toast('Produkt als verkauft markiert', 'success');
           }
