@@ -303,95 +303,95 @@ function VintedToolsTab({ user, toast, confirm }: {
   confirm: (msg: string, onConfirm: () => void) => void
 }) {
   const [activeSubTab, setActiveSubTab] = useState<'bulk' | 'status'>('bulk');
-const [profileUrl, setProfileUrl] = useState(''); 
+  const [profileUrl, setProfileUrl] = useState(''); // NEU: statt username
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [autoRemove, setAutoRemove] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-// Bulk Scrape - ganzen Account importieren (NEU - mit Profil-URL)
-const scrapeBulk = async () => {
-  if (!profileUrl) {
-    toast('Bitte Profil-URL oder Username eingeben', 'error');
-    return;
-  }
-
-  setLoading(true);
-  setResult(null);
-  setProgress({ current: 0, total: 0 });
-
-  try {
-    // Schritt 1: URLs holen
-    const quickRes = await fetch('/api/vinted', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        mode: 'bulk', 
-        profileUrl, // NEU: profileUrl statt username
-        quick: true 
-      }),
-    });
-
-    const quickData = await quickRes.json();
-    if (!quickRes.ok) {
-      toast(quickData.message || 'Fehler', 'error');
-      setLoading(false);
+  // Bulk Scrape - ganzen Account importieren (NEU)
+  const scrapeBulk = async () => {
+    if (!profileUrl) {
+      toast('Bitte Profil-URL oder Username eingeben', 'error');
       return;
     }
 
-    setProgress({ current: 0, total: quickData.totalItems });
-    toast(`${quickData.totalItems} Items gefunden. Starte Scraping...`, 'info');
-
-    // Schritt 2: Alle Items scrapen
-    const res = await fetch('/api/vinted', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        mode: 'bulk', 
-        profileUrl, // NEU: profileUrl statt username
-        autoRemove 
-      }),
-    });
-
-    const data = await res.json();
-    setResult(data);
-
-    // Erfolgreiche Items in DB speichern
-    if (data.items?.added?.length > 0) {
-      let savedCount = 0;
-      for (const item of data.items.added) {
-        const newProduct = {
-          name: item.name,
-          category: item.category || 'Sonstiges',
-          price: item.price?.replace(/^€/, '') || '0',
-          size: item.size || '–',
-          condition: item.condition || 'Gut',
-          images: item.images || [],
-          vinted_url: item.url,
-          sold: false
-        };
-        
-        const { error } = await supabase.from('products').insert(newProduct);
-        if (!error) savedCount++;
-        setProgress(prev => ({ ...prev, current: prev.current + 1 }));
-      }
-      
-      toast(`${savedCount} von ${data.items.added.length} Items gespeichert`, 'success');
-      logActivity(user!.id, user!.username, 'Bulk Import', `${savedCount} Items importiert`);
-    }
-
-    if (data.items?.skipped?.length > 0) {
-      toast(`${data.items.skipped.length} verkaufte/reservierte Items übersprungen`, 'info');
-    }
-
-  } catch (e) {
-    toast('Fehler beim Bulk-Scrapen: ' + String(e), 'error');
-  } finally {
-    setLoading(false);
+    setLoading(true);
+    setResult(null);
     setProgress({ current: 0, total: 0 });
-  }
-};
+
+    try {
+      // Schritt 1: URLs holen
+      const quickRes = await fetch('/api/vinted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          mode: 'bulk', 
+          profileUrl,
+          quick: true 
+        }),
+      });
+
+      const quickData = await quickRes.json();
+      if (!quickRes.ok) {
+        toast(quickData.message || 'Fehler', 'error');
+        setLoading(false);
+        return;
+      }
+
+      setProgress({ current: 0, total: quickData.totalItems });
+      toast(`${quickData.totalItems} Items gefunden. Starte Scraping...`, 'info');
+
+      // Schritt 2: Alle Items scrapen
+      const res = await fetch('/api/vinted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          mode: 'bulk', 
+          profileUrl,
+          autoRemove 
+        }),
+      });
+
+      const data = await res.json();
+      setResult(data);
+
+      // Erfolgreiche Items in DB speichern
+      if (data.items?.added?.length > 0) {
+        let savedCount = 0;
+        for (const item of data.items.added) {
+          const newProduct = {
+            name: item.name,
+            category: item.category || 'Sonstiges',
+            price: item.price?.replace(/^€/, '') || '0',
+            size: item.size || '–',
+            condition: item.condition || 'Gut',
+            images: item.images || [],
+            vinted_url: item.url,
+            sold: false
+          };
+          
+          const { error } = await supabase.from('products').insert(newProduct);
+          if (!error) savedCount++;
+          setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+        }
+        
+        toast(`${savedCount} von ${data.items.added.length} Items gespeichert`, 'success');
+        logActivity(user!.id, user!.username, 'Bulk Import', `${savedCount} Items importiert`);
+      }
+
+      if (data.items?.skipped?.length > 0) {
+        toast(`${data.items.skipped.length} verkaufte/reservierte Items übersprungen`, 'info');
+      }
+
+    } catch (e) {
+      toast('Fehler beim Bulk-Scrapen: ' + String(e), 'error');
+    } finally {
+      setLoading(false);
+      setProgress({ current: 0, total: 0 });
+    }
+  };
 
   // Status Check - alle Produkte prüfen
   const checkStatus = async () => {
@@ -399,7 +399,6 @@ const scrapeBulk = async () => {
     setResult(null);
 
     try {
-      // Hole alle Produkte aus DB
       const { data: products, error } = await supabase.from('products').select('*').eq('sold', false);
       if (error) {
         toast('Fehler beim Laden der Produkte', 'error');
@@ -418,7 +417,6 @@ const scrapeBulk = async () => {
 
       const soldItems: any[] = [];
       const reservedItems: any[] = [];
-      const checkedItems: number[] = [];
 
       for (let i = 0; i < products.length; i++) {
         const product = products[i];
@@ -430,7 +428,6 @@ const scrapeBulk = async () => {
           });
 
           const data = await res.json();
-          checkedItems.push(product.id);
 
           if (data.status === 'sold') {
             soldItems.push({ ...product, ...data });
@@ -442,8 +439,6 @@ const scrapeBulk = async () => {
           }
 
           setProgress(prev => ({ ...prev, current: i + 1 }));
-          
-          // Rate limiting
           await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           console.error(`Fehler bei Produkt ${product.id}:`, e);
@@ -454,34 +449,24 @@ const scrapeBulk = async () => {
         timestamp: new Date().toISOString(),
         summary: {
           total: products.length,
-          checked: checkedItems.length,
+          checked: products.length,
           sold: soldItems.length,
           reserved: reservedItems.length,
           available: products.length - soldItems.length - reservedItems.length,
           autoRemoved: autoRemove ? soldItems.length : 0,
         },
-        soldItems: soldItems.map(s => ({
-          id: s.id,
-          name: s.name,
-          url: s.vinted_url,
-          reason: 'Verkauft',
-        })),
-        reservedItems: reservedItems.map(r => ({
-          id: r.id,
-          name: r.name,
-          url: r.vinted_url,
-          reason: 'Reserviert',
-        })),
+        soldItems: soldItems.map(s => ({ id: s.id, name: s.name, url: s.vinted_url })),
+        reservedItems: reservedItems.map(r => ({ id: r.id, name: r.name, url: r.vinted_url })),
         message: autoRemove && soldItems.length > 0
-          ? `✅ ${checkedItems.length} geprüft, ${soldItems.length} als verkauft markiert`
-          : `✅ ${checkedItems.length} geprüft, ${soldItems.length} verkauft, ${reservedItems.length} reserviert`,
+          ? `✅ ${products.length} geprüft, ${soldItems.length} als verkauft markiert`
+          : `✅ ${products.length} geprüft, ${soldItems.length} verkauft, ${reservedItems.length} reserviert`,
       };
 
       setResult(resultData);
       toast(resultData.message, soldItems.length > 0 ? 'info' : 'success');
       
       if (soldItems.length > 0 || reservedItems.length > 0) {
-        logActivity(user!.id, user!.username, 'Status Check', `${soldItems.length} verkauft, ${reservedItems.length} reserviert gefunden`);
+        logActivity(user!.id, user!.username, 'Status Check', `${soldItems.length} verkauft, ${reservedItems.length} reserviert`);
       }
 
     } catch (e) {
@@ -515,7 +500,6 @@ const scrapeBulk = async () => {
       if (data.status === 'sold') {
         toast('⚠️ Item ist VERKAUFT!', 'error');
         if (autoRemove) {
-          // Suche Produkt in DB und markiere als verkauft
           const { data: products } = await supabase.from('products').select('*').ilike('vinted_url', `%${url}%`);
           if (products && products.length > 0) {
             await supabase.from('products').update({ sold: true }).eq('id', products[0].id);
@@ -580,15 +564,16 @@ const scrapeBulk = async () => {
             <Globe className="w-5 h-5"/> Vinted Account Import
           </h3>
           <p className="text-sm text-gray-400">
-            Importiert alle aktiven Items eines Vinted-Accounts. Verkaufte Items werden automatisch übersprungen.
+            Profil-URL einfügen (z.B. https://www.vinted.de/member/123456-username)
           </p>
           
+          {/* ═══ DAS INPUT-FELD HIER ═══ */}
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Vinted Username (z.B. max_mustermann)"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              placeholder="https://www.vinted.de/member/... oder @username"
+              value={profileUrl}
+              onChange={(e) => setProfileUrl(e.target.value)}
               className="flex-1 bg-[#1A1A1A] border border-green-500/30 px-4 py-3 text-sm"
             />
             <button
@@ -599,6 +584,7 @@ const scrapeBulk = async () => {
               {loading ? `⏳ ${progress.current}/${progress.total}` : '📦 Importieren'}
             </button>
           </div>
+          {/* ═══ ENDE INPUT-FELD ═══ */}
 
           {loading && progress.total > 0 && (
             <div className="w-full bg-gray-800 rounded-full h-2">
@@ -618,10 +604,10 @@ const scrapeBulk = async () => {
             <RefreshCw className="w-5 h-5"/> Status Überwachung
           </h3>
           <p className="text-sm text-gray-400">
-            Prüft alle Produkte im Inventar auf Verfügbarkeit. Verkaufte Items werden markiert oder entfernt.
+            Prüft alle Produkte im Inventar auf Verfügbarkeit
           </p>
 
-          {/* Einzelnes Item checken */}
+          {/* Einzelnes Item */}
           <div className="border border-gray-700 p-4 space-y-2">
             <p className="text-xs uppercase text-gray-500">Einzelnes Item prüfen</p>
             <div className="flex gap-2">
@@ -642,7 +628,7 @@ const scrapeBulk = async () => {
             </div>
           </div>
 
-          {/* Alle Items checken */}
+          {/* Alle Items */}
           <div className="border border-gray-700 p-4">
             <button
               onClick={checkStatus}
@@ -670,7 +656,7 @@ const scrapeBulk = async () => {
         <div className="bg-[#111] border border-[#FF4400]/30 p-6">
           <h3 className="text-lg font-bold text-[#FF4400] mb-4">Ergebnis</h3>
           
-          {/* Summary Stats */}
+          {/* Summary */}
           {result.summary && (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
               <div className="bg-blue-500/10 border border-blue-500/30 p-3 text-center">
@@ -707,77 +693,20 @@ const scrapeBulk = async () => {
                 result.status === 'reserved' ? 'bg-yellow-500 text-black' :
                 'bg-gray-500 text-white'
               }`}>
-                {result.status === 'available' && <CheckCircle className="w-3 h-3 inline mr-1"/>}
-                {result.status === 'sold' && <XCircle className="w-3 h-3 inline mr-1"/>}
                 {result.status}
-              </span>
-            )}
-            {result.action && (
-              <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${
-                result.action === 'removed' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
-              }`}>
-                {result.action}
               </span>
             )}
           </div>
 
-          {/* Nachricht */}
-          {result.message && (
-            <p className="text-sm text-gray-300 mb-4">{result.message}</p>
-          )}
-          {result.warning && (
-            <p className="text-sm text-yellow-400 mb-4 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4"/> {result.warning}
-            </p>
-          )}
+          {result.message && <p className="text-sm text-gray-300 mb-4">{result.message}</p>}
 
-          {/* Item Details */}
-          {result.name && (
-            <div className="border border-gray-700 p-4 mb-4">
-              <h4 className="font-bold text-lg mb-2">{result.name}</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-400">
-                <p>💰 {result.price || '-'} €</p>
-                <p>📏 {result.size || '-'}</p>
-                <p>🔖 {result.condition || '-'}</p>
-                <p>📂 {result.category || '-'}</p>
-              </div>
-              {result.images && result.images.length > 0 && (
-                <div className="flex gap-2 mt-3 overflow-x-auto">
-                  {result.images.map((img: string, i: number) => (
-                    <img key={i} src={img} alt="" className="w-16 h-16 object-cover rounded border border-gray-700" />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Verkaufte Items Liste */}
+          {/* Verkaufte Items */}
           {result.soldItems && result.soldItems.length > 0 && (
             <div className="mt-4">
-              <h4 className="font-bold text-red-400 mb-2 flex items-center gap-2">
-                <XCircle className="w-4 h-4"/> Verkaufte Items ({result.soldItems.length})
-              </h4>
+              <h4 className="font-bold text-red-400 mb-2">🚨 Verkaufte Items ({result.soldItems.length})</h4>
               <div className="bg-red-950/30 border border-red-500/30 rounded p-3 max-h-48 overflow-y-auto space-y-2">
                 {result.soldItems.map((item: any, i: number) => (
                   <div key={i} className="text-sm border-b border-red-500/20 pb-2 last:border-0">
-                    <p className="font-medium text-gray-300">{item.name || 'Unbekannt'}</p>
-                    <p className="text-xs text-gray-500 truncate">{item.url}</p>
-                    {autoRemove && <p className="text-xs text-red-400">✓ Entfernt</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Reservierte Items */}
-          {result.reservedItems && result.reservedItems.length > 0 && (
-            <div className="mt-4">
-              <h4 className="font-bold text-yellow-400 mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4"/> Reservierte Items ({result.reservedItems.length})
-              </h4>
-              <div className="bg-yellow-950/30 border border-yellow-500/30 rounded p-3 max-h-48 overflow-y-auto space-y-2">
-                {result.reservedItems.map((item: any, i: number) => (
-                  <div key={i} className="text-sm border-b border-yellow-500/20 pb-2 last:border-0">
                     <p className="font-medium text-gray-300">{item.name || 'Unbekannt'}</p>
                     <p className="text-xs text-gray-500 truncate">{item.url}</p>
                   </div>
