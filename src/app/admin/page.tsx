@@ -295,9 +295,6 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
     </div>
   );
 }
-// Ersetze VintedToolsTab + füge ResultDisplay danach ein
-// in src/app/admin/page.tsx
-
 function VintedToolsTab({ user, toast, confirm }: {
   user: Employee | null,
   toast: (msg: string, type?: ToastType) => void,
@@ -346,14 +343,22 @@ function VintedToolsTab({ user, toast, confirm }: {
       const { data: existingProducts } = await supabase.from('products').select('vinted_url');
       const existingUrls = new Set<string>(
         (existingProducts || []).map((p: any) => {
-          // Normalisieren: URL ohne Query-Params und ohne trailing slash
-          try { return new URL(p.vinted_url).pathname.replace(/\/$/, ''); } catch { return p.vinted_url; }
+          try { 
+            const url = new URL(p.vinted_url);
+            return url.pathname.replace(/\/$/, '');
+          } catch { 
+            return p.vinted_url; 
+          }
         })
       );
 
       // ── Schritt 3: Nur neue URLs scrapen ──
       const newUrls = allVintedUrls.filter(u => {
-        try { return !existingUrls.has(new URL(u).pathname.replace(/\/$/, '')); } catch { return !existingUrls.has(u); }
+        try { 
+          return !existingUrls.has(new URL(u).pathname.replace(/\/$/, '')); 
+        } catch { 
+          return !existingUrls.has(u); 
+        }
       });
 
       const dupeCount = totalItems - newUrls.length;
@@ -362,7 +367,6 @@ function VintedToolsTab({ user, toast, confirm }: {
         toast(`Alle ${totalItems} Items bereits in der Datenbank – nichts zu importieren`, 'info');
         setBulkResult({
           summary: { total: totalItems, available: 0, sold: 0, reserved: 0, errors: 0, dupes: dupeCount },
-          soldItems: [],
           message: `✅ Alle ${totalItems} Items bereits vorhanden – keine Duplikate importiert`,
         });
         setBulkLoading(false);
@@ -379,7 +383,6 @@ function VintedToolsTab({ user, toast, confirm }: {
       let totalAdded = 0;
       let totalSkipped = 0;
       let totalErrors = 0;
-      const allSoldItems: any[] = [];
       let offset = 0;
       let batchNum = 0;
 
@@ -387,58 +390,68 @@ function VintedToolsTab({ user, toast, confirm }: {
         batchNum++;
         setBulkProgress(prev => ({ ...prev, batch: batchNum }));
 
-        // Batch der neuen URLs direkt übergeben (kein erneuter getAllUserItems-Call)
+        // Batch der neuen URLs
         const batchUrls = newUrls.slice(offset, offset + BATCH_SIZE);
-
-        // Scrape direkt via items array (kein profileUrl nötig)
-        const res = await fetch('/api/vinted', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          // urls-Array übergeben → API scrapt diese direkt
-          body: JSON.stringify({ mode: 'bulk', urls: batchUrls, profileUrl, autoRemove, offset }),
-        });
-        const data = await res.json();
-
-        if (!res.ok) { toast(`Fehler Batch ${batchNum}: ${data.message}`, 'error'); break; }
-
-        // Speichern – nochmal auf Duplikate prüfen (Race condition)
-        if (data.items?.added?.length > 0) {
-          for (const item of data.items.added) {
-            // Doppelte Sicherheitsprüfung direkt vor dem Insert
-            const { data: existing } = await supabase
-              .from('products')
-              .select('id')
-              .eq('vinted_url', item.url)
-              .maybeSingle();
-
-            if (existing) continue; // bereits vorhanden → überspringen
-
-            const newProduct = {
-              name: item.name,
-              category: item.category || 'Sonstiges',
-              price: (item.price || '0').replace(/^€/, '').replace(',', '.'),
-              size: item.size || '–',
-              condition: item.condition || 'Gut',
-              images: item.images || [],
-              vinted_url: item.url,
-              sold: false,
-            };
-            const { error } = await supabase.from('products').insert(newProduct);
-            if (!error) totalAdded++;
+        
+        // Für jede URL einzeln scrapen (da API kein bulk-Array unterstützt)
+        for (const itemUrl of batchUrls) {
+          try {
+            const scrapeRes = await fetch('/api/vinted', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mode: 'single', url: itemUrl }),
+            });
+            const itemData = await scrapeRes.json();
+            
+            // Wenn verfügbar → speichern
+            if (itemData.status === 'available' && itemData.name) {
+              // Nochmal prüfen ob nicht doch schon vorhanden (Race condition)
+              const { data: existing } = await supabase
+                .from('products')
+                .select('id')
+                .eq('vinted_url', itemUrl)
+                .maybeSingle();
+              
+              if (!existing) {
+                const newProduct = {
+                  name: itemData.name || 'Unbekannt',
+                  category: itemData.category || 'Sonstiges',
+                  price: (itemData.price || '0').toString().replace(/^€/, '').replace(',', '.'),
+                  size: itemData.size || '–',
+                  condition: itemData.condition || 'Gut',
+                  images: itemData.images || [],
+                  vinted_url: itemUrl,
+                  sold: false,
+                };
+                const { error: insertError } = await supabase.from('products').insert(newProduct);
+                if (!insertError) {
+                  totalAdded++;
+                } else {
+                  console.error('Insert error:', insertError);
+                }
+              } else {
+                totalSkipped++; // bereits vorhanden (sollte nicht passieren)
+              }
+            } else if (itemData.status === 'sold') {
+              totalSkipped++;
+            } else {
+              totalErrors++;
+            }
+          } catch (err) {
+            console.error(`Error scraping ${itemUrl}:`, err);
+            totalErrors++;
           }
+          
+          // Fortschritt aktualisieren
+          const processedSoFar = offset + (batchUrls.indexOf(itemUrl) + 1);
+          setBulkProgress(prev => ({ ...prev, current: processedSoFar }));
+          
+          // Rate limiting
+          await new Promise(r => setTimeout(r, 400));
         }
-
-        totalSkipped += data.items?.skipped?.length || 0;
-        totalErrors  += data.summary?.errors || 0;
-        if (data.soldItems) allSoldItems.push(...data.soldItems);
-
-        const processedSoFar = Math.min(offset + BATCH_SIZE, newUrls.length);
-        setBulkProgress(prev => ({ ...prev, current: processedSoFar }));
-
-        if (data.pagination?.isLastBatch || data.pagination?.nextOffset === null) break;
-        offset = data.pagination.nextOffset;
-
-        await new Promise(r => setTimeout(r, 400));
+        
+        offset += BATCH_SIZE;
+        await new Promise(r => setTimeout(r, 500));
       }
 
       const finalResult = {
@@ -450,14 +463,16 @@ function VintedToolsTab({ user, toast, confirm }: {
           errors: totalErrors,
           dupes: dupeCount,
         },
-        soldItems: allSoldItems,
-        message: `✅ Fertig: ${totalAdded} neu gespeichert · ${dupeCount} bereits vorhanden übersprungen · ${totalSkipped} verkauft`,
+        message: `✅ Fertig: ${totalAdded} neu gespeichert · ${dupeCount} bereits vorhanden übersprungen · ${totalSkipped} verkauft/fehlerhaft`,
       };
       setBulkResult(finalResult);
       toast(finalResult.message, 'success');
-      logActivity(user!.id, user!.username, 'Bulk Import', `${totalAdded} neu, ${dupeCount} Duplikate übersprungen`);
+      if (user) {
+        await logActivity(user.id, user.username, 'Bulk Import', `${totalAdded} neu, ${dupeCount} Duplikate übersprungen`);
+      }
 
     } catch (e) {
+      console.error('Bulk error:', e);
       toast('Fehler: ' + String(e), 'error');
     } finally {
       setBulkLoading(false);
@@ -534,7 +549,9 @@ function VintedToolsTab({ user, toast, confirm }: {
           } else if (data.status === 'reserved') {
             reservedItems.push({ ...product, ...data });
           }
-        } catch {}
+        } catch (err) {
+          console.error(`Error checking ${product.vinted_url}:`, err);
+        }
         setStatusProgress(prev => ({ ...prev, current: i + 1 }));
         await new Promise(r => setTimeout(r, 500));
       }
@@ -555,10 +572,11 @@ function VintedToolsTab({ user, toast, confirm }: {
       };
       setStatusResult(result);
       toast(result.message, soldItems.length > 0 ? 'info' : 'success');
-      if (soldItems.length > 0 || reservedItems.length > 0) {
-        logActivity(user!.id, user!.username, 'Status Check', `${soldItems.length} verkauft, ${reservedItems.length} reserviert`);
+      if (user && (soldItems.length > 0 || reservedItems.length > 0)) {
+        await logActivity(user.id, user.username, 'Status Check', `${soldItems.length} verkauft, ${reservedItems.length} reserviert`);
       }
     } catch (e) {
+      console.error('Status check error:', e);
       toast('Fehler: ' + String(e), 'error');
     } finally {
       setStatusLoading(false);
@@ -719,50 +737,6 @@ function VintedToolsTab({ user, toast, confirm }: {
     </div>
   );
 }
-
-// ── RESULT DISPLAY ────────────────────────────────────────────────────────────
-function ResultDisplay({ result }: { result: any }) {
-  return (
-    <div className="border border-[#FF4400]/20 bg-[#0A0A0A] p-4 space-y-4 mt-2 rounded">
-      {result.message && <p className="text-sm text-gray-300 font-medium">{result.message}</p>}
-      {result.summary && (
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {[
-            { label: 'Gesamt',      value: result.summary.total,       color: 'text-blue-400',   border: 'border-blue-500/30' },
-            { label: 'Neu',         value: result.summary.available,   color: 'text-green-400',  border: 'border-green-500/30' },
-            { label: 'Verkauft',    value: result.summary.sold,        color: 'text-red-400',    border: 'border-red-500/30' },
-            { label: 'Reserviert',  value: result.summary.reserved ?? 0,  color: 'text-yellow-400', border: 'border-yellow-500/30' },
-            { label: 'Duplikate',   value: result.summary.dupes ?? 0,    color: 'text-gray-400',   border: 'border-gray-600/30' },
-            { label: 'Fehler',      value: result.summary.errors ?? 0,   color: 'text-orange-400', border: 'border-orange-600/30' },
-          ].map(s => (
-            <div key={s.label} className={`border ${s.border} p-2 text-center`}>
-              <div className={`text-xl font-bold ${s.color}`}>{s.value ?? 0}</div>
-              <div className="text-xs text-gray-500 uppercase">{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      {result.soldItems?.length > 0 && (
-        <div>
-          <h4 className="text-xs uppercase font-bold text-red-400 mb-2">🚨 Verkaufte Items ({result.soldItems.length})</h4>
-          <div className="bg-red-950/20 border border-red-500/20 p-3 max-h-48 overflow-y-auto space-y-2">
-            {result.soldItems.map((item: any, i: number) => (
-              <div key={i} className="text-xs border-b border-red-500/10 pb-1 last:border-0">
-                <p className="text-gray-300 font-medium">{item.name || 'Unbekannt'}</p>
-                <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#FF4400] truncate block">{item.url}</a>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      <details>
-        <summary className="cursor-pointer text-xs text-gray-600 hover:text-gray-400 uppercase">Rohdaten</summary>
-        <pre className="mt-2 bg-black p-3 text-xs text-gray-500 overflow-x-auto max-h-48">{JSON.stringify(result, null, 2)}</pre>
-      </details>
-    </div>
-  );
-}
-
 // =================== INVENTORY TAB (bestehend) ===================
 function InventoryTab({ user, toast, confirm }: {
   user: Employee | null,
