@@ -1,19 +1,2 @@
 @import "tailwindcss";
-
-@theme {
-  /* Hier definieren wir deine Markenfarbe, damit Tailwind sie kennt */
-  --color-brand: #FF4400;
-}
-
-/* Dein Basis-Setup für den Darkmode */
-:root {
-  --background: #0A0A0A;
-  --foreground: #F5F5F5;
-}
-
-body {
-  background-color: var(--background);
-  color: var(--foreground);
-  margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
+/* cache bust So 22. Mär 03:16:14 CET 2026 */
