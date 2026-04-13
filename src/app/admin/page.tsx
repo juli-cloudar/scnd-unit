@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Trash2, ExternalLink, RefreshCw, ShoppingBag, Plus,
   Wand2, ImageIcon, Users, Package, BarChart3, Eye, EyeOff,
@@ -67,10 +67,7 @@ function useToast() {
 }
 
 // =================== CONFIRM DIALOG ===================
-interface ConfirmOptions {
-  message: string;
-  onConfirm: () => void;
-}
+interface ConfirmOptions { message: string; onConfirm: () => void; }
 
 function ConfirmDialog({ options, onClose }: { options: ConfirmOptions, onClose: () => void }) {
   return (
@@ -78,9 +75,7 @@ function ConfirmDialog({ options, onClose }: { options: ConfirmOptions, onClose:
       <div className="bg-[#0A0A0A] border border-[#FF4400]/50 p-6 max-w-sm w-full mx-4 shadow-2xl">
         <div className="flex items-start gap-3 mb-6">
           <div className="w-1 h-12 bg-[#FF4400] shrink-0 mt-0.5"/>
-          <p className="text-sm uppercase tracking-wide text-[#F5F5F5] font-mono leading-relaxed">
-            {options.message}
-          </p>
+          <p className="text-sm uppercase tracking-wide text-[#F5F5F5] font-mono leading-relaxed">{options.message}</p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => { options.onConfirm(); onClose(); }}
@@ -99,11 +94,20 @@ function ConfirmDialog({ options, onClose }: { options: ConfirmOptions, onClose:
 
 function useConfirm() {
   const [confirmOptions, setConfirmOptions] = useState<ConfirmOptions | null>(null);
-  const showConfirm = (message: string, onConfirm: () => void) => {
-    setConfirmOptions({ message, onConfirm });
-  };
+  const showConfirm = (message: string, onConfirm: () => void) => setConfirmOptions({ message, onConfirm });
   const closeConfirm = () => setConfirmOptions(null);
   return { confirmOptions, showConfirm, closeConfirm };
+}
+
+// =================== ACTIVITY LOGGER ===================
+async function logActivity(employeeId: number, username: string, action: string, details: string = '') {
+  await supabase.from('activity_logs').insert({
+    employee_id: employeeId,
+    username,
+    action,
+    details,
+    timestamp: new Date().toISOString()
+  });
 }
 
 // =================== KONSTANTEN ===================
@@ -124,7 +128,7 @@ export default function ManagementPanel() {
     const savedUser = sessionStorage.getItem('scnd_user');
     if (savedAuth === 'admin') {
       setAuthed(true); setAuthMode('admin');
-      setCurrentUser({ id: 0, username: 'Mastercontrol', role: 'Admin', password: '', login_count: 0, total_work_hours: 0, online: true,
+      setCurrentUser({ id: 0, username: 'Admin', role: 'Admin', password: '', login_count: 0, total_work_hours: 0, online: true,
         permissions: { canAddProducts: true, canEditProducts: true, canDeleteProducts: true, canViewStats: true, canManageEmployees: true }
       });
     } else if (savedAuth === 'employee' && savedUser) {
@@ -135,6 +139,10 @@ export default function ManagementPanel() {
   }, []);
 
   const handleLogout = () => {
+    if (currentUser && currentUser.id !== 0) {
+      supabase.from('employees').update({ online: false }).eq('id', currentUser.id);
+      logActivity(currentUser.id, currentUser.username, 'Ausgeloggt', '');
+    }
     sessionStorage.removeItem('scnd_auth');
     sessionStorage.removeItem('scnd_user');
     setAuthed(false); setAuthMode(null); setCurrentUser(null);
@@ -199,7 +207,7 @@ export default function ManagementPanel() {
 
       <main className="max-w-7xl mx-auto p-6">
         {activeTab==='inventory' && <InventoryTab user={currentUser} toast={addToast} confirm={showConfirm} />}
-        {activeTab==='add' && <AddTab user={currentUser} toast={addToast} />}
+        {activeTab==='add' && <AddTab user={currentUser} toast={addToast} onProductAdded={() => {}} />}
         {activeTab==='analytics' && <AnalyticsTab />}
         {activeTab==='employees' && currentUser?.permissions.canManageEmployees && <EmployeesTab currentUser={currentUser} toast={addToast} confirm={showConfirm} />}
         {activeTab==='logs' && currentUser?.role === 'Admin' && <LogsTab />}
@@ -222,6 +230,7 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
     const { data, error } = await supabase.from('employees').select('*').eq('password', input).single();
     if (data && !error) {
       await supabase.from('employees').update({ online: true, last_login: new Date().toISOString(), login_count: (data.login_count || 0) + 1 }).eq('id', data.id);
+      await logActivity(data.id, data.username, 'Eingeloggt', `Rolle: ${data.role}`);
       onLogin('employee', data);
     } else {
       setError('Ungültiges Passwort');
@@ -267,31 +276,45 @@ function InventoryTab({ user, toast, confirm }: {
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  useEffect(() => { loadProducts(); }, []);
-
-  const loadProducts = async () => {
+  // ── AUTO-REFRESH: Supabase Realtime ──────────────────────────────────────
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.from('products').select('*').order('id');
     if (!error && data) setProducts(data);
     setLoading(false);
-  };
+  }, []);
 
-  const markSold = (id: number, currentSold: boolean) => {
+  useEffect(() => {
+    loadProducts();
+
+    // Realtime subscription — updated sofort wenn sich DB ändert
+    const channel = supabase
+      .channel('products-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        loadProducts();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [loadProducts]);
+
+  const markSold = (id: number, currentSold: boolean, productName: string) => {
     if (!user?.permissions.canEditProducts) { toast('Keine Berechtigung!', 'error'); return; }
     supabase.from('products').update({ sold: !currentSold }).eq('id', id).then(({ error }) => {
       if (error) { toast('Fehler: ' + error.message, 'error'); return; }
-      setProducts(p => p.map(x => x.id === id ? { ...x, sold: !currentSold } : x));
-      toast(currentSold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info');
+      const newStatus = !currentSold;
+      toast(newStatus ? 'Produkt als verkauft markiert' : 'Produkt reaktiviert', 'info');
+      logActivity(user.id, user.username, newStatus ? 'Produkt verkauft' : 'Produkt reaktiviert', `"${productName}"`);
     });
   };
 
-  const removeProduct = (id: number) => {
+  const removeProduct = (id: number, productName: string) => {
     if (!user?.permissions.canDeleteProducts) { toast('Keine Berechtigung!', 'error'); return; }
     confirm('Produkt wirklich löschen?', () => {
       supabase.from('products').delete().eq('id', id).then(({ error }) => {
         if (error) { toast('Fehler: ' + error.message, 'error'); return; }
-        setProducts(p => p.filter(x => x.id !== id));
         toast('Produkt gelöscht', 'info');
+        logActivity(user!.id, user!.username, 'Produkt gelöscht', `"${productName}"`);
       });
     });
   };
@@ -300,9 +323,9 @@ function InventoryTab({ user, toast, confirm }: {
     if (!user?.permissions.canEditProducts) { toast('Keine Berechtigung!', 'error'); return; }
     supabase.from('products').update(product).eq('id', product.id).then(({ error }) => {
       if (error) { toast('Fehler: ' + error.message, 'error'); return; }
-      setProducts(p => p.map(x => x.id === product.id ? product : x));
       setEditingProduct(null);
       toast('Produkt gespeichert');
+      logActivity(user.id, user.username, 'Produkt bearbeitet', `"${product.name}" — Preis: ${product.price}, Größe: ${product.size}`);
     });
   };
 
@@ -391,7 +414,7 @@ function InventoryTab({ user, toast, confirm }: {
                     </button>
                   )}
                   {user?.permissions.canEditProducts && (
-                    <button type="button" onClick={() => markSold(p.id, p.sold)}
+                    <button type="button" onClick={() => markSold(p.id, p.sold, p.name)}
                       className={`flex-1 py-1 text-xs font-bold uppercase flex items-center justify-center gap-1 ${p.sold ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>
                       <ShoppingBag className="w-3 h-3"/>{p.sold ? 'Reaktiv.' : 'Verkauft'}
                     </button>
@@ -400,7 +423,7 @@ function InventoryTab({ user, toast, confirm }: {
                     <ExternalLink className="w-3 h-3"/>
                   </a>
                   {user?.permissions.canDeleteProducts && (
-                    <button type="button" onClick={() => removeProduct(p.id)} className="px-2 py-1 border border-red-500/30 text-red-400">
+                    <button type="button" onClick={() => removeProduct(p.id, p.name)} className="px-2 py-1 border border-red-500/30 text-red-400">
                       <Trash2 className="w-3 h-3"/>
                     </button>
                   )}
@@ -415,7 +438,11 @@ function InventoryTab({ user, toast, confirm }: {
 }
 
 // =================== ADD TAB ===================
-function AddTab({ user, toast }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void }) {
+function AddTab({ user, toast, onProductAdded }: {
+  user: Employee | null,
+  toast: (msg: string, type?: ToastType) => void,
+  onProductAdded: () => void
+}) {
   const [url, setUrl] = useState('');
   const [isScraping, setIsScraping] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -455,8 +482,10 @@ function AddTab({ user, toast }: { user: Employee | null, toast: (msg: string, t
       if (error) { toast('Fehler: ' + error.message, 'error'); }
       else {
         toast('Produkt gespeichert!');
+        logActivity(user?.id || 0, user?.username || 'Admin', 'Produkt hinzugefügt', `"${newProduct.name}" — ${newProduct.price}€, Größe: ${newProduct.size}, Zustand: ${newProduct.condition}`);
         setFormData({ name: '', category: 'Jacken', price: '', size: '', condition: 'Gut', vinted_url: '', images: [] });
         setUrl('');
+        onProductAdded();
       }
       setIsSaving(false);
     });
@@ -562,17 +591,21 @@ function AnalyticsTab() {
         <table className="w-full text-sm">
           <thead className="border-b border-[#FF4400]/30">
             <tr>
-              <th className="text-left py-2">Username</th><th className="text-left py-2">Rolle</th>
-              <th className="text-left py-2">Logins</th><th className="text-left py-2">Status</th>
+              <th className="text-left py-2 px-2">Username</th>
+              <th className="text-left py-2 px-2">Rolle</th>
+              <th className="text-left py-2 px-2">Logins</th>
+              <th className="text-left py-2 px-2">Letzter Login</th>
+              <th className="text-left py-2 px-2">Status</th>
             </tr>
           </thead>
           <tbody>
             {employeeStats.map(emp => (
               <tr key={emp.id} className="border-b border-[#FF4400]/10">
-                <td className="py-3 font-bold">{emp.username}</td>
-                <td className="py-3">{emp.role}</td>
-                <td className="py-3">{emp.login_count}</td>
-                <td className="py-3"><span className={emp.online ? 'text-green-500' : 'text-gray-500'}>{emp.online ? '● Online' : '○ Offline'}</span></td>
+                <td className="py-3 px-2 font-bold">{emp.username}</td>
+                <td className="py-3 px-2">{emp.role}</td>
+                <td className="py-3 px-2">{emp.login_count}×</td>
+                <td className="py-3 px-2 text-gray-500 text-xs">{emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}</td>
+                <td className="py-3 px-2"><span className={emp.online ? 'text-green-500' : 'text-gray-500'}>{emp.online ? '● Online' : '○ Offline'}</span></td>
               </tr>
             ))}
           </tbody>
@@ -614,6 +647,7 @@ function EmployeesTab({ currentUser, toast, confirm }: {
       if (error) { toast('Fehler: ' + error.message, 'error'); }
       else {
         toast('Mitarbeiter erstellt!');
+        logActivity(currentUser.id, currentUser.username, 'Mitarbeiter erstellt', `"${newEmployee.username}" als ${newEmployee.role}`);
         setNewEmployee({ username: '', password: '', role: 'Mitarbeiter',
           permissions: { canAddProducts: false, canEditProducts: false, canDeleteProducts: false, canViewStats: false, canManageEmployees: false }
         });
@@ -628,16 +662,18 @@ function EmployeesTab({ currentUser, toast, confirm }: {
       supabase.from('employees').delete().eq('id', id).then(({ error }) => {
         if (error) { toast('Fehler: ' + error.message, 'error'); return; }
         toast('Mitarbeiter gelöscht', 'info');
+        logActivity(currentUser.id, currentUser.username, 'Mitarbeiter gelöscht', `"${username}"`);
         loadEmployees();
       });
     });
   };
 
-  const resetPassword = (id: number) => {
+  const resetPassword = (id: number, username: string) => {
     if (!newPassword) { toast('Bitte neues Passwort eingeben', 'error'); return; }
     supabase.from('employees').update({ password: newPassword }).eq('id', id).then(({ error }) => {
       if (error) { toast('Fehler: ' + error.message, 'error'); return; }
       toast('Passwort geändert');
+      logActivity(currentUser.id, currentUser.username, 'Passwort geändert', `für "${username}"`);
       setNewPassword(''); setEditingEmployee(null);
       loadEmployees();
     });
@@ -677,7 +713,7 @@ function EmployeesTab({ currentUser, toast, confirm }: {
           <div className="flex gap-2">
             <input type="password" placeholder="Neues Passwort" value={newPassword} onChange={e => setNewPassword(e.target.value)}
               className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"/>
-            <button type="button" onClick={() => resetPassword(editingEmployee.id)} className="px-6 py-3 bg-blue-500 text-white font-bold uppercase text-xs">Speichern</button>
+            <button type="button" onClick={() => resetPassword(editingEmployee.id, editingEmployee.username)} className="px-6 py-3 bg-blue-500 text-white font-bold uppercase text-xs">Speichern</button>
             <button type="button" onClick={() => { setEditingEmployee(null); setNewPassword(''); }} className="px-6 py-3 border border-gray-600 text-gray-400 uppercase text-xs">Abbrechen</button>
           </div>
         </div>
@@ -697,9 +733,9 @@ function EmployeesTab({ currentUser, toast, confirm }: {
               <tr key={emp.id} className="border-t border-[#FF4400]/10">
                 <td className="px-4 py-3 font-bold">{emp.username}</td>
                 <td className="px-4 py-3"><span className={`px-2 py-1 text-xs ${emp.role === 'Manager' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'}`}>{emp.role}</span></td>
-                <td className="px-4 py-3">{emp.login_count}</td>
+                <td className="px-4 py-3">{emp.login_count}×</td>
                 <td className="px-4 py-3"><span className={`flex items-center gap-1 ${emp.online ? 'text-green-500' : 'text-gray-500'}`}><div className={`w-2 h-2 rounded-full ${emp.online ? 'bg-green-500' : 'bg-gray-500'}`}/>{emp.online ? 'Online' : 'Offline'}</span></td>
-                <td className="px-4 py-3 text-gray-500">{emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setEditingEmployee(emp)} className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs"><Key className="w-3 h-3"/></button>
@@ -718,28 +754,66 @@ function EmployeesTab({ currentUser, toast, confirm }: {
 // =================== LOGS TAB ===================
 function LogsTab() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [filter, setFilter] = useState('Alle');
+
   useEffect(() => { loadLogs(); }, []);
+
   const loadLogs = async () => {
-    const { data } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(100);
+    const { data } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(200);
     if (data) setLogs(data);
   };
+
+  const actionColors: Record<string, string> = {
+    'Eingeloggt': 'border-green-500 text-green-400',
+    'Ausgeloggt': 'border-gray-500 text-gray-400',
+    'Produkt hinzugefügt': 'border-[#FF4400] text-[#FF4400]',
+    'Produkt bearbeitet': 'border-blue-500 text-blue-400',
+    'Produkt gelöscht': 'border-red-500 text-red-400',
+    'Produkt verkauft': 'border-yellow-400 text-yellow-400',
+    'Produkt reaktiviert': 'border-purple-400 text-purple-400',
+    'Mitarbeiter erstellt': 'border-green-400 text-green-400',
+    'Mitarbeiter gelöscht': 'border-red-400 text-red-400',
+    'Passwort geändert': 'border-blue-400 text-blue-400',
+  };
+
+  const allActions = ['Alle', ...Object.keys(actionColors)];
+  const filtered = filter === 'Alle' ? logs : logs.filter(l => l.action === filter);
+
   return (
     <div className="bg-[#111] border border-purple-500/30 p-6">
-      <h3 className="text-lg font-bold text-purple-400 mb-4 flex items-center gap-2"><Clock className="w-5 h-5"/> Aktivitäts-Logs</h3>
-      <div className="space-y-2 max-h-[600px] overflow-y-auto">
-        {logs.map(log => (
-          <div key={log.id} className="flex items-center gap-4 p-3 bg-[#1A1A1A] border-l-2 border-purple-500">
-            <div className="text-xs text-gray-500 w-32">{new Date(log.timestamp).toLocaleString('de-DE')}</div>
-            <div className="text-xs font-bold text-purple-400 w-32">{log.username}</div>
-            <div className="text-sm flex-1"><span className="text-gray-300">{log.action}</span>{log.details && <span className="text-gray-500 ml-2">({log.details})</span>}</div>
-          </div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2"><Clock className="w-5 h-5"/> Aktivitäts-Logs</h3>
+        <button onClick={loadLogs} className="p-2 border border-purple-500/30 text-purple-400 hover:bg-purple-500/10">
+          <RefreshCw className="w-4 h-4"/>
+        </button>
+      </div>
+
+      {/* Filter */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {allActions.map(action => (
+          <button key={action} onClick={() => setFilter(action)}
+            className={`px-2 py-1 text-xs uppercase font-bold transition-colors ${filter === action ? 'bg-purple-500 text-white' : 'border border-purple-500/30 text-gray-500 hover:text-purple-400'}`}>
+            {action}
+          </button>
         ))}
+      </div>
+
+      <div className="space-y-1 max-h-[600px] overflow-y-auto">
+        {filtered.map(log => {
+          const colorClass = actionColors[log.action] || 'border-gray-600 text-gray-400';
+          return (
+            <div key={log.id} className={`flex items-start gap-3 p-3 bg-[#1A1A1A] border-l-2 ${colorClass.split(' ')[0]}`}>
+              <div className="text-xs text-gray-600 w-36 shrink-0 pt-0.5">{new Date(log.timestamp).toLocaleString('de-DE')}</div>
+              <div className={`text-xs font-bold w-24 shrink-0 pt-0.5 ${colorClass.split(' ')[1]}`}>{log.username}</div>
+              <div className="text-xs flex-1">
+                <span className="text-[#F5F5F5] font-bold">{log.action}</span>
+                {log.details && <span className="text-gray-500 ml-2">{log.details}</span>}
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && <div className="text-center py-10 text-gray-600">Keine Einträge</div>}
       </div>
     </div>
   );
-}
-
-// =================== HILFSFUNKTIONEN ===================
-async function logActivity(employeeId: number, username: string, action: string, details: string = '') {
-  await supabase.from('activity_logs').insert({ employee_id: employeeId, username, action, details, timestamp: new Date().toISOString() });
 }
