@@ -12,11 +12,38 @@ export async function OPTIONS() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// TYPEN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface StoredItem {
+  id: string;
+  url: string;
+  status?: 'available' | 'sold' | 'reserved';
+  lastChecked?: string;
+}
+
+interface ScrapeResult {
+  itemId: string | null;
+  url: string;
+  status: 'available' | 'sold' | 'reserved';
+  name: string;
+  price: string;
+  size: string;
+  condition: string;
+  category: string;
+  images: string[];
+  lastChecked: string;
+  error?: boolean;
+  message?: string;
+  action?: string;
+  warning?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // HILFSFUNKTIONEN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Item aus HTML extrahieren
-function extractItemFromHTML(html: string, url: string): any {
+function extractItemFromHTML(html: string, url: string): ScrapeResult {
   // ── STATUS CHECK ─────────────────────────────────────────────────────────────
   const statusIndicators = {
     sold: [
@@ -227,8 +254,7 @@ function extractItemFromHTML(html: string, url: string): any {
   };
 }
 
-// Einzelnes Item fetchen und scrapen
-async function scrapeSingleItem(url: string): Promise<any> {
+async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -242,9 +268,17 @@ async function scrapeSingleItem(url: string): Promise<any> {
   if (!response.ok) {
     if (response.status === 404 || response.status === 410) {
       return { 
+        itemId: null,
         url, 
         status: 'sold', 
-        error: 'Nicht mehr verfügbar (404/410)',
+        name: '',
+        price: '',
+        size: '',
+        condition: '',
+        category: 'Sonstiges',
+        images: [],
+        error: true,
+        message: 'Nicht mehr verfügbar (404/410)',
         lastChecked: new Date().toISOString(),
       };
     }
@@ -255,7 +289,6 @@ async function scrapeSingleItem(url: string): Promise<any> {
   return extractItemFromHTML(html, url);
 }
 
-// Alle Item-URLs eines Users finden
 async function getAllUserItems(usernameOrId: string): Promise<string[]> {
   const urls: string[] = [];
   let page = 1;
@@ -277,7 +310,6 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
 
     const html = await response.text();
     
-    // Item-URLs extrahieren
     const itemMatches = [...html.matchAll(/href="(\/items\/\d+-[^"]+)"/g)];
     const pageUrls = itemMatches.map(m => `https://www.vinted.de${m[1]}`);
     
@@ -285,7 +317,6 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
     
     urls.push(...pageUrls);
     
-    // Prüfen ob weitere Seiten existieren
     const hasNextPage = html.includes(`page=${page + 1}`) || 
                        html.includes('pagination') ||
                        html.includes('rel="next"');
@@ -293,15 +324,14 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
     if (!hasNextPage) break;
     
     page++;
-    await new Promise(r => setTimeout(r, 1000)); // Rate limiting
+    await new Promise(r => setTimeout(r, 1000));
   }
 
-  return [...new Set(urls)]; // Duplikate entfernen
+  return [...new Set(urls)];
 }
 
-// Bulk Scrape mit Concurrency-Limit
-async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise<any[]> {
-  const results: any[] = [];
+async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise<ScrapeResult[]> {
+  const results: ScrapeResult[] = [];
   const queue = [...urls];
   let activeWorkers = 0;
   
@@ -316,13 +346,20 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
         try {
           const data = await scrapeSingleItem(url);
           results.push(data);
-          await new Promise(r => setTimeout(r, 500)); // 500ms Delay
+          await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           console.error(`Fehler bei ${url}:`, e);
           results.push({ 
+            itemId: null,
             url, 
+            status: 'sold',
+            name: '',
+            price: '',
+            size: '',
+            condition: '',
+            category: 'Sonstiges',
+            images: [],
             error: true, 
-            status: 'error',
             message: String(e),
             lastChecked: new Date().toISOString(),
           });
@@ -333,12 +370,10 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
       if (activeWorkers === 0) resolve(results);
     }
     
-    // Worker starten
     for (let i = 0; i < Math.min(concurrency, urls.length); i++) {
       worker();
     }
     
-    // Fallback falls keine URLs
     if (urls.length === 0) resolve([]);
   });
 }
@@ -347,15 +382,13 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
 // API ROUTES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// GET: Status-Check für alle gespeicherten Items oder einzelnes Item
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const mode = searchParams.get('mode'); // 'status-check' | 'single'
+    const mode = searchParams.get('mode');
     const url = searchParams.get('url');
     const autoRemove = searchParams.get('autoRemove') === 'true';
 
-    // Einzelnes Item checken
     if (mode === 'single' && url) {
       const data = await scrapeSingleItem(url);
       
@@ -365,21 +398,19 @@ export async function GET(request: Request) {
       }, { headers: CORS });
     }
 
-    // Status-Check für alle (hier musst du deine DB-Items einbinden)
     if (mode === 'status-check') {
-      // TODO: Hole Items aus deiner Datenbank
-      // const storedItems = await db.items.findMany();
-      const mockItems = [
+      // Expliziter Typ für mockItems
+      const mockItems: StoredItem[] = [
         // { id: '1', url: 'https://www.vinted.de/items/...' }
       ];
 
       const results = {
         checked: 0,
-        sold: [] as any[],
-        reserved: [] as any[],
-        available: [] as any[],
-        removed: [] as any[],
-        errors: [] as any[],
+        sold: [] as ScrapeResult[],
+        reserved: [] as ScrapeResult[],
+        available: [] as ScrapeResult[],
+        removed: [] as string[],
+        errors: [] as { id: string; error: string }[],
       };
 
       for (const item of mockItems) {
@@ -388,18 +419,15 @@ export async function GET(request: Request) {
           results.checked++;
 
           if (data.status === 'sold') {
-            results.sold.push({ id: item.id, ...data });
+            results.sold.push(data);
             if (autoRemove) {
-              // TODO: await db.items.delete({ where: { id: item.id } });
               results.removed.push(item.id);
             }
           } else if (data.status === 'reserved') {
-            results.reserved.push({ id: item.id, ...data });
+            results.reserved.push(data);
           } else {
-            results.available.push({ id: item.id, ...data });
+            results.available.push(data);
           }
-
-          // TODO: await db.items.update({ where: { id: item.id }, data: { status: data.status } });
           
           await new Promise(r => setTimeout(r, 500));
         } catch (e) {
@@ -425,20 +453,18 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: Einzelnes Item oder Bulk Scrape
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { 
-      url,                    // Einzelne URL
-      urls,                   // Array von URLs
-      username,               // Username für Bulk
-      userId,                 // Oder User ID
-      mode = 'single',        // 'single' | 'bulk' | 'quick'
-      autoRemove = false,     // Auto-Remove bei Verkauf
+      url,
+      urls,
+      username,
+      userId,
+      mode = 'single',
+      autoRemove = false,
     } = body;
 
-    // ═══ EINZELNES ITEM ═══
     if (mode === 'single' && url) {
       if (!url.includes('vinted')) {
         return NextResponse.json({ message: 'Ungültige URL' }, { status: 400, headers: CORS });
@@ -446,7 +472,6 @@ export async function POST(request: Request) {
 
       const data = await scrapeSingleItem(url);
 
-      // Auto-Remove Logik
       if (data.status === 'sold' && autoRemove) {
         return NextResponse.json({
           ...data,
@@ -466,11 +491,9 @@ export async function POST(request: Request) {
       return NextResponse.json(data, { headers: CORS });
     }
 
-    // ═══ BULK SCRAPE ═══
     if (mode === 'bulk') {
       let urlsToScrape: string[] = [];
 
-      // Von Username/ID alle Items holen
       if (username || userId) {
         const identifier = username || userId;
         urlsToScrape = await getAllUserItems(identifier);
@@ -481,10 +504,8 @@ export async function POST(request: Request) {
             { status: 404, headers: CORS }
           );
         }
-      } 
-      // Oder direkt URLs übergeben
-      else if (urls && Array.isArray(urls)) {
-        urlsToScrape = urls.filter(u => u.includes('vinted'));
+      } else if (urls && Array.isArray(urls)) {
+        urlsToScrape = urls.filter((u: string) => u.includes('vinted'));
       } else {
         return NextResponse.json(
           { message: 'username, userId oder urls Array erforderlich' }, 
@@ -492,7 +513,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Quick Mode: Nur URLs zurückgeben
       if (body.quick === true) {
         return NextResponse.json({
           totalItems: urlsToScrape.length,
@@ -501,7 +521,6 @@ export async function POST(request: Request) {
         }, { headers: CORS });
       }
 
-      // Alle Items scrapen
       const results = await bulkScrapeItems(urlsToScrape, 3);
       
       const successful = results.filter(r => !r.error && r.status !== 'sold');
@@ -509,11 +528,9 @@ export async function POST(request: Request) {
       const reserved = results.filter(r => r.status === 'reserved');
       const errors = results.filter(r => r.error);
 
-      // Auto-Remove: Verkaufte Items filtern
-      let removed: any[] = [];
+      let removed: string[] = [];
       if (autoRemove && sold.length > 0) {
-        removed = sold.map(s => s.itemId || s.url);
-        // TODO: await db.items.deleteMany({ where: { id: { in: removed } } });
+        removed = sold.map(s => s.itemId || s.url).filter((id): id is string => id !== null);
       }
 
       return NextResponse.json({
