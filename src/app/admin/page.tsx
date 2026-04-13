@@ -101,13 +101,14 @@ function useConfirm() {
 
 // =================== ACTIVITY LOGGER ===================
 async function logActivity(employeeId: number, username: string, action: string, details: string = '') {
-  await supabase.from('activity_logs').insert({
-    employee_id: employeeId,
+  const { error } = await supabase.from('activity_logs').insert({
+    employee_id: employeeId || null,
     username,
     action,
     details,
     timestamp: new Date().toISOString()
   });
+  if (error) console.error('Log Fehler:', error);
 }
 
 // =================== KONSTANTEN ===================
