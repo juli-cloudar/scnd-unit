@@ -1,10 +1,6 @@
 // src/app/api/vinted/route.ts
 import { NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
-export const maxDuration = 60;
-export const dynamic = 'force-dynamic';
-
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
@@ -13,6 +9,14 @@ const CORS = {
 
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
+}
+
+// TYPEN
+interface StoredItem {
+  id: string;
+  url: string;
+  status?: 'available' | 'sold' | 'reserved';
+  lastChecked?: string;
 }
 
 interface ScrapeResult {
@@ -28,77 +32,212 @@ interface ScrapeResult {
   lastChecked: string;
   error?: boolean;
   message?: string;
+  action?: string;
+  warning?: string;
 }
 
-async function fetchWithTimeout(url: string, timeoutMs = 7000): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
-        'Cache-Control': 'no-cache',
-        'Referer': 'https://www.vinted.de/',
-      },
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
+// HILFSFUNKTIONEN
 function extractItemFromHTML(html: string, url: string): ScrapeResult {
-  const isSold = /Dieser Artikel ist bereits verkauft|Artikel nicht verfügbar|bereits verkauft/i.test(html);
-  const isReserved = /Dieser Artikel ist reserviert|reserviert/i.test(html);
-  
-  let status: 'available' | 'sold' | 'reserved' = 'available';
-  if (isSold) status = 'sold';
-  else if (isReserved) status = 'reserved';
+  // STATUS CHECK
+  const statusIndicators = {
+    sold: [
+      /Dieser Artikel ist bereits verkauft/i,
+      /Artikel nicht verfügbar/i,
+      /reserviert/i,
+      /sold/i,
+      /verkauft/i,
+      /nicht mehr verfügbar/i,
+      /data-testid="item-sold"/i,
+      /class="[^"]*item-sold[^"]*"/i,
+      /Dieser Artikel ist reserviert/i,
+    ],
+    reserved: [
+      /reserviert/i,
+      /reserved/i,
+      /vorübergehend nicht verfügbar/i,
+      /Dieser Artikel ist reserviert/i,
+    ]
+  };
 
-  const images: string[] = [];
-  const imgMatches = html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g);
-  for (const m of imgMatches) {
-    let imgUrl = m[0];
-    if (imgUrl.includes('/f800/')) {
-      imgUrl = imgUrl.split('?')[0];
-      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(imgUrl)}`;
-      if (!images.includes(proxyUrl)) images.push(proxyUrl);
+  let itemStatus: 'available' | 'sold' | 'reserved' = 'available';
+  
+  for (const pattern of statusIndicators.sold) {
+    if (pattern.test(html)) {
+      itemStatus = 'sold';
+      break;
+    }
+  }
+  
+  if (itemStatus === 'available') {
+    for (const pattern of statusIndicators.reserved) {
+      if (pattern.test(html)) {
+        itemStatus = 'reserved';
+        break;
+      }
     }
   }
 
-  const titleMatch = html.match(/<title>([^<]+)/i);
-  const name = titleMatch ? titleMatch[1].replace(' | Vinted', '').trim() : '';
+  // BILDER
+  const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
+  const seen = new Set<string>();
+  const images: string[] = [];
+  
+  for (const m of imgMatches) {
+    let fullUrl = m[0];
+    if (!fullUrl.includes('/f800/')) continue;
+    fullUrl = fullUrl.replace(/&amp;/g, '&');
+    const base = fullUrl.split('?')[0];
+    if (!seen.has(base)) {
+      seen.add(base);
+      images.push(`/api/image-proxy?url=${encodeURIComponent(fullUrl)}`);
+    }
+  }
 
-  let price = '';
-  const priceMatch = html.match(/(\d{1,3}(?:[.,]\d{2})?)\s*€/);
-  if (priceMatch) price = priceMatch[1].replace(',', '.');
+  // NAME
+  const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
+  const titleMatch = html.match(/<title>\s*([^|<]+)/i);
+  const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
+  // GRÖSSE
   let size = '';
-  const sizeMatch = html.match(/Größe<\/dt>\s*<dd[^>]*>([^<]+)/i) || 
-                    html.match(/"size"[:\s]*"([^"]+)"/i);
-  if (sizeMatch) size = sizeMatch[1].trim();
+  const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) ||
+                       html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) ||
+                       html.match(/"size_title"[:\s]*"([^"]{1,20})"/i);
+  if (sizeJsonMatch) size = sizeJsonMatch[1].trim();
+
+  if (!size) {
+    const sizePatterns = [
+      /data-testid="item-details-size"[^>]*>([^<]{1,20})/i,
+      /class="[^"]*item-details[^"]*"[^>]*>[^<]*Größe[^<]*<[^>]*>([^<]{1,20})/i,
+      /Größe\s*<\/[^>]+>\s*<[^>]+>\s*([^<]{1,20})/i,
+      /Größe[^<]{0,30}<[^>]+>([^<]{1,20})/i,
+      /"Größe"[^:]*:[^"]*"([^"]{1,20})"/i,
+    ];
+    for (const pattern of sizePatterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        size = match[1].trim().replace(/[·\/\-]/g, '').trim();
+        if (size.length > 0 && size.length < 20) break;
+      }
+    }
+  }
+
+  if (!size) {
+    const broadMatch = html.match(/(?:Größe|Grösse|Size)[^\w]{0,10}(XXS|XS|S|M|L|XL|XXL|XXXL|4XL|5XL|One Size|Einheitsgröße|UNI|\d{2,3})/i);
+    if (broadMatch) size = broadMatch[1].trim();
+  }
+
+  if (!size) {
+    const numericMatch = html.match(/(?:Größe|Size)[^\d]{0,15}(\d{2,3})\b/i);
+    if (numericMatch) size = numericMatch[1];
+  }
+
+  // PREIS
+  let price = '';
+  const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+  for (const jsonMatch of jsonLdMatches) {
+    try {
+      const jsonData = JSON.parse(jsonMatch[1]);
+      const findPrice = (obj: any): string | null => {
+        if (!obj) return null;
+        if (obj.price) return obj.price.toString().replace('.', ',');
+        if (typeof obj === 'object') {
+          for (const key in obj) {
+            const found = findPrice(obj[key]);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const foundPrice = findPrice(jsonData);
+      if (foundPrice) {
+        price = foundPrice;
+        break;
+      }
+    } catch (e) {}
+  }
+
+  if (!price) {
+    const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
+    const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
+    if (priceMatch) price = priceMatch[1];
+  }
+
+  // ZUSTAND
+  const condMap: Record<string, string> = {
+    'neu mit etikett': 'Neu mit Etikett',
+    'neu ohne etikett': 'Neu ohne Etikett',
+    'sehr gut': 'Sehr gut',
+    'zufriedenstellend': 'Zufriedenstellend',
+    'schlecht': 'Schlecht',
+    'gut': 'Gut',
+    'neu': 'Neu',
+  };
 
   let condition = '';
-  const conditionMatch = html.match(/Zustand<\/dt>\s*<dd[^>]*>([^<]+)/i);
-  if (conditionMatch) condition = conditionMatch[1].trim();
+  const directMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Sehr gut|Zufriedenstellend|Schlecht|Gut|Neu)</i);
+  if (directMatch) condition = directMatch[1];
 
+  if (!condition) {
+    const condJsonMatch = html.match(/"condition"[:\s]*"([^"]+)"/i) ||
+                         html.match(/"item_condition"[:\s]*"([^"]+)"/i);
+    if (condJsonMatch) {
+      const raw = condJsonMatch[1].toLowerCase();
+      for (const [key, val] of Object.entries(condMap)) {
+        if (raw.includes(key)) { condition = val; break; }
+      }
+    }
+  }
+
+  if (!condition) {
+    const contextMatch = html.match(/Zustand[^<]{0,50}(Neu mit Etikett|Neu ohne Etikett|Sehr gut|Zufriedenstellend|Schlecht|Gut|Neu)/i);
+    if (contextMatch) condition = contextMatch[1];
+  }
+
+  if (!condition) {
+    const htmlLower = html.toLowerCase();
+    const order = ['neu mit etikett', 'neu ohne etikett', 'sehr gut', 'zufriedenstellend', 'schlecht', 'gut'];
+    for (const key of order) {
+      const pattern = new RegExp(`[>\\s"']${key}[<\\s"'·]`, 'i');
+      if (pattern.test(htmlLower)) {
+        condition = condMap[key];
+        break;
+      }
+    }
+  }
+
+  // KATEGORIE
+  const catMap: Record<string, string> = {
+    'jacke': 'Jacken', 'jacket': 'Jacken', 'mantel': 'Jacken', 'coat': 'Jacken',
+    'pullover': 'Pullover', 'hoodie': 'Pullover', 'strickjacke': 'Pullover', 'sweater': 'Pullover',
+    'sweatshirt': 'Sweatshirts', 'sweat': 'Sweatshirts', 'crewneck': 'Sweatshirts',
+    'top': 'Tops', 'shirt': 'Tops', 't-shirt': 'Tops', 'tshirt': 'Tops', 'crop': 'Tops',
+    'kleid': 'Kleider', 'dress': 'Kleider',
+    'rock': 'Röcke', 'skirt': 'Röcke',
+    'hose': 'Hosen', 'pants': 'Hosen', 'jeans': 'Hosen',
+    'schuhe': 'Schuhe', 'shoes': 'Schuhe', 'sneaker': 'Schuhe',
+    'tasche': 'Taschen', 'bag': 'Taschen',
+  };
+  
   let category = 'Sonstiges';
   const nameLower = name.toLowerCase();
-  if (nameLower.includes('jacke') || nameLower.includes('jacket')) category = 'Jacken';
-  else if (nameLower.includes('pullover') || nameLower.includes('hoodie')) category = 'Pullover';
-  else if (nameLower.includes('sweat')) category = 'Sweatshirts';
-  else if (nameLower.includes('shirt') || nameLower.includes('top')) category = 'Tops';
-  else if (nameLower.includes('kleid')) category = 'Kleider';
-  else if (nameLower.includes('hose') || nameLower.includes('jeans')) category = 'Hosen';
-  else if (nameLower.includes('schuh') || nameLower.includes('sneaker')) category = 'Schuhe';
+  const urlLower = url.toLowerCase();
+  
+  for (const [key, val] of Object.entries(catMap)) {
+    if (nameLower.includes(key) || urlLower.includes(key)) {
+      category = val;
+      break;
+    }
+  }
 
-  const itemIdMatch = url.match(/\/items\/(\d+)/);
+  // ITEM ID
+  const itemIdMatch = url.match(/\/items\/(\d+)-/) || url.match(/item_id=(\d+)/);
+  const itemId = itemIdMatch ? itemIdMatch[1] : null;
+
   return {
-    itemId: itemIdMatch?.[1] ?? null,
+    itemId,
     url,
-    status,
+    status: itemStatus,
     name,
     price,
     size,
@@ -110,189 +249,382 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
 }
 
 async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
-  console.log(`[Scrape] Fetching: ${url}`);
-  try {
-    const response = await fetchWithTimeout(url);
-    if (!response.ok) {
-      console.log(`[Scrape] HTTP ${response.status} for ${url}`);
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+      'Cache-Control': 'no-cache',
+      'Referer': 'https://www.vinted.de/',
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 410) {
       return { 
-        itemId: null, url, status: 'sold', name: '', price: '', size: '', 
-        condition: '', category: 'Sonstiges', images: [], 
-        lastChecked: new Date().toISOString(), error: true, 
-        message: `HTTP ${response.status}` 
+        itemId: null,
+        url, 
+        status: 'sold', 
+        name: '',
+        price: '',
+        size: '',
+        condition: '',
+        category: 'Sonstiges',
+        images: [],
+        error: true,
+        message: 'Nicht mehr verfügbar (404/410)',
+        lastChecked: new Date().toISOString(),
       };
     }
-    const html = await response.text();
-    const result = extractItemFromHTML(html, url);
-    console.log(`[Scrape] Success: ${result.name} - ${result.status}`);
-    return result;
-  } catch (error) {
-    console.error(`[Scrape] Error for ${url}:`, error);
-    return { 
-      itemId: null, url, status: 'sold', name: '', price: '', size: '', 
-      condition: '', category: 'Sonstiges', images: [], 
-      lastChecked: new Date().toISOString(), error: true, 
-      message: String(error) 
-    };
+    throw new Error(`Vinted nicht erreichbar: ${response.status}`);
   }
+
+  const html = await response.text();
+  return extractItemFromHTML(html, url);
 }
 
-// ⭐⭐⭐ VERBESSERTE getAllUserItems - unterstützt verschiedene Eingabeformate ⭐⭐⭐
-async function getAllUserItems(memberInput: string): Promise<string[]> {
+async function getAllUserItems(usernameOrId: string): Promise<string[]> {
   const urls: string[] = [];
-  
-  // Extrahiere die numerische Member-ID aus verschiedenen Formaten
-  let memberId = '';
-  
-  // Entferne Leerzeichen
-  memberInput = memberInput.trim();
-  
-  // Fall 1: Nur eine Zahl
-  if (/^\d+$/.test(memberInput)) {
-    memberId = memberInput;
-  }
-  // Fall 2: URL mit /member/Zahl-Name
-  else {
-    const match = memberInput.match(/\/member\/(\d+)/);
-    if (match) {
-      memberId = match[1];
-    } else {
-      // Fall 3: Nur die Zahl mit eventuellem Text dahinter (z.B. "3138250645-scndunit")
-      const numMatch = memberInput.match(/^(\d+)/);
-      if (numMatch) {
-        memberId = numMatch[1];
-      }
-    }
-  }
-  
-  if (!memberId) {
-    console.error('[Vinted] Could not extract member ID from:', memberInput);
-    return [];
-  }
-  
-  console.log(`[Vinted] Member ID: ${memberId}`);
-  
   let page = 1;
-  const maxPages = 20;
+  const maxPages = 15;
+  
+  const cleanUsername = usernameOrId.replace(/^@/, '').trim().replace(/\/$/, '');
   
   while (page <= maxPages) {
-    const profileUrl = `https://www.vinted.de/member/${memberId}?page=${page}`;
-    console.log(`[Vinted] Fetching page ${page}: ${profileUrl}`);
+    const profileUrl = `https://www.vinted.de/member/${cleanUsername}?page=${page}`;
     
-    try {
-      const response = await fetchWithTimeout(profileUrl, 10000);
-      if (!response.ok) {
-        console.log(`[Vinted] HTTP ${response.status} on page ${page}`);
-        break;
+    const response = await fetch(profileUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': 'https://www.vinted.de/',
+        'Cache-Control': 'no-cache',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`Page ${page} failed:`, response.status);
+      break;
+    }
+
+    const html = await response.text();
+    
+    const itemPatterns = [
+      /href="(\/items\/\d+-[^"]+)"/g,
+      /href="(\/items\/\d+[^"]*)"/g,
+      /"url":\s*"(\/items\/\d+[^"]*)"/g,
+      /"item_id":\s*(\d+)[^}]*"title":\s*"([^"]+)"/g,
+    ];
+
+    const pageUrls: string[] = [];
+    
+    for (const pattern of itemPatterns) {
+      const matches = [...html.matchAll(pattern)];
+      
+      for (const match of matches) {
+        let itemUrl: string;
+        
+        if (match[2]) {
+          const id = match[1];
+          const title = match[2].toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9\-]/g, '')
+            .substring(0, 50);
+          itemUrl = `https://www.vinted.de/items/${id}-${title}`;
+        } else {
+          itemUrl = match[1].startsWith('http') 
+            ? match[1] 
+            : `https://www.vinted.de${match[1]}`;
+        }
+        
+        itemUrl = itemUrl.split('?')[0];
+        
+        if (!pageUrls.includes(itemUrl)) {
+          pageUrls.push(itemUrl);
+        }
       }
+    }
+
+    const dataTestIdMatches = [...html.matchAll(/data-testid="item-card"[^>]*href="(\/items\/\d+[^"]*)"/g)];
+    for (const match of dataTestIdMatches) {
+      const url = `https://www.vinted.de${match[1].split('?')[0]}`;
+      if (!pageUrls.includes(url)) pageUrls.push(url);
+    }
+
+    if (pageUrls.length === 0) {
+      console.log(`Keine Items auf Seite ${page} gefunden`);
+      break;
+    }
+    
+    urls.push(...pageUrls);
+    console.log(`Seite ${page}: ${pageUrls.length} Items gefunden`);
+    
+    const hasNextPage = html.includes(`page=${page + 1}`) || 
+                       html.includes('pagination') ||
+                       html.includes('rel="next"') ||
+                       html.includes('>Weiter<') ||
+                       html.includes('>Next<') ||
+                       pageUrls.length === 96;
+    
+    if (!hasNextPage) break;
+    
+    page++;
+    await new Promise(r => setTimeout(r, 1200));
+  }
+
+  const uniqueUrls = [...new Set(urls)].filter(url => 
+    url.includes('/items/') && url.match(/\/items\/\d+/)
+  );
+
+  console.log(`Total: ${uniqueUrls.length} unique Items gefunden`);
+  return uniqueUrls;
+}
+
+async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise<ScrapeResult[]> {
+  const results: ScrapeResult[] = [];
+  const queue = [...urls];
+  let activeWorkers = 0;
+  
+  return new Promise((resolve) => {
+    async function worker() {
+      activeWorkers++;
       
-      const html = await response.text();
-      
-      // Finde alle Item-Links mit verschiedenen Patterns
-      const itemMatches = html.matchAll(/href="(\/items\/\d+[^"?#]*)"/g);
-      let found = 0;
-      for (const match of itemMatches) {
-        const fullUrl = `https://www.vinted.de${match[1]}`;
-        if (!urls.includes(fullUrl)) {
-          urls.push(fullUrl);
-          found++;
+      while (queue.length > 0) {
+        const url = queue.shift();
+        if (!url) continue;
+        
+        try {
+          const data = await scrapeSingleItem(url);
+          results.push(data);
+          await new Promise(r => setTimeout(r, 500));
+        } catch (e) {
+          console.error(`Fehler bei ${url}:`, e);
+          results.push({ 
+            itemId: null,
+            url, 
+            status: 'sold',
+            name: '',
+            price: '',
+            size: '',
+            condition: '',
+            category: 'Sonstiges',
+            images: [],
+            error: true, 
+            message: String(e),
+            lastChecked: new Date().toISOString(),
+          });
         }
       }
       
-      console.log(`[Vinted] Page ${page}: found ${found} items (total: ${urls.length})`);
-      
-      // Prüfe auf nächste Seite
-      const hasNext = html.includes(`page=${page + 1}`) || 
-                      html.includes('rel="next"') ||
-                      html.includes('>Weiter<');
-      
-      if (!hasNext || found === 0) {
-        console.log(`[Vinted] No more pages`);
-        break;
-      }
-      
-      page++;
-      await new Promise(r => setTimeout(r, 500));
-    } catch (err) {
-      console.error(`[Vinted] Error fetching page ${page}:`, err);
-      break;
+      activeWorkers--;
+      if (activeWorkers === 0) resolve(results);
     }
-  }
-  
-  console.log(`[Vinted] Total unique items found: ${urls.length}`);
-  return urls;
+    
+    for (let i = 0; i < Math.min(concurrency, urls.length); i++) {
+      worker();
+    }
+    
+    if (urls.length === 0) resolve([]);
+  });
 }
 
-// ⭐⭐⭐ POST - Unterstützt Single und Bulk ⭐⭐⭐
-export async function POST(request: Request) {
-  console.log('[API] POST received');
-  
+// API ROUTES
+export async function GET(request: Request) {
   try {
-    const body = await request.json();
-    console.log('[API] Body:', JSON.stringify(body, null, 2));
-    
-    const { mode, profileUrl, url, quick = false } = body;
+    const { searchParams } = new URL(request.url);
+    const mode = searchParams.get('mode');
+    const url = searchParams.get('url');
+    const autoRemove = searchParams.get('autoRemove') === 'true';
 
-    // ── SINGLE MODE (Item-URL) ──
     if (mode === 'single' && url) {
-      console.log('[API] Single mode for:', url);
       const data = await scrapeSingleItem(url);
-      return NextResponse.json(data, { headers: CORS });
-    }
-
-    // ── BULK MODE (Member-URL oder Member-ID) ──
-    if (mode === 'bulk' && profileUrl) {
-      console.log('[API] Bulk mode for:', profileUrl);
-      
-      const allUrls = await getAllUserItems(profileUrl);
-      console.log(`[API] Found ${allUrls.length} total items`);
-      
-      if (quick === true) {
-        return NextResponse.json({
-          totalItems: allUrls.length,
-          itemUrls: allUrls,
-          message: `${allUrls.length} Items gefunden.`
-        }, { headers: CORS });
-      }
-      
-      // Bulk mit Scraping
-      const results: ScrapeResult[] = [];
-      for (let i = 0; i < allUrls.length; i++) {
-        console.log(`[API] Scraping ${i + 1}/${allUrls.length}`);
-        const result = await scrapeSingleItem(allUrls[i]);
-        results.push(result);
-        await new Promise(r => setTimeout(r, 300));
-      }
-      
-      const available = results.filter(r => r.status === 'available' && !r.error);
       
       return NextResponse.json({
-        summary: {
-          total: results.length,
-          available: available.length,
-          sold: results.filter(r => r.status === 'sold').length,
-          reserved: results.filter(r => r.status === 'reserved').length,
-          errors: results.filter(r => r.error).length
-        },
-        items: available,
-        message: `${available.length} verfügbare Items gefunden`
+        ...data,
+        action: data.status === 'sold' && autoRemove ? 'remove' : 'keep',
+      }, { headers: CORS });
+    }
+
+    if (mode === 'status-check') {
+      const mockItems: StoredItem[] = [];
+
+      const results = {
+        checked: 0,
+        sold: [] as ScrapeResult[],
+        reserved: [] as ScrapeResult[],
+        available: [] as ScrapeResult[],
+        removed: [] as string[],
+        errors: [] as { id: string; error: string }[],
+      };
+
+      for (const item of mockItems) {
+        try {
+          const data = await scrapeSingleItem(item.url);
+          results.checked++;
+
+          if (data.status === 'sold') {
+            results.sold.push(data);
+            if (autoRemove) {
+              results.removed.push(item.id);
+            }
+          } else if (data.status === 'reserved') {
+            results.reserved.push(data);
+          } else {
+            results.available.push(data);
+          }
+          
+          await new Promise(r => setTimeout(r, 500));
+        } catch (e) {
+          results.errors.push({ id: item.id, error: String(e) });
+        }
+      }
+
+      return NextResponse.json({
+        timestamp: new Date().toISOString(),
+        ...results,
+        message: autoRemove && results.removed.length > 0 
+          ? `${results.removed.length} verkaufte Items entfernt`
+          : `${results.sold.length} Items als verkauft markiert`,
       }, { headers: CORS });
     }
 
     return NextResponse.json({ 
-      message: 'Ungültiger Modus. Nutze: mode="single" mit url ODER mode="bulk" mit profileUrl' 
-    }, { status: 400, headers: CORS });
-    
-  } catch (error) {
-    console.error('[API] Error:', error);
-    return NextResponse.json({ 
-      message: 'Fehler: ' + String(error) 
-    }, { status: 500, headers: CORS });
+      message: 'Verwende ?mode=single&url=... oder ?mode=status-check' 
+    }, { headers: CORS });
+
+  } catch (e) {
+    return NextResponse.json({ message: 'Fehler: ' + String(e) }, { status: 500, headers: CORS });
   }
 }
 
-export async function GET(request: Request) {
-  return NextResponse.json({ 
-    message: 'Verwende POST für API-Zugriff. Beispiele: { "mode": "single", "url": "..." } oder { "mode": "bulk", "profileUrl": "...", "quick": true }' 
-  }, { headers: CORS });
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { 
+      url,
+      urls,
+      username,
+      userId,
+      profileUrl,
+      mode = 'single',
+      autoRemove = false,
+      quick = false,
+    } = body;
+
+    if (mode === 'single' && url) {
+      if (!url.includes('vinted')) {
+        return NextResponse.json({ message: 'Ungültige URL' }, { status: 400, headers: CORS });
+      }
+
+      const data = await scrapeSingleItem(url);
+
+      if (data.status === 'sold' && autoRemove) {
+        return NextResponse.json({
+          ...data,
+          action: 'removed',
+          message: '⚠️ Item ist VERKAUFT und wurde aus der Datenbank entfernt',
+        }, { headers: CORS });
+      }
+
+      if (data.status === 'sold') {
+        return NextResponse.json({
+          ...data,
+          warning: '⚠️ Item ist VERKAUFT - soll aus der Datenbank entfernt werden?',
+          action: 'suggest_remove',
+        }, { headers: CORS });
+      }
+
+      return NextResponse.json(data, { headers: CORS });
+    }
+
+    if (mode === 'bulk') {
+      let identifier = username || userId || profileUrl;
+      
+      if (identifier?.includes('vinted')) {
+        const match = identifier.match(/member\/\d+-([^/?]+)/) || 
+                      identifier.match(/member\/([^/?]+)/);
+        if (match) identifier = match[1];
+      }
+      
+      if (identifier) {
+        identifier = identifier.replace(/^@/, '');
+      }
+      
+      if (!identifier) {
+        return NextResponse.json(
+          { message: 'username, userId oder profileUrl erforderlich' }, 
+          { status: 400, headers: CORS }
+        );
+      }
+
+      const urlsToScrape = await getAllUserItems(identifier);
+      
+      if (urlsToScrape.length === 0) {
+        return NextResponse.json(
+          { message: 'Keine Items gefunden für: ' + identifier }, 
+          { status: 404, headers: CORS }
+        );
+      }
+
+      if (quick === true) {
+        return NextResponse.json({
+          totalItems: urlsToScrape.length,
+          itemUrls: urlsToScrape,
+          message: 'URLs gefunden. Setze quick: false zum Scrapen.',
+        }, { headers: CORS });
+      }
+
+      const results = await bulkScrapeItems(urlsToScrape, 3);
+      
+      const successful = results.filter(r => !r.error && r.status !== 'sold');
+      const sold = results.filter(r => r.status === 'sold');
+      const reserved = results.filter(r => r.status === 'reserved');
+      const errors = results.filter(r => r.error);
+
+      let removed: string[] = [];
+      if (autoRemove && sold.length > 0) {
+        removed = sold.map(s => s.itemId || s.url).filter((id): id is string => id !== null);
+      }
+
+      return NextResponse.json({
+        timestamp: new Date().toISOString(),
+        summary: {
+          total: results.length,
+          available: successful.length,
+          sold: sold.length,
+          reserved: reserved.length,
+          errors: errors.length,
+          autoRemoved: removed.length,
+        },
+        items: {
+          added: successful,
+          skipped: sold,
+          reserved: reserved,
+          failed: errors,
+        },
+        soldItems: sold.map(s => ({
+          itemId: s.itemId,
+          url: s.url,
+          name: s.name,
+          reason: 'Verkauft/Reserviert',
+        })),
+        message: autoRemove && removed.length > 0
+          ? `✅ ${successful.length} Items hinzugefügt, ${removed.length} verkaufte entfernt`
+          : `✅ ${successful.length} Items hinzugefügt, ${sold.length} verkaufte übersprungen`,
+      }, { headers: CORS });
+    }
+
+    return NextResponse.json(
+      { message: 'Ungültiger Modus. Verwende mode: "single" oder "bulk"' }, 
+      { status: 400, headers: CORS }
+    );
+
+  } catch (e) {
+    console.error('Scraper Error:', e);
+    return NextResponse.json(
+      { message: 'Fehler: ' + String(e) }, 
+      { status: 500, headers: CORS }
+    );
+  }
 }
