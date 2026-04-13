@@ -282,47 +282,120 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   const html = await response.text();
   return extractItemFromHTML(html, url);
 }
-
+// ═══════════════════════════════════════════════════════════
+// NEU - EINFÜGEN
+// ═══════════════════════════════════════════════════════════
 async function getAllUserItems(usernameOrId: string): Promise<string[]> {
   const urls: string[] = [];
   let page = 1;
-  const maxPages = 10;
+  const maxPages = 15;
+  
+  // Username bereinigen (entferne @ und trailing slashes)
+  const cleanUsername = usernameOrId.replace(/^@/, '').trim().replace(/\/$/, '');
   
   while (page <= maxPages) {
-    const profileUrl = `https://www.vinted.de/member/${usernameOrId}?page=${page}`;
+    const profileUrl = `https://www.vinted.de/member/${cleanUsername}?page=${page}`;
     
     const response = await fetch(profileUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'de-DE,de;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
         'Referer': 'https://www.vinted.de/',
+        'Cache-Control': 'no-cache',
       },
     });
 
-    if (!response.ok) break;
+    if (!response.ok) {
+      console.log(`Page ${page} failed:`, response.status);
+      break;
+    }
 
     const html = await response.text();
     
-    const itemMatches = [...html.matchAll(/href="(\/items\/\d+-[^"]+)"/g)];
-    const pageUrls = itemMatches.map(m => `https://www.vinted.de${m[1]}`);
+    // VERBESSERTE Regex - sucht nach Vinteds aktuellen Item-Link Patterns
+    const itemPatterns = [
+      // Pattern 1: Standard href links (neueste Vinted Version)
+      /href="(\/items\/\d+-[^"]+)"/g,
+      // Pattern 2: URL-encoded Links
+      /href="(\/items\/\d+[^"]*)"/g,
+      // Pattern 3: Aus JSON-Strukturen (window.__INITIAL_STATE__ etc.)
+      /"url":\s*"(\/items\/\d+[^"]*)"/g,
+      // Pattern 4: Item IDs für manuelle Konstruktion
+      /"item_id":\s*(\d+)[^}]*"title":\s*"([^"]+)"/g,
+    ];
+
+    const pageUrls: string[] = [];
     
-    if (pageUrls.length === 0) break;
+    // Versuche alle Patterns
+    for (const pattern of itemPatterns) {
+      const matches = [...html.matchAll(pattern)];
+      
+      for (const match of matches) {
+        let itemUrl: string;
+        
+        if (match[2]) {
+          // Pattern 4: Konstruiere URL aus ID und Titel
+          const id = match[1];
+          const title = match[2].toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9\-]/g, '')
+            .substring(0, 50);
+          itemUrl = `https://www.vinted.de/items/${id}-${title}`;
+        } else {
+          // Patterns 1-3: Bereits vollständige Pfade
+          itemUrl = match[1].startsWith('http') 
+            ? match[1] 
+            : `https://www.vinted.de${match[1]}`;
+        }
+        
+        // Bereinige URL (entferne Query params)
+        itemUrl = itemUrl.split('?')[0];
+        
+        if (!pageUrls.includes(itemUrl)) {
+          pageUrls.push(itemUrl);
+        }
+      }
+    }
+
+    // Alternative: Suche nach data-testid Attributen (Vinted React App)
+    const dataTestIdMatches = [...html.matchAll(/data-testid="item-card"[^>]*href="(\/items\/\d+[^"]*)"/g)];
+    for (const match of dataTestIdMatches) {
+      const url = `https://www.vinted.de${match[1].split('?')[0]}`;
+      if (!pageUrls.includes(url)) pageUrls.push(url);
+    }
+
+    if (pageUrls.length === 0) {
+      console.log(`Keine Items auf Seite ${page} gefunden`);
+      break;
+    }
     
     urls.push(...pageUrls);
+    console.log(`Seite ${page}: ${pageUrls.length} Items gefunden`);
     
+    // Prüfe auf Pagination (nächste Seite existiert?)
     const hasNextPage = html.includes(`page=${page + 1}`) || 
                        html.includes('pagination') ||
-                       html.includes('rel="next"');
+                       html.includes('rel="next"') ||
+                       html.includes('>Weiter<') ||
+                       html.includes('>Next<') ||
+                       pageUrls.length === 96; // Vinted zeigt meist 96 Items pro Seite
     
     if (!hasNextPage) break;
     
     page++;
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 1200)); // Wichtig: Längerer Delay gegen Rate-Limit
   }
 
-  return [...new Set(urls)];
+  // Entferne Duplikate und bereinige
+  const uniqueUrls = [...new Set(urls)].filter(url => 
+    url.includes('/items/') && url.match(/\/items\/\d+/)
+  );
+
+  console.log(`Total: ${uniqueUrls.length} unique Items gefunden`);
+  return uniqueUrls;
 }
+// ═══════════════════════════════════════════════════════════
 
 async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
