@@ -1375,3 +1375,38 @@ function LogsTab({ toast, confirm }: {
         <span className="text-xs uppercase text-gray-500">Auto-Löschen nach</span>
         {[1, 3, 7, 14, 30].map(days => (
           <button key={days} onClick
+            ={() => setAutoDeleteDays(days)}
+            className={`px-2 py-1 text-xs font-bold uppercase ${autoDeleteDays === days ? 'bg-purple-500 text-white' : 'border border-purple-500/30 text-gray-500 hover:text-purple-400'}`}>
+            {days}d
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {allActions.map(action => (
+          <button key={action} onClick={() => setFilter(action)}
+            className={`px-2 py-1 text-xs uppercase font-bold transition-colors ${filter === action ? 'bg-purple-500 text-white' : 'border border-purple-500/30 text-gray-500 hover:text-purple-400'}`}>
+            {action}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-1 max-h-[500px] overflow-y-auto">
+        {filteredLogs.map(log => {
+          const colorClass = actionColors[log.action] || 'border-gray-600 text-gray-400';
+          return (
+            <div key={log.id} className={`flex items-start gap-3 p-3 bg-[#0A0A0A] border-l-2 ${colorClass.split(' ')[0]}`}>
+              <div className="text-xs text-gray-600 w-36 shrink-0 pt-0.5">{new Date(log.timestamp).toLocaleString('de-DE')}</div>
+              <div className={`text-xs font-bold w-24 shrink-0 pt-0.5 ${colorClass.split(' ')[1]}`}>{log.username}</div>
+              <div className="text-xs flex-1">
+                <span className="text-[#F5F5F5] font-bold">{log.action}</span>
+                {log.details && <span className="text-gray-500 ml-2">{log.details}</span>}
+              </div>
+            </div>
+          );
+        })}
+        {filteredLogs.length === 0 && <div className="text-center py-10 text-gray-600">Keine Einträge</div>}
+      </div>
+    </div>
+  );
+}
