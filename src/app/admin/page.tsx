@@ -303,91 +303,95 @@ function VintedToolsTab({ user, toast, confirm }: {
   confirm: (msg: string, onConfirm: () => void) => void
 }) {
   const [activeSubTab, setActiveSubTab] = useState<'bulk' | 'status'>('bulk');
-  const [username, setUsername] = useState('');
+const [profileUrl, setProfileUrl] = useState(''); 
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [autoRemove, setAutoRemove] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-  // Bulk Scrape - ganzen Account importieren
-  const scrapeBulk = async () => {
-    if (!username) {
-      toast('Bitte Username eingeben', 'error');
+// Bulk Scrape - ganzen Account importieren (NEU - mit Profil-URL)
+const scrapeBulk = async () => {
+  if (!profileUrl) {
+    toast('Bitte Profil-URL oder Username eingeben', 'error');
+    return;
+  }
+
+  setLoading(true);
+  setResult(null);
+  setProgress({ current: 0, total: 0 });
+
+  try {
+    // Schritt 1: URLs holen
+    const quickRes = await fetch('/api/vinted', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        mode: 'bulk', 
+        profileUrl, // NEU: profileUrl statt username
+        quick: true 
+      }),
+    });
+
+    const quickData = await quickRes.json();
+    if (!quickRes.ok) {
+      toast(quickData.message || 'Fehler', 'error');
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setResult(null);
-    setProgress({ current: 0, total: 0 });
+    setProgress({ current: 0, total: quickData.totalItems });
+    toast(`${quickData.totalItems} Items gefunden. Starte Scraping...`, 'info');
 
-    try {
-      // Schritt 1: URLs holen
-      const quickRes = await fetch('/api/vinted', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'bulk', username, quick: true }),
-      });
+    // Schritt 2: Alle Items scrapen
+    const res = await fetch('/api/vinted', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        mode: 'bulk', 
+        profileUrl, // NEU: profileUrl statt username
+        autoRemove 
+      }),
+    });
 
-      const quickData = await quickRes.json();
-      if (!quickRes.ok) {
-        toast(quickData.message || 'Fehler', 'error');
-        setLoading(false);
-        return;
-      }
+    const data = await res.json();
+    setResult(data);
 
-      setProgress({ current: 0, total: quickData.totalItems });
-      toast(`${quickData.totalItems} Items gefunden. Starte Scraping...`, 'info');
-
-      // Schritt 2: Alle Items scrapen
-      const res = await fetch('/api/vinted', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          mode: 'bulk', 
-          username,
-          autoRemove 
-        }),
-      });
-
-      const data = await res.json();
-      setResult(data);
-
-      // Erfolgreiche Items in DB speichern
-      if (data.items?.added?.length > 0) {
-        let savedCount = 0;
-        for (const item of data.items.added) {
-          const newProduct = {
-            name: item.name,
-            category: item.category || 'Sonstiges',
-            price: item.price?.replace(/^€/, '') || '0',
-            size: item.size || '–',
-            condition: item.condition || 'Gut',
-            images: item.images || [],
-            vinted_url: item.url,
-            sold: false
-          };
-          
-          const { error } = await supabase.from('products').insert(newProduct);
-          if (!error) savedCount++;
-          setProgress(prev => ({ ...prev, current: prev.current + 1 }));
-        }
+    // Erfolgreiche Items in DB speichern
+    if (data.items?.added?.length > 0) {
+      let savedCount = 0;
+      for (const item of data.items.added) {
+        const newProduct = {
+          name: item.name,
+          category: item.category || 'Sonstiges',
+          price: item.price?.replace(/^€/, '') || '0',
+          size: item.size || '–',
+          condition: item.condition || 'Gut',
+          images: item.images || [],
+          vinted_url: item.url,
+          sold: false
+        };
         
-        toast(`${savedCount} von ${data.items.added.length} Items gespeichert`, 'success');
-        logActivity(user!.id, user!.username, 'Bulk Import', `${savedCount} Items von ${username} importiert`);
+        const { error } = await supabase.from('products').insert(newProduct);
+        if (!error) savedCount++;
+        setProgress(prev => ({ ...prev, current: prev.current + 1 }));
       }
-
-      if (data.items?.skipped?.length > 0) {
-        toast(`${data.items.skipped.length} verkaufte Items übersprungen`, 'info');
-      }
-
-    } catch (e) {
-      toast('Fehler beim Bulk-Scrapen: ' + String(e), 'error');
-    } finally {
-      setLoading(false);
-      setProgress({ current: 0, total: 0 });
+      
+      toast(`${savedCount} von ${data.items.added.length} Items gespeichert`, 'success');
+      logActivity(user!.id, user!.username, 'Bulk Import', `${savedCount} Items importiert`);
     }
-  };
+
+    if (data.items?.skipped?.length > 0) {
+      toast(`${data.items.skipped.length} verkaufte/reservierte Items übersprungen`, 'info');
+    }
+
+  } catch (e) {
+    toast('Fehler beim Bulk-Scrapen: ' + String(e), 'error');
+  } finally {
+    setLoading(false);
+    setProgress({ current: 0, total: 0 });
+  }
+};
 
   // Status Check - alle Produkte prüfen
   const checkStatus = async () => {
