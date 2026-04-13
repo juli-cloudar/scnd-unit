@@ -34,7 +34,7 @@ interface ScrapeResult {
 // ─────────────────────────────────────────────
 // FETCH MIT TIMEOUT
 // ─────────────────────────────────────────────
-async function fetchWithTimeout(url: string, timeoutMs = 8000): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs = 7000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -166,14 +166,18 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   for (const [k, v] of Object.entries(catMap)) { if (nl.includes(k) || ul.includes(k)) { category = v; break; } }
 
   const itemIdMatch = url.match(/\/items\/(\d+)-/) || url.match(/item_id=(\d+)/);
-  return { itemId: itemIdMatch?.[1] ?? null, url, status: itemStatus, name, price, size, condition, category, images: images.slice(0, 5), lastChecked: new Date().toISOString() };
+  return {
+    itemId: itemIdMatch?.[1] ?? null,
+    url, status: itemStatus, name, price, size, condition, category,
+    images: images.slice(0, 5),
+    lastChecked: new Date().toISOString(),
+  };
 }
 
 async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   let response: Response;
-  try {
-    response = await fetchWithTimeout(url);
-  } catch (e) {
+  try { response = await fetchWithTimeout(url); }
+  catch {
     return { itemId: null, url, status: 'sold', name: '', price: '', size: '', condition: '', category: 'Sonstiges', images: [], error: true, message: 'Timeout', lastChecked: new Date().toISOString() };
   }
   if (!response.ok) {
@@ -197,7 +201,7 @@ function extractMemberPath(input: string): string {
 }
 
 // ─────────────────────────────────────────────
-// ALLE ITEM-URLS EINES ACCOUNTS HOLEN
+// ALLE ITEM-URLS EINES ACCOUNTS
 // ─────────────────────────────────────────────
 async function getAllUserItems(memberInput: string): Promise<string[]> {
   const urls: string[] = [];
@@ -209,9 +213,8 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
   while (page <= maxPages) {
     const profileUrl = `https://www.vinted.de/member/${memberPath}?page=${page}`;
     let response: Response;
-    try { response = await fetchWithTimeout(profileUrl, 10000); }
+    try { response = await fetchWithTimeout(profileUrl, 9000); }
     catch { console.log(`[Vinted] Timeout Seite ${page}`); break; }
-
     if (!response.ok) { console.log(`[Vinted] HTTP ${response.status} Seite ${page}`); break; }
 
     const html = await response.text();
@@ -239,7 +242,7 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
     const hasNext = html.includes(`page=${page + 1}`) || html.includes('rel="next"') || html.includes('>Weiter<') || valid.length >= 20;
     if (!hasNext) break;
     page++;
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 800));
   }
 
   const unique = [...new Set(urls)].filter(u => /\/items\/\d+/.test(u));
@@ -248,29 +251,18 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
 }
 
 // ─────────────────────────────────────────────
-// BULK SCRAPER
+// BULK SCRAPER (sequenziell)
 // ─────────────────────────────────────────────
-async function bulkScrapeItems(urls: string[], concurrency = 2): Promise<ScrapeResult[]> {
+async function bulkScrapeItems(urls: string[]): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
-  const queue = [...urls];
-  let active = 0;
-  return new Promise((resolve) => {
-    async function worker() {
-      active++;
-      while (queue.length > 0) {
-        const url = queue.shift();
-        if (!url) continue;
-        try { results.push(await scrapeSingleItem(url)); }
-        catch (e) { results.push({ itemId: null, url, status: 'sold', name: '', price: '', size: '', condition: '', category: 'Sonstiges', images: [], error: true, message: String(e), lastChecked: new Date().toISOString() }); }
-        await new Promise(r => setTimeout(r, 400));
-      }
-      active--;
-      if (active === 0) resolve(results);
+  for (const url of urls) {
+    try { results.push(await scrapeSingleItem(url)); }
+    catch (e) {
+      results.push({ itemId: null, url, status: 'sold', name: '', price: '', size: '', condition: '', category: 'Sonstiges', images: [], error: true, message: String(e), lastChecked: new Date().toISOString() });
     }
-    const w = Math.min(concurrency, urls.length);
-    for (let i = 0; i < w; i++) worker();
-    if (urls.length === 0) resolve([]);
-  });
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return results;
 }
 
 // ─────────────────────────────────────────────
@@ -315,17 +307,22 @@ export async function POST(request: Request) {
       const allUrls = await getAllUserItems(identifier);
       if (allUrls.length === 0) return NextResponse.json({ message: 'Keine Items gefunden für: ' + identifier }, { status: 404, headers: CORS });
 
-      // Quick: nur Anzahl
+      // Quick: nur Anzahl + alle URLs zurückgeben
       if (quick === true) {
-        return NextResponse.json({ totalItems: allUrls.length, itemUrls: allUrls, message: `${allUrls.length} Items gefunden.` }, { headers: CORS });
+        return NextResponse.json({
+          totalItems: allUrls.length,
+          // Alle URLs auf einmal zurückgeben – Frontend filtert bereits vorhandene heraus
+          itemUrls: allUrls,
+          message: `${allUrls.length} Items gefunden.`,
+        }, { headers: CORS });
       }
 
-      // Batch: 5 Items pro Request → kein Vercel-Timeout
-      const batchSize = 5;
-      const batch = allUrls.slice(offset, offset + batchSize);
-      const isLastBatch = offset + batchSize >= allUrls.length;
+      // Batch: 5 Items pro Request (Vercel Free sicher)
+      const BATCH_SIZE = 5;
+      const batch = allUrls.slice(offset, offset + BATCH_SIZE);
+      const isLastBatch = offset + BATCH_SIZE >= allUrls.length;
 
-      const results = await bulkScrapeItems(batch, 2);
+      const results = await bulkScrapeItems(batch);
       const successful = results.filter(r => !r.error && r.status === 'available');
       const sold       = results.filter(r => r.status === 'sold');
       const reserved   = results.filter(r => r.status === 'reserved');
@@ -335,17 +332,23 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString(),
         pagination: {
           offset,
-          batchSize,
+          batchSize: BATCH_SIZE,
           batchCount: batch.length,
           totalItems: allUrls.length,
-          nextOffset: isLastBatch ? null : offset + batchSize,
+          nextOffset: isLastBatch ? null : offset + BATCH_SIZE,
           isLastBatch,
         },
-        summary: { total: batch.length, available: successful.length, sold: sold.length, reserved: reserved.length, errors: errors.length },
+        summary: {
+          total: batch.length,
+          available: successful.length,
+          sold: sold.length,
+          reserved: reserved.length,
+          errors: errors.length,
+        },
         items: { added: successful, skipped: sold, reserved, failed: errors },
         message: isLastBatch
-          ? `✅ Fertig: ${successful.length} verfügbar, ${sold.length} verkauft übersprungen`
-          : `⏳ Batch ${Math.floor(offset / batchSize) + 1} von ${Math.ceil(allUrls.length / batchSize)}: ${successful.length} gefunden`,
+          ? `✅ Fertig: ${successful.length} verfügbar, ${sold.length} verkauft`
+          : `⏳ Batch ${Math.floor(offset / BATCH_SIZE) + 1} von ${Math.ceil(allUrls.length / BATCH_SIZE)}`,
       }, { headers: CORS });
     }
 
