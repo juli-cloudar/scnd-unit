@@ -1,13 +1,9 @@
 // src/app/api/vinted/route.ts
 import { NextResponse } from 'next/server';
 
-// ⭐⭐⭐ DAS HINZUFÜGEN ⭐⭐⭐
+// ⭐⭐⭐ Nur EINMAL definieren ⭐⭐⭐
 export const runtime = 'nodejs';
 export const preferredRegion = 'auto';
-// ⭐⭐⭐
-
-export const maxDuration = 60;
-export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +17,7 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
+// ... hier kommt der Rest deines Codes
 interface ScrapeResult {
   itemId: string | null;
   url: string;
