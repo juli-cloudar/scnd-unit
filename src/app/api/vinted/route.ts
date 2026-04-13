@@ -282,15 +282,12 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   const html = await response.text();
   return extractItemFromHTML(html, url);
 }
-// ═══════════════════════════════════════════════════════════
-// NEU - EINFÜGEN
-// ═══════════════════════════════════════════════════════════
+
 async function getAllUserItems(usernameOrId: string): Promise<string[]> {
   const urls: string[] = [];
   let page = 1;
   const maxPages = 15;
   
-  // Username bereinigen (entferne @ und trailing slashes)
   const cleanUsername = usernameOrId.replace(/^@/, '').trim().replace(/\/$/, '');
   
   while (page <= maxPages) {
@@ -313,21 +310,15 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
 
     const html = await response.text();
     
-    // VERBESSERTE Regex - sucht nach Vinteds aktuellen Item-Link Patterns
     const itemPatterns = [
-      // Pattern 1: Standard href links (neueste Vinted Version)
       /href="(\/items\/\d+-[^"]+)"/g,
-      // Pattern 2: URL-encoded Links
       /href="(\/items\/\d+[^"]*)"/g,
-      // Pattern 3: Aus JSON-Strukturen (window.__INITIAL_STATE__ etc.)
       /"url":\s*"(\/items\/\d+[^"]*)"/g,
-      // Pattern 4: Item IDs für manuelle Konstruktion
       /"item_id":\s*(\d+)[^}]*"title":\s*"([^"]+)"/g,
     ];
 
     const pageUrls: string[] = [];
     
-    // Versuche alle Patterns
     for (const pattern of itemPatterns) {
       const matches = [...html.matchAll(pattern)];
       
@@ -335,7 +326,6 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
         let itemUrl: string;
         
         if (match[2]) {
-          // Pattern 4: Konstruiere URL aus ID und Titel
           const id = match[1];
           const title = match[2].toLowerCase()
             .replace(/\s+/g, '-')
@@ -343,13 +333,11 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
             .substring(0, 50);
           itemUrl = `https://www.vinted.de/items/${id}-${title}`;
         } else {
-          // Patterns 1-3: Bereits vollständige Pfade
           itemUrl = match[1].startsWith('http') 
             ? match[1] 
             : `https://www.vinted.de${match[1]}`;
         }
         
-        // Bereinige URL (entferne Query params)
         itemUrl = itemUrl.split('?')[0];
         
         if (!pageUrls.includes(itemUrl)) {
@@ -358,7 +346,6 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
       }
     }
 
-    // Alternative: Suche nach data-testid Attributen (Vinted React App)
     const dataTestIdMatches = [...html.matchAll(/data-testid="item-card"[^>]*href="(\/items\/\d+[^"]*)"/g)];
     for (const match of dataTestIdMatches) {
       const url = `https://www.vinted.de${match[1].split('?')[0]}`;
@@ -373,21 +360,19 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
     urls.push(...pageUrls);
     console.log(`Seite ${page}: ${pageUrls.length} Items gefunden`);
     
-    // Prüfe auf Pagination (nächste Seite existiert?)
     const hasNextPage = html.includes(`page=${page + 1}`) || 
                        html.includes('pagination') ||
                        html.includes('rel="next"') ||
                        html.includes('>Weiter<') ||
                        html.includes('>Next<') ||
-                       pageUrls.length === 96; // Vinted zeigt meist 96 Items pro Seite
+                       pageUrls.length === 96;
     
     if (!hasNextPage) break;
     
     page++;
-    await new Promise(r => setTimeout(r, 1200)); // Wichtig: Längerer Delay gegen Rate-Limit
+    await new Promise(r => setTimeout(r, 1200));
   }
 
-  // Entferne Duplikate und bereinige
   const uniqueUrls = [...new Set(urls)].filter(url => 
     url.includes('/items/') && url.match(/\/items\/\d+/)
   );
@@ -395,7 +380,6 @@ async function getAllUserItems(usernameOrId: string): Promise<string[]> {
   console.log(`Total: ${uniqueUrls.length} unique Items gefunden`);
   return uniqueUrls;
 }
-// ═══════════════════════════════════════════════════════════
 
 async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
@@ -514,21 +498,18 @@ export async function GET(request: Request) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// NEU - EINFÜGEN (im POST Handler)
-// ═══════════════════════════════════════════════════════════
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { 
       url,
       urls,
-      username,  // ← Vom neuen Frontend gesendet
+      username,
       userId,
-      profileUrl, // ← Fallback für alte/compatibility
+      profileUrl,
       mode = 'single',
       autoRemove = false,
-      quick = false, // ← Neu hinzugefügt
+      quick = false,
     } = body;
 
     if (mode === 'single' && url) {
@@ -558,17 +539,14 @@ export async function POST(request: Request) {
     }
 
     if (mode === 'bulk') {
-      // KORRIGIERT: Identifier aus username, userId ODER profileUrl extrahieren
       let identifier = username || userId || profileUrl;
       
-      // Falls es eine URL ist, extrahiere den Username
       if (identifier?.includes('vinted')) {
         const match = identifier.match(/member\/\d+-([^/?]+)/) || 
                       identifier.match(/member\/([^/?]+)/);
         if (match) identifier = match[1];
       }
       
-      // Bereinige @ falls vorhanden
       if (identifier) {
         identifier = identifier.replace(/^@/, '');
       }
@@ -589,71 +567,7 @@ export async function POST(request: Request) {
         );
       }
 
-      // ← Der REST DES CODES bleibt gleich (quick check, bulk scrape, etc.)
       if (quick === true) {
-        return NextResponse.json({
-          totalItems: urlsToScrape.length,
-          itemUrls: urlsToScrape,
-          message: 'URLs gefunden. Setze quick: false zum Scrapen.',
-        }, { headers: CORS });
-      }
-
-      const results = await bulkScrapeItems(urlsToScrape, 3);
-      
-      const successful = results.filter(r => !r.error && r.status !== 'sold');
-      const sold = results.filter(r => r.status === 'sold');
-      const reserved = results.filter(r => r.status === 'reserved');
-      const errors = results.filter(r => r.error);
-
-      let removed: string[] = [];
-      if (autoRemove && sold.length > 0) {
-        removed = sold.map(s => s.itemId || s.url).filter((id): id is string => id !== null);
-      }
-
-      return NextResponse.json({
-        timestamp: new Date().toISOString(),
-        summary: {
-          total: results.length,
-          available: successful.length,
-          sold: sold.length,
-          reserved: reserved.length,
-          errors: errors.length,
-          autoRemoved: removed.length,
-        },
-        items: {
-          added: successful,
-          skipped: sold,
-          reserved: reserved,
-          failed: errors,
-        },
-        soldItems: sold.map(s => ({
-          itemId: s.itemId,
-          url: s.url,
-          name: s.name,
-          reason: 'Verkauft/Reserviert',
-        })),
-        message: autoRemove && removed.length > 0
-          ? `✅ ${successful.length} Items hinzugefügt, ${removed.length} verkaufte entfernt`
-          : `✅ ${successful.length} Items hinzugefügt, ${sold.length} verkaufte übersprungen`,
-      }, { headers: CORS });
-    }
-
-    return NextResponse.json(
-      { message: 'Ungültiger Modus. Verwende mode: "single" oder "bulk"' }, 
-      { status: 400, headers: CORS }
-    );
-
-  } catch (e) {
-    console.error('Scraper Error:', e);
-    return NextResponse.json(
-      { message: 'Fehler: ' + String(e) }, 
-      { status: 500, headers: CORS }
-    );
-  }
-}
-// ═══════════════════════════════════════════════════════════
-
-      if (body.quick === true) {
         return NextResponse.json({
           totalItems: urlsToScrape.length,
           itemUrls: urlsToScrape,
