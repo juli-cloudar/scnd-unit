@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Trash2, ExternalLink, RefreshCw, ShoppingBag, Plus,
   Wand2, ImageIcon, Users, Package, BarChart3, Eye, EyeOff,
-  Clock, LogOut, Edit3, UserPlus, Search, Key, Save
+  Clock, LogOut, Edit3, UserPlus, Search, Key, Save, Download
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -129,7 +129,7 @@ export default function ManagementPanel() {
     const savedUser = sessionStorage.getItem('scnd_user');
     if (savedAuth === 'admin') {
       setAuthed(true); setAuthMode('admin');
-      setCurrentUser({ id: 0, username: 'Mastercontrol', role: 'Admin', password: '', login_count: 0, total_work_hours: 0, online: true,
+      setCurrentUser({ id: 0, username: 'Admin', role: 'Admin', password: '', login_count: 0, total_work_hours: 0, online: true,
         permissions: { canAddProducts: true, canEditProducts: true, canDeleteProducts: true, canViewStats: true, canManageEmployees: true }
       });
     } else if (savedAuth === 'employee' && savedUser) {
@@ -211,7 +211,7 @@ export default function ManagementPanel() {
         {activeTab==='add' && <AddTab user={currentUser} toast={addToast} onProductAdded={() => {}} />}
         {activeTab==='analytics' && <AnalyticsTab />}
         {activeTab==='employees' && currentUser?.permissions.canManageEmployees && <EmployeesTab currentUser={currentUser} toast={addToast} confirm={showConfirm} />}
-        {activeTab==='logs' && currentUser?.role === 'Admin' && <LogsTab />}
+        {activeTab==='logs' && currentUser?.role === 'Admin' && <LogsTab toast={addToast} confirm={showConfirm} />}
       </main>
     </div>
   );
@@ -277,7 +277,6 @@ function InventoryTab({ user, toast, confirm }: {
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // ── AUTO-REFRESH: Supabase Realtime ──────────────────────────────────────
   const loadProducts = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.from('products').select('*').order('id');
@@ -287,28 +286,25 @@ function InventoryTab({ user, toast, confirm }: {
 
   useEffect(() => {
     loadProducts();
-
-    // Realtime subscription — updated sofort wenn sich DB ändert
     const channel = supabase
-      .channel('products-changes')
+      .channel('products-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
         loadProducts();
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [loadProducts]);
 
- const markSold = (id: number, currentSold: boolean, productName: string) => {
-  console.log('user:', user?.username, 'id:', user?.id);
-  if (!user?.permissions.canEditProducts) { toast('Keine Berechtigung!', 'error'); return; }
-  supabase.from('products').update({ sold: !currentSold }).eq('id', id).then(({ error }) => {
-    if (error) { toast('Fehler: ' + error.message, 'error'); return; }
-    const newStatus = !currentSold;
-    toast(newStatus ? 'Produkt als verkauft markiert' : 'Produkt reaktiviert', 'info');
-    logActivity(user.id, user.username, newStatus ? 'Produkt verkauft' : 'Produkt reaktiviert', `"${productName}"`);
-  });
-};
+  const markSold = (id: number, currentSold: boolean, productName: string) => {
+    console.log('user:', user?.username, 'id:', user?.id);
+    if (!user?.permissions.canEditProducts) { toast('Keine Berechtigung!', 'error'); return; }
+    supabase.from('products').update({ sold: !currentSold }).eq('id', id).then(({ error }) => {
+      if (error) { toast('Fehler: ' + error.message, 'error'); return; }
+      const newStatus = !currentSold;
+      toast(newStatus ? 'Produkt als verkauft markiert' : 'Produkt reaktiviert', 'info');
+      logActivity(user!.id, user!.username, newStatus ? 'Produkt verkauft' : 'Produkt reaktiviert', `"${productName}"`);
+    });
+  };
 
   const removeProduct = (id: number, productName: string) => {
     if (!user?.permissions.canDeleteProducts) { toast('Keine Berechtigung!', 'error'); return; }
@@ -327,7 +323,7 @@ function InventoryTab({ user, toast, confirm }: {
       if (error) { toast('Fehler: ' + error.message, 'error'); return; }
       setEditingProduct(null);
       toast('Produkt gespeichert');
-      logActivity(user.id, user.username, 'Produkt bearbeitet', `"${product.name}" — Preis: ${product.price}, Größe: ${product.size}`);
+      logActivity(user!.id, user!.username, 'Produkt bearbeitet', `"${product.name}" — Preis: ${product.price}, Größe: ${product.size}`);
     });
   };
 
@@ -754,15 +750,60 @@ function EmployeesTab({ currentUser, toast, confirm }: {
 }
 
 // =================== LOGS TAB ===================
-function LogsTab() {
+function LogsTab({ toast, confirm }: {
+  toast: (msg: string, type?: ToastType) => void,
+  confirm: (msg: string, onConfirm: () => void) => void
+}) {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [filter, setFilter] = useState('Alle');
+  const [autoDeleteDays, setAutoDeleteDays] = useState(3);
 
-  useEffect(() => { loadLogs(); }, []);
+  const loadLogs = useCallback(async () => {
+    // Auto-delete Logs älter als X Tage
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - autoDeleteDays);
+    await supabase.from('activity_logs').delete().lt('timestamp', cutoff.toISOString());
 
-  const loadLogs = async () => {
-    const { data } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(200);
+    const { data } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(500);
     if (data) setLogs(data);
+  }, [autoDeleteDays]);
+
+  useEffect(() => {
+    loadLogs();
+    // Realtime für Logs
+    const channel = supabase
+      .channel('logs-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, () => {
+        loadLogs();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadLogs]);
+
+  const clearAllLogs = () => {
+    confirm('Alle Logs wirklich löschen?', async () => {
+      const { error } = await supabase.from('activity_logs').delete().neq('id', 0);
+      if (error) { toast('Fehler: ' + error.message, 'error'); return; }
+      setLogs([]);
+      toast('Alle Logs gelöscht', 'info');
+    });
+  };
+
+  const downloadLogs = () => {
+    const filtered = filter === 'Alle' ? logs : logs.filter(l => l.action === filter);
+    const csv = [
+      'Zeitpunkt,Mitarbeiter,Aktion,Details',
+      ...filtered.map(l => `"${new Date(l.timestamp).toLocaleString('de-DE')}","${l.username}","${l.action}","${l.details}"`)
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `logs_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Logs heruntergeladen');
   };
 
   const actionColors: Record<string, string> = {
@@ -779,19 +820,42 @@ function LogsTab() {
   };
 
   const allActions = ['Alle', ...Object.keys(actionColors)];
-  const filtered = filter === 'Alle' ? logs : logs.filter(l => l.action === filter);
+  const filteredLogs = filter === 'Alle' ? logs : logs.filter(l => l.action === filter);
 
   return (
-    <div className="bg-[#111] border border-purple-500/30 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2"><Clock className="w-5 h-5"/> Aktivitäts-Logs</h3>
-        <button onClick={loadLogs} className="p-2 border border-purple-500/30 text-purple-400 hover:bg-purple-500/10">
-          <RefreshCw className="w-4 h-4"/>
-        </button>
+    <div className="bg-[#111] border border-purple-500/30 p-6 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2">
+          <Clock className="w-5 h-5"/> Aktivitäts-Logs
+          <span className="text-gray-500 text-sm font-normal">({filteredLogs.length} Einträge)</span>
+        </h3>
+        <div className="flex items-center gap-2">
+          <button onClick={loadLogs} className="p-2 border border-purple-500/30 text-purple-400 hover:bg-purple-500/10">
+            <RefreshCw className="w-4 h-4"/>
+          </button>
+          <button onClick={downloadLogs} className="px-3 py-2 border border-green-500/30 text-green-400 hover:bg-green-500/10 text-xs uppercase font-bold flex items-center gap-1">
+            <Download className="w-3 h-3"/> CSV
+          </button>
+          <button onClick={clearAllLogs} className="px-3 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs uppercase font-bold flex items-center gap-1">
+            <Trash2 className="w-3 h-3"/> Leeren
+          </button>
+        </div>
+      </div>
+
+      {/* Auto-Delete Einstellung */}
+      <div className="flex items-center gap-3 bg-[#1A1A1A] border border-purple-500/20 px-4 py-3">
+        <span className="text-xs uppercase text-gray-500">Auto-Löschen nach</span>
+        {[1, 3, 7, 14, 30].map(days => (
+          <button key={days} onClick={() => setAutoDeleteDays(days)}
+            className={`px-2 py-1 text-xs font-bold uppercase ${autoDeleteDays === days ? 'bg-purple-500 text-white' : 'border border-purple-500/30 text-gray-500 hover:text-purple-400'}`}>
+            {days}d
+          </button>
+        ))}
       </div>
 
       {/* Filter */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2">
         {allActions.map(action => (
           <button key={action} onClick={() => setFilter(action)}
             className={`px-2 py-1 text-xs uppercase font-bold transition-colors ${filter === action ? 'bg-purple-500 text-white' : 'border border-purple-500/30 text-gray-500 hover:text-purple-400'}`}>
@@ -800,11 +864,12 @@ function LogsTab() {
         ))}
       </div>
 
-      <div className="space-y-1 max-h-[600px] overflow-y-auto">
-        {filtered.map(log => {
+      {/* Log Einträge */}
+      <div className="space-y-1 max-h-[500px] overflow-y-auto">
+        {filteredLogs.map(log => {
           const colorClass = actionColors[log.action] || 'border-gray-600 text-gray-400';
           return (
-            <div key={log.id} className={`flex items-start gap-3 p-3 bg-[#1A1A1A] border-l-2 ${colorClass.split(' ')[0]}`}>
+            <div key={log.id} className={`flex items-start gap-3 p-3 bg-[#0A0A0A] border-l-2 ${colorClass.split(' ')[0]}`}>
               <div className="text-xs text-gray-600 w-36 shrink-0 pt-0.5">{new Date(log.timestamp).toLocaleString('de-DE')}</div>
               <div className={`text-xs font-bold w-24 shrink-0 pt-0.5 ${colorClass.split(' ')[1]}`}>{log.username}</div>
               <div className="text-xs flex-1">
@@ -814,7 +879,7 @@ function LogsTab() {
             </div>
           );
         })}
-        {filtered.length === 0 && <div className="text-center py-10 text-gray-600">Keine Einträge</div>}
+        {filteredLogs.length === 0 && <div className="text-center py-10 text-gray-600">Keine Einträge</div>}
       </div>
     </div>
   );
