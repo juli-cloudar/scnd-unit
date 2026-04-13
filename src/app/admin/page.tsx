@@ -292,8 +292,7 @@ function VintedToolsTab({ user, toast, confirm }: {
               const newProduct = {
                 name: itemData.name || 'Unbekannt',
                 category: itemData.category || 'Sonstiges',
-       let cleanPrice = (itemData.price || '0').toString().replace(/€/g, '').replace(',', '.').trim();
-price: `${cleanPrice} €`,
+                price: `${(itemData.price || '0').toString().replace(/^€/, '').replace(',', '.')} €`,
                 size: itemData.size || '–',
                 condition: itemData.condition || 'Gut',
                 images: itemData.images || [],
