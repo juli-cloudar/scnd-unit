@@ -38,53 +38,38 @@ interface ScrapeResult {
 
 // HILFSFUNKTIONEN
 function extractItemFromHTML(html: string, url: string): ScrapeResult {
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // STATUS CHECK - KORRIGIERT
-  // ═══════════════════════════════════════════════════════════════════════════════
-  
-  // Prüfe ob Seite existiert
-  if (html.includes('404') && html.includes('nicht gefunden')) {
-    return { 
-      itemId: null, url, status: 'sold', name: '', price: '', size: '', condition: '',
-      category: 'Sonstiges', images: [], error: true,
-      message: 'Seite nicht gefunden (404)',
-      lastChecked: new Date().toISOString(),
-    };
-  }
-
-  // WICHTIG: Prüfe ob Produkt-DATA vorhanden ist
-  const hasProduct = html.includes('item-details') || 
-                     html.includes('item-title') ||
-                     html.includes('"@type":"Product"') ||
-                     html.includes('data-testid="item-page"');
-
-  // Verkauft-Indikatoren (nur wenn wirklich eindeutig)
-  const soldPatterns = [
-    /Dieser Artikel ist bereits verkauft/i,
-    /Dieser Artikel ist nicht mehr verfügbar/i,
-    /Artikel wurde verkauft/i,
-    /item-not-available/i,
-    /"availability":\s*"https:\/\/schema\.org\/OutOfStock"/i,
-  ];
-
-  const reservedPatterns = [
-    /Dieser Artikel ist reserviert/i,
-    /item-reserved/i,
-  ];
+  // STATUS CHECK
+  const statusIndicators = {
+    sold: [
+      /Dieser Artikel ist bereits verkauft/i,
+      /Artikel nicht verfügbar/i,
+      /reserviert/i,
+      /sold/i,
+      /verkauft/i,
+      /nicht mehr verfügbar/i,
+      /data-testid="item-sold"/i,
+      /class="[^"]*item-sold[^"]*"/i,
+      /Dieser Artikel ist reserviert/i,
+    ],
+    reserved: [
+      /reserviert/i,
+      /reserved/i,
+      /vorübergehend nicht verfügbar/i,
+      /Dieser Artikel ist reserviert/i,
+    ]
+  };
 
   let itemStatus: 'available' | 'sold' | 'reserved' = 'available';
-
-  // Prüfe auf "verkauft"
-  for (const pattern of soldPatterns) {
+  
+  for (const pattern of statusIndicators.sold) {
     if (pattern.test(html)) {
       itemStatus = 'sold';
       break;
     }
   }
-
-  // Prüfe auf "reserviert"
+  
   if (itemStatus === 'available') {
-    for (const pattern of reservedPatterns) {
+    for (const pattern of statusIndicators.reserved) {
       if (pattern.test(html)) {
         itemStatus = 'reserved';
         break;
@@ -92,16 +77,14 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════════
   // BILDER
-  // ═══════════════════════════════════════════════════════════════════════════════
   const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
   const seen = new Set<string>();
   const images: string[] = [];
   
   for (const m of imgMatches) {
     let fullUrl = m[0];
-    if (!fullUrl.includes('/f800/') && !fullUrl.includes('/t/')) continue;
+    if (!fullUrl.includes('/f800/')) continue;
     fullUrl = fullUrl.replace(/&amp;/g, '&');
     const base = fullUrl.split('?')[0];
     if (!seen.has(base)) {
@@ -110,134 +93,77 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // NAME - JSON-LD priorisiert
-  // ═══════════════════════════════════════════════════════════════════════════════
-  let name = '';
-  
-  // JSON-LD suchen
+  // NAME
+  const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
+  const titleMatch = html.match(/<title>\s*([^|<]+)/i);
+  const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
+
+  // GRÖSSE
+  let size = '';
+  const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) ||
+                       html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) ||
+                       html.match(/"size_title"[:\s]*"([^"]{1,20})"/i);
+  if (sizeJsonMatch) size = sizeJsonMatch[1].trim();
+
+  if (!size) {
+    const sizePatterns = [
+      /data-testid="item-details-size"[^>]*>([^<]{1,20})/i,
+      /class="[^"]*item-details[^"]*"[^>]*>[^<]*Größe[^<]*<[^>]*>([^<]{1,20})/i,
+      /Größe\s*<\/[^>]+>\s*<[^>]+>\s*([^<]{1,20})/i,
+      /Größe[^<]{0,30}<[^>]+>([^<]{1,20})/i,
+      /"Größe"[^:]*:[^"]*"([^"]{1,20})"/i,
+    ];
+    for (const pattern of sizePatterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        size = match[1].trim().replace(/[·\/\-]/g, '').trim();
+        if (size.length > 0 && size.length < 20) break;
+      }
+    }
+  }
+
+  if (!size) {
+    const broadMatch = html.match(/(?:Größe|Grösse|Size)[^\w]{0,10}(XXS|XS|S|M|L|XL|XXL|XXXL|4XL|5XL|One Size|Einheitsgröße|UNI|\d{2,3})/i);
+    if (broadMatch) size = broadMatch[1].trim();
+  }
+
+  if (!size) {
+    const numericMatch = html.match(/(?:Größe|Size)[^\d]{0,15}(\d{2,3})\b/i);
+    if (numericMatch) size = numericMatch[1];
+  }
+
+  // PREIS
+  let price = '';
   const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
-  let jsonData: any = null;
-  
-  for (const match of jsonLdMatches) {
+  for (const jsonMatch of jsonLdMatches) {
     try {
-      const data = JSON.parse(match[1]);
-      if (data['@type'] === 'Product' || data.name) {
-        jsonData = data;
-        if (data.name) name = data.name;
+      const jsonData = JSON.parse(jsonMatch[1]);
+      const findPrice = (obj: any): string | null => {
+        if (!obj) return null;
+        if (obj.price) return obj.price.toString().replace('.', ',');
+        if (typeof obj === 'object') {
+          for (const key in obj) {
+            const found = findPrice(obj[key]);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const foundPrice = findPrice(jsonData);
+      if (foundPrice) {
+        price = foundPrice;
         break;
       }
     } catch (e) {}
   }
 
-  // Fallback: OG Title
-  if (!name) {
-    const ogTitle = html.match(/<meta property="og:title" content="([^"]+)"/i);
-    if (ogTitle) name = ogTitle[1].replace(/\s*\|\s*Vinted$/i, '').trim();
-  }
-
-  // Fallback: H1
-  if (!name) {
-    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-    if (h1Match) name = h1Match[1].trim();
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // GRÖSSE - VERBESSERT MIT JSON-LD
-  // ═══════════════════════════════════════════════════════════════════════════════
-  let size = '';
-
-  // Versuch 1: Aus JSON-LD (size Objekt)
-  if (jsonData) {
-    // Suche nach size in verschachtelten Strukturen
-    const findSize = (obj: any, depth = 0): string | null => {
-      if (depth > 5 || !obj) return null;
-      
-      if (obj.size) {
-        if (typeof obj.size === 'string') return obj.size;
-        if (typeof obj.size === 'object' && obj.size.name) return obj.size.name;
-        if (Array.isArray(obj.size) && obj.size.length > 0) return obj.size[0].name || obj.size[0];
-      }
-      
-      if (obj.size_name) return obj.size_name;
-      if (obj.sizes && Array.isArray(obj.size) && obj.sizes.length > 0) {
-        return obj.sizes[0].name || obj.sizes[0];
-      }
-      
-      for (const key in obj) {
-        if (typeof obj[key] === 'object') {
-          const found = findSize(obj[key], depth + 1);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    
-    const foundSize = findSize(jsonData);
-    if (foundSize) size = foundSize;
-  }
-
-  // Versuch 2: Aus HTML-Struktur (neue Vinted UI)
-  if (!size) {
-    // Suche nach data-testid="item-details-size" oder ähnlich
-    const sizeMatch = html.match(/data-testid="[^"]*size[^"]*"[^>]*>\s*([^<]+)/i) ||
-                     html.match(/Größe[:\s]*<\/[^>]+>\s*<[^>]+class="[^"]*value[^"]*"[^>]*>\s*([^<]+)/i) ||
-                     html.match(/class="[^"]*item-details[^"]*"[^>]*>[\s\S]*?Größe[:\s]*([^<]+)/i);
-    if (sizeMatch) size = sizeMatch[1].trim();
-  }
-
-  // Versuch 3: Breite Suche nach Größen-Mustern im Text
-  if (!size) {
-    // Suche im Bereich um "Größe" herum
-    const sizeContext = html.match(/Größe[:\s]+([A-Z0-9]{1,5}(?:\/[A-Z0-9]{1,5})?)/i) ||
-                       html.match(/Size[:\s]+([A-Z0-9]{1,5})/i) ||
-                       html.match(/(?:Größe|Size)[:\s]+(\d{2,3})/i);
-    if (sizeContext) size = sizeContext[1];
-  }
-
-  // Versuch 4: Gängige Größen im Titel suchen
-  if (!size && name) {
-    const sizeInTitle = name.match(/\b(XXS|XS|S|M|L|XL|XXL|XXXL|3XL|4XL|5XL|One Size|UNI|\d{2,3})\b/i);
-    if (sizeInTitle) size = sizeInTitle[1];
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // PREIS
-  // ═══════════════════════════════════════════════════════════════════════════════
-  let price = '';
-
-  // Aus JSON-LD
-  if (jsonData) {
-    const findPrice = (obj: any): string | null => {
-      if (!obj) return null;
-      if (obj.price) {
-        const p = typeof obj.price === 'object' ? obj.price.value || obj.price.amount : obj.price;
-        return String(p).replace('.', ',');
-      }
-      if (obj.offers && obj.offers.price) {
-        return String(obj.offers.price).replace('.', ',');
-      }
-      return null;
-    };
-    const p = findPrice(jsonData);
-    if (p) price = p;
-  }
-
-  // Aus Meta
   if (!price) {
-    const priceMeta = html.match(/<meta property="product:price:amount" content="([^"]+)"/i);
-    if (priceMeta) price = priceMeta[1].replace('.', ',');
+    const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
+    const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
+    if (priceMatch) price = priceMatch[1];
   }
 
-  // Aus Text (nur erster Treffer)
-  if (!price) {
-    const priceMatch = html.match(/(\d{1,3}(?:[.,]\d{2})?)\s*€/);
-    if (priceMatch) price = priceMatch[1].replace('.', ',');
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════════
   // ZUSTAND
-  // ═══════════════════════════════════════════════════════════════════════════════
   const condMap: Record<string, string> = {
     'neu mit etikett': 'Neu mit Etikett',
     'neu ohne etikett': 'Neu ohne Etikett',
@@ -249,30 +175,38 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   };
 
   let condition = '';
+  const directMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Sehr gut|Zufriedenstellend|Schlecht|Gut|Neu)</i);
+  if (directMatch) condition = directMatch[1];
 
-  // Aus JSON-LD
-  if (jsonData && jsonData.itemCondition) {
-    const cond = jsonData.itemCondition.toString().toLowerCase();
-    if (cond.includes('new')) condition = 'Neu';
-    else if (cond.includes('used')) condition = 'Gut';
+  if (!condition) {
+    const condJsonMatch = html.match(/"condition"[:\s]*"([^"]+)"/i) ||
+                         html.match(/"item_condition"[:\s]*"([^"]+)"/i);
+    if (condJsonMatch) {
+      const raw = condJsonMatch[1].toLowerCase();
+      for (const [key, val] of Object.entries(condMap)) {
+        if (raw.includes(key)) { condition = val; break; }
+      }
+    }
   }
 
-  // Aus Text (nur ganze Wörter)
+  if (!condition) {
+    const contextMatch = html.match(/Zustand[^<]{0,50}(Neu mit Etikett|Neu ohne Etikett|Sehr gut|Zufriedenstellend|Schlecht|Gut|Neu)/i);
+    if (contextMatch) condition = contextMatch[1];
+  }
+
   if (!condition) {
     const htmlLower = html.toLowerCase();
-    for (const [key, val] of Object.entries(condMap)) {
-      // Word boundary mit Lookbehind/lookahead
-      const pattern = new RegExp(`(?:^|[\\s>])${key}(?:[\\s<.,]|$)`, 'i');
+    const order = ['neu mit etikett', 'neu ohne etikett', 'sehr gut', 'zufriedenstellend', 'schlecht', 'gut'];
+    for (const key of order) {
+      const pattern = new RegExp(`[>\\s"']${key}[<\\s"'·]`, 'i');
       if (pattern.test(htmlLower)) {
-        condition = val;
+        condition = condMap[key];
         break;
       }
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════════
   // KATEGORIE
-  // ═══════════════════════════════════════════════════════════════════════════════
   const catMap: Record<string, string> = {
     'jacke': 'Jacken', 'jacket': 'Jacken', 'mantel': 'Jacken', 'coat': 'Jacken',
     'pullover': 'Pullover', 'hoodie': 'Pullover', 'strickjacke': 'Pullover', 'sweater': 'Pullover',
@@ -287,16 +221,17 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   
   let category = 'Sonstiges';
   const nameLower = name.toLowerCase();
+  const urlLower = url.toLowerCase();
   
   for (const [key, val] of Object.entries(catMap)) {
-    if (nameLower.includes(key)) {
+    if (nameLower.includes(key) || urlLower.includes(key)) {
       category = val;
       break;
     }
   }
 
   // ITEM ID
-  const itemIdMatch = url.match(/\/items\/(\d+)-/);
+  const itemIdMatch = url.match(/\/items\/(\d+)-/) || url.match(/item_id=(\d+)/);
   const itemId = itemIdMatch ? itemIdMatch[1] : null;
 
   return {
@@ -327,8 +262,16 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   if (!response.ok) {
     if (response.status === 404 || response.status === 410) {
       return { 
-        itemId: null, url, status: 'sold', name: '', price: '', size: '', condition: '',
-        category: 'Sonstiges', images: [], error: true,
+        itemId: null,
+        url, 
+        status: 'sold', 
+        name: '',
+        price: '',
+        size: '',
+        condition: '',
+        category: 'Sonstiges',
+        images: [],
+        error: true,
         message: 'Nicht mehr verfügbar (404/410)',
         lastChecked: new Date().toISOString(),
       };
@@ -340,118 +283,48 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   return extractItemFromHTML(html, url);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// BULK SCRAPE - MIT ACCOUNT LINK (PROFIL-URL)
-// ═══════════════════════════════════════════════════════════════════════════════
-async function getAllUserItems(profileUrl: string): Promise<string[]> {
+async function getAllUserItems(usernameOrId: string): Promise<string[]> {
   const urls: string[] = [];
   let page = 1;
-  const maxPages = 5; // Reduziert für Stabilität
+  const maxPages = 10;
   
-  // Extrahiere Username aus verschiedenen URL-Formaten
-  let username: string | null = null;
-  
-  // Format: https://www.vinted.de/member/123456-username oder /u/username
-  const memberMatch = profileUrl.match(/\/member\/\d+-([^/?]+)/) || 
-                      profileUrl.match(/\/u\/([^/?]+)/) ||
-                      profileUrl.match(/\/member\/([^/?]+)/);
-  
-  if (memberMatch) {
-    username = memberMatch[1];
-  } else {
-    // Direkter Username eingegeben
-    username = profileUrl.replace(/^@/, '').trim();
-  }
-
-  if (!username) {
-    console.error('Kein Username gefunden in:', profileUrl);
-    return [];
-  }
-
-  console.log('Suche Items für User:', username);
-
   while (page <= maxPages) {
-    // Versuche verschiedene URL-Formate
-    const urlsToTry = [
-      `https://www.vinted.de/member/${username}?page=${page}`,
-      `https://www.vinted.de/u/${username}?page=${page}`,
-    ];
-
-    let success = false;
+    const profileUrl = `https://www.vinted.de/member/${usernameOrId}?page=${page}`;
     
-    for (const tryUrl of urlsToTry) {
-      try {
-        console.log('Versuche:', tryUrl);
-        
-        const response = await fetch(tryUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'de-DE,de;q=0.9',
-            'Referer': 'https://www.vinted.de/',
-          },
-        });
+    const response = await fetch(profileUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'de-DE,de;q=0.9',
+        'Referer': 'https://www.vinted.de/',
+      },
+    });
 
-        if (!response.ok) continue;
+    if (!response.ok) break;
 
-        const html = await response.text();
-        
-        // Prüfe ob Profil existiert
-        if (html.includes('404') || html.includes('nicht gefunden')) {
-          console.log('Profil nicht gefunder:', tryUrl);
-          continue;
-        }
-
-        // Extrahiere Item-URLs - verschiedene Muster
-        const itemMatches = [
-          ...html.matchAll(/href="(\/items\/\d+-[^"]+)"/g),
-          ...html.matchAll(/href="(\/item\/\d+[^"]*)"/g),
-        ];
-        
-        const pageUrls = itemMatches.map(m => {
-          const path = m[1];
-          return path.startsWith('http') ? path : `https://www.vinted.de${path}`;
-        });
-
-        console.log(`Seite ${page}: ${pageUrls.length} Items gefunden`);
-
-        if (pageUrls.length === 0) {
-          success = true;
-          break; // Keine Items mehr
-        }
-        
-        urls.push(...pageUrls);
-        success = true;
-        
-        // Prüfe auf weitere Seiten
-        const hasNext = html.includes(`page=${page + 1}`) || 
-                       html.includes('rel="next"') ||
-                       html.includes('pagination__next');
-        
-        if (!hasNext) {
-          page = maxPages + 1; // Beende Schleife
-          break;
-        }
-        
-        break; // Erfolg, nächste Seite
-        
-      } catch (e) {
-        console.error('Fehler bei:', tryUrl, e);
-      }
-    }
-
-    if (!success) break;
+    const html = await response.text();
+    
+    const itemMatches = [...html.matchAll(/href="(\/items\/\d+-[^"]+)"/g)];
+    const pageUrls = itemMatches.map(m => `https://www.vinted.de${m[1]}`);
+    
+    if (pageUrls.length === 0) break;
+    
+    urls.push(...pageUrls);
+    
+    const hasNextPage = html.includes(`page=${page + 1}`) || 
+                       html.includes('pagination') ||
+                       html.includes('rel="next"');
+    
+    if (!hasNextPage) break;
     
     page++;
-    await new Promise(r => setTimeout(r, 1500)); // Längerer Delay
+    await new Promise(r => setTimeout(r, 1000));
   }
 
-  const uniqueUrls = [...new Set(urls)];
-  console.log('Gesamt einzigartige URLs:', uniqueUrls.length);
-  return uniqueUrls;
+  return [...new Set(urls)];
 }
 
-async function bulkScrapeItems(urls: string[], concurrency: number = 2): Promise<ScrapeResult[]> {
+async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
   const queue = [...urls];
   let activeWorkers = 0;
@@ -467,12 +340,21 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 2): Promise
         try {
           const data = await scrapeSingleItem(url);
           results.push(data);
-          await new Promise(r => setTimeout(r, 800)); // Längerer Delay
+          await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           console.error(`Fehler bei ${url}:`, e);
           results.push({ 
-            itemId: null, url, status: 'sold', name: '', price: '', size: '', condition: '',
-            category: 'Sonstiges', images: [], error: true, message: String(e),
+            itemId: null,
+            url, 
+            status: 'sold',
+            name: '',
+            price: '',
+            size: '',
+            condition: '',
+            category: 'Sonstiges',
+            images: [],
+            error: true, 
+            message: String(e),
             lastChecked: new Date().toISOString(),
           });
         }
@@ -500,10 +382,59 @@ export async function GET(request: Request) {
 
     if (mode === 'single' && url) {
       const data = await scrapeSingleItem(url);
-      return NextResponse.json({ ...data, action: data.status === 'sold' && autoRemove ? 'remove' : 'keep' }, { headers: CORS });
+      
+      return NextResponse.json({
+        ...data,
+        action: data.status === 'sold' && autoRemove ? 'remove' : 'keep',
+      }, { headers: CORS });
     }
 
-    return NextResponse.json({ message: 'Verwende ?mode=single&url=...' }, { headers: CORS });
+    if (mode === 'status-check') {
+      const mockItems: StoredItem[] = [];
+
+      const results = {
+        checked: 0,
+        sold: [] as ScrapeResult[],
+        reserved: [] as ScrapeResult[],
+        available: [] as ScrapeResult[],
+        removed: [] as string[],
+        errors: [] as { id: string; error: string }[],
+      };
+
+      for (const item of mockItems) {
+        try {
+          const data = await scrapeSingleItem(item.url);
+          results.checked++;
+
+          if (data.status === 'sold') {
+            results.sold.push(data);
+            if (autoRemove) {
+              results.removed.push(item.id);
+            }
+          } else if (data.status === 'reserved') {
+            results.reserved.push(data);
+          } else {
+            results.available.push(data);
+          }
+          
+          await new Promise(r => setTimeout(r, 500));
+        } catch (e) {
+          results.errors.push({ id: item.id, error: String(e) });
+        }
+      }
+
+      return NextResponse.json({
+        timestamp: new Date().toISOString(),
+        ...results,
+        message: autoRemove && results.removed.length > 0 
+          ? `${results.removed.length} verkaufte Items entfernt`
+          : `${results.sold.length} Items als verkauft markiert`,
+      }, { headers: CORS });
+    }
+
+    return NextResponse.json({ 
+      message: 'Verwende ?mode=single&url=... oder ?mode=status-check' 
+    }, { headers: CORS });
 
   } catch (e) {
     return NextResponse.json({ message: 'Fehler: ' + String(e) }, { status: 500, headers: CORS });
@@ -513,9 +444,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { url, urls, profileUrl, username, mode = 'single', autoRemove = false } = body;
+    const { 
+      url,
+      urls,
+      username,
+      userId,
+      mode = 'single',
+      autoRemove = false,
+    } = body;
 
-    // ═══ EINZELNES ITEM ═══
     if (mode === 'single' && url) {
       if (!url.includes('vinted')) {
         return NextResponse.json({ message: 'Ungültige URL' }, { status: 400, headers: CORS });
@@ -523,59 +460,66 @@ export async function POST(request: Request) {
 
       const data = await scrapeSingleItem(url);
 
+      if (data.status === 'sold' && autoRemove) {
+        return NextResponse.json({
+          ...data,
+          action: 'removed',
+          message: '⚠️ Item ist VERKAUFT und wurde aus der Datenbank entfernt',
+        }, { headers: CORS });
+      }
+
       if (data.status === 'sold') {
         return NextResponse.json({
           ...data,
-          warning: '⚠️ Item ist VERKAUFT',
-          action: autoRemove ? 'removed' : 'suggest_remove',
+          warning: '⚠️ Item ist VERKAUFT - soll aus der Datenbank entfernt werden?',
+          action: 'suggest_remove',
         }, { headers: CORS });
       }
 
       return NextResponse.json(data, { headers: CORS });
     }
 
-    // ═══ BULK SCRAPE ═══
     if (mode === 'bulk') {
       let urlsToScrape: string[] = [];
 
-      // Option 1: Profil-URL oder Username
-      if (profileUrl || username) {
-        const identifier = profileUrl || username;
+      if (username || userId) {
+        const identifier = username || userId;
         urlsToScrape = await getAllUserItems(identifier);
         
         if (urlsToScrape.length === 0) {
           return NextResponse.json(
-            { message: 'Keine Items gefunden. Tip: Verwende die Profil-URL (z.B. https://www.vinted.de/member/123456-username)' }, 
+            { message: 'Keine Items gefunden für: ' + identifier }, 
             { status: 404, headers: CORS }
           );
         }
-      } 
-      // Option 2: Direkte URLs
-      else if (urls && Array.isArray(urls)) {
+      } else if (urls && Array.isArray(urls)) {
         urlsToScrape = urls.filter((u: string) => u.includes('vinted'));
       } else {
         return NextResponse.json(
-          { message: 'profileUrl, username oder urls Array erforderlich' }, 
+          { message: 'username, userId oder urls Array erforderlich' }, 
           { status: 400, headers: CORS }
         );
       }
 
-      // Quick Mode: Nur URLs zurückgeben
       if (body.quick === true) {
         return NextResponse.json({
           totalItems: urlsToScrape.length,
           itemUrls: urlsToScrape,
-          message: `${urlsToScrape.length} URLs gefunden`,
+          message: 'URLs gefunden. Setze quick: false zum Scrapen.',
         }, { headers: CORS });
       }
 
-      // Scrape alle Items
-      const results = await bulkScrapeItems(urlsToScrape, 2);
+      const results = await bulkScrapeItems(urlsToScrape, 3);
       
-      const successful = results.filter(r => !r.error && r.status === 'available');
+      const successful = results.filter(r => !r.error && r.status !== 'sold');
       const sold = results.filter(r => r.status === 'sold');
       const reserved = results.filter(r => r.status === 'reserved');
       const errors = results.filter(r => r.error);
+
+      let removed: string[] = [];
+      if (autoRemove && sold.length > 0) {
+        removed = sold.map(s => s.itemId || s.url).filter((id): id is string => id !== null);
+      }
 
       return NextResponse.json({
         timestamp: new Date().toISOString(),
@@ -585,23 +529,36 @@ export async function POST(request: Request) {
           sold: sold.length,
           reserved: reserved.length,
           errors: errors.length,
+          autoRemoved: removed.length,
         },
         items: {
           added: successful,
-          skipped: [...sold, ...reserved],
+          skipped: sold,
+          reserved: reserved,
           failed: errors,
         },
-        message: `✅ ${successful.length} verfügbar, ${sold.length} verkauft, ${reserved.length} reserviert`,
+        soldItems: sold.map(s => ({
+          itemId: s.itemId,
+          url: s.url,
+          name: s.name,
+          reason: 'Verkauft/Reserviert',
+        })),
+        message: autoRemove && removed.length > 0
+          ? `✅ ${successful.length} Items hinzugefügt, ${removed.length} verkaufte entfernt`
+          : `✅ ${successful.length} Items hinzugefügt, ${sold.length} verkaufte übersprungen`,
       }, { headers: CORS });
     }
 
     return NextResponse.json(
-      { message: 'Ungültiger Modus' }, 
+      { message: 'Ungültiger Modus. Verwende mode: "single" oder "bulk"' }, 
       { status: 400, headers: CORS }
     );
 
   } catch (e) {
     console.error('Scraper Error:', e);
-    return NextResponse.json({ message: 'Fehler: ' + String(e) }, { status: 500, headers: CORS });
+    return NextResponse.json(
+      { message: 'Fehler: ' + String(e) }, 
+      { status: 500, headers: CORS }
+    );
   }
 }
