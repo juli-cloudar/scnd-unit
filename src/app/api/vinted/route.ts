@@ -431,78 +431,14 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
   });
 }
 
-// API ROUTES
-export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const mode = searchParams.get('mode');
-    const url = searchParams.get('url');
-    const autoRemove = searchParams.get('autoRemove') === 'true';
-
-    if (mode === 'single' && url) {
-      const data = await scrapeSingleItem(url);
-      
-      return NextResponse.json({
-        ...data,
-        action: data.status === 'sold' && autoRemove ? 'remove' : 'keep',
-      }, { headers: CORS });
-    }
-
-    if (mode === 'status-check') {
-      const mockItems: StoredItem[] = [];
-
-      const results = {
-        checked: 0,
-        sold: [] as ScrapeResult[],
-        reserved: [] as ScrapeResult[],
-        available: [] as ScrapeResult[],
-        removed: [] as string[],
-        errors: [] as { id: string; error: string }[],
-      };
-
-      for (const item of mockItems) {
-        try {
-          const data = await scrapeSingleItem(item.url);
-          results.checked++;
-
-          if (data.status === 'sold') {
-            results.sold.push(data);
-            if (autoRemove) {
-              results.removed.push(item.id);
-            }
-          } else if (data.status === 'reserved') {
-            results.reserved.push(data);
-          } else {
-            results.available.push(data);
-          }
-          
-          await new Promise(r => setTimeout(r, 500));
-        } catch (e) {
-          results.errors.push({ id: item.id, error: String(e) });
-        }
-      }
-
-      return NextResponse.json({
-        timestamp: new Date().toISOString(),
-        ...results,
-        message: autoRemove && results.removed.length > 0 
-          ? `${results.removed.length} verkaufte Items entfernt`
-          : `${results.sold.length} Items als verkauft markiert`,
-      }, { headers: CORS });
-    }
-
-    return NextResponse.json({ 
-      message: 'Verwende POST für API-Zugriff. Beispiele: { "mode": "single", "url": "..." } oder { "mode": "bulk", "profileUrl": "...", "quick": true }' 
-    }, { headers: CORS });
-
-  } catch (e) {
-    return NextResponse.json({ message: 'Fehler: ' + String(e) }, { status: 500, headers: CORS });
-  }
-}
-
+// ⭐⭐⭐ POST MUSS VOR GET KOMMEN - WICHTIG FÜR VERCEL! ⭐⭐⭐
 export async function POST(request: Request) {
+  console.log('[API] POST received');
+  
   try {
     const body = await request.json();
+    console.log('[API] Body:', JSON.stringify(body, null, 2));
+    
     const { 
       url,
       username,
@@ -519,6 +455,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Ungültige URL' }, { status: 400, headers: CORS });
       }
 
+      console.log('[API] Single mode for:', url);
       const data = await scrapeSingleItem(url);
 
       if (data.status === 'sold' && autoRemove) {
@@ -563,6 +500,7 @@ export async function POST(request: Request) {
 
       // Quick Mode: Nur URLs zurückgeben
       if (quick === true) {
+        console.log(`[API] Quick mode: returning ${allUrls.length} URLs`);
         return NextResponse.json({
           totalItems: allUrls.length,
           itemUrls: allUrls,
@@ -571,6 +509,7 @@ export async function POST(request: Request) {
       }
 
       // Vollständiger Import mit Scraping
+      console.log(`[API] Full scrape mode: processing ${allUrls.length} items`);
       const results = await bulkScrapeItems(allUrls, 2);
       
       const successful = results.filter(r => !r.error && r.status === 'available');
@@ -609,4 +548,11 @@ export async function POST(request: Request) {
       { status: 500, headers: CORS }
     );
   }
+}
+
+// ⭐⭐⭐ GET DANACH - WICHTIG FÜR VERCEL! ⭐⭐⭐
+export async function GET(request: Request) {
+  return NextResponse.json({ 
+    message: 'Verwende POST für API-Zugriff. Beispiele: { "mode": "single", "url": "..." } oder { "mode": "bulk", "profileUrl": "...", "quick": true }' 
+  }, { headers: CORS });
 }
