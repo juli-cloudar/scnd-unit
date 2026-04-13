@@ -514,16 +514,21 @@ export async function GET(request: Request) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// NEU - EINFÜGEN (im POST Handler)
+// ═══════════════════════════════════════════════════════════
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { 
       url,
       urls,
-      username,
+      username,  // ← Vom neuen Frontend gesendet
       userId,
+      profileUrl, // ← Fallback für alte/compatibility
       mode = 'single',
       autoRemove = false,
+      quick = false, // ← Neu hinzugefügt
     } = body;
 
     if (mode === 'single' && url) {
@@ -553,26 +558,100 @@ export async function POST(request: Request) {
     }
 
     if (mode === 'bulk') {
-      let urlsToScrape: string[] = [];
-
-      if (username || userId) {
-        const identifier = username || userId;
-        urlsToScrape = await getAllUserItems(identifier);
-        
-        if (urlsToScrape.length === 0) {
-          return NextResponse.json(
-            { message: 'Keine Items gefunden für: ' + identifier }, 
-            { status: 404, headers: CORS }
-          );
-        }
-      } else if (urls && Array.isArray(urls)) {
-        urlsToScrape = urls.filter((u: string) => u.includes('vinted'));
-      } else {
+      // KORRIGIERT: Identifier aus username, userId ODER profileUrl extrahieren
+      let identifier = username || userId || profileUrl;
+      
+      // Falls es eine URL ist, extrahiere den Username
+      if (identifier?.includes('vinted')) {
+        const match = identifier.match(/member\/\d+-([^/?]+)/) || 
+                      identifier.match(/member\/([^/?]+)/);
+        if (match) identifier = match[1];
+      }
+      
+      // Bereinige @ falls vorhanden
+      if (identifier) {
+        identifier = identifier.replace(/^@/, '');
+      }
+      
+      if (!identifier) {
         return NextResponse.json(
-          { message: 'username, userId oder urls Array erforderlich' }, 
+          { message: 'username, userId oder profileUrl erforderlich' }, 
           { status: 400, headers: CORS }
         );
       }
+
+      const urlsToScrape = await getAllUserItems(identifier);
+      
+      if (urlsToScrape.length === 0) {
+        return NextResponse.json(
+          { message: 'Keine Items gefunden für: ' + identifier }, 
+          { status: 404, headers: CORS }
+        );
+      }
+
+      // ← Der REST DES CODES bleibt gleich (quick check, bulk scrape, etc.)
+      if (quick === true) {
+        return NextResponse.json({
+          totalItems: urlsToScrape.length,
+          itemUrls: urlsToScrape,
+          message: 'URLs gefunden. Setze quick: false zum Scrapen.',
+        }, { headers: CORS });
+      }
+
+      const results = await bulkScrapeItems(urlsToScrape, 3);
+      
+      const successful = results.filter(r => !r.error && r.status !== 'sold');
+      const sold = results.filter(r => r.status === 'sold');
+      const reserved = results.filter(r => r.status === 'reserved');
+      const errors = results.filter(r => r.error);
+
+      let removed: string[] = [];
+      if (autoRemove && sold.length > 0) {
+        removed = sold.map(s => s.itemId || s.url).filter((id): id is string => id !== null);
+      }
+
+      return NextResponse.json({
+        timestamp: new Date().toISOString(),
+        summary: {
+          total: results.length,
+          available: successful.length,
+          sold: sold.length,
+          reserved: reserved.length,
+          errors: errors.length,
+          autoRemoved: removed.length,
+        },
+        items: {
+          added: successful,
+          skipped: sold,
+          reserved: reserved,
+          failed: errors,
+        },
+        soldItems: sold.map(s => ({
+          itemId: s.itemId,
+          url: s.url,
+          name: s.name,
+          reason: 'Verkauft/Reserviert',
+        })),
+        message: autoRemove && removed.length > 0
+          ? `✅ ${successful.length} Items hinzugefügt, ${removed.length} verkaufte entfernt`
+          : `✅ ${successful.length} Items hinzugefügt, ${sold.length} verkaufte übersprungen`,
+      }, { headers: CORS });
+    }
+
+    return NextResponse.json(
+      { message: 'Ungültiger Modus. Verwende mode: "single" oder "bulk"' }, 
+      { status: 400, headers: CORS }
+    );
+
+  } catch (e) {
+    console.error('Scraper Error:', e);
+    return NextResponse.json(
+      { message: 'Fehler: ' + String(e) }, 
+      { status: 500, headers: CORS }
+    );
+  }
+}
+// ═══════════════════════════════════════════════════════════
 
       if (body.quick === true) {
         return NextResponse.json({
