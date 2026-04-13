@@ -140,102 +140,83 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
 // ⭐⭐⭐ VERBESSERTE getAllUserItems FUNKTION ⭐⭐⭐
 async function getAllUserItems(memberUrl: string): Promise<string[]> {
   const urls: string[] = [];
-  let page = 1;
-  const maxPages = 20;
   
-  // Extrahiere Member-ID aus verschiedenen URL-Formaten
+  // Extrahiere Member-ID
   let memberId = '';
-  
-  // Entferne führende/trailende Leerzeichen
-  memberUrl = memberUrl.trim();
-  
-  // Wenn es eine volle URL ist, extrahiere die ID
-  if (memberUrl.includes('vinted.de')) {
-    // Matcht /member/3138250645-scndunit oder /member/3138250645
-    const match = memberUrl.match(/\/member\/(\d+)(?:-[^\/?#]+)?/);
-    if (match) {
-      memberId = match[1]; // Nur die Zahl: 3138250645
-    } else {
-      // Fallback: Versuche nur Zahlen zu finden
-      const numMatch = memberUrl.match(/(\d+)/);
-      if (numMatch) memberId = numMatch[1];
-    }
-  } else {
-    // Wenn nur eine Zahl oder "3138250645-scndunit" eingegeben wurde
-    const numMatch = memberUrl.match(/^(\d+)/);
-    if (numMatch) memberId = numMatch[1];
-  }
+  const match = memberUrl.match(/(\d+)/);
+  if (match) memberId = match[1];
   
   if (!memberId) {
-    console.error('[Vinted] Invalid member URL/ID:', memberUrl);
+    console.error('[Vinted] Invalid member ID');
     return [];
   }
   
-  console.log(`[Vinted] Member ID extrahiert: ${memberId}`);
+  console.log(`[Vinted] Fetching items for member: ${memberId}`);
   
-  // Verwende NUR die numerische ID für die Vinted-URL
+  // Versuche zuerst die Vinted API (funktioniert oft besser)
+  try {
+    const apiUrl = `https://www.vinted.de/api/v2/members/${memberId}/items?page=1&per_page=100&order=relevance`;
+    console.log(`[Vinted] Trying API: ${apiUrl}`);
+    
+    const response = await fetchWithTimeout(apiUrl, 10000);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.items && Array.isArray(data.items)) {
+        for (const item of data.items) {
+          if (item.url) {
+            const fullUrl = item.url.startsWith('http') ? item.url : `https://www.vinted.de${item.url}`;
+            urls.push(fullUrl);
+          }
+        }
+        console.log(`[Vinted] API found ${urls.length} items`);
+        return urls;
+      }
+    }
+  } catch (err) {
+    console.log('[Vinted] API failed, falling back to HTML scraping');
+  }
+  
+  // Fallback: HTML Scraping
+  let page = 1;
+  const maxPages = 20;
   const baseUrl = `https://www.vinted.de/member/${memberId}`;
   
   while (page <= maxPages) {
     const profileUrl = `${baseUrl}?page=${page}`;
-    console.log(`[Vinted] Fetching page ${page}: ${profileUrl}`);
+    console.log(`[Vinted] HTML scraping page ${page}`);
     
     try {
       const response = await fetchWithTimeout(profileUrl, 10000);
-      if (!response.ok) {
-        console.log(`[Vinted] HTTP ${response.status} on page ${page}`);
-        break;
-      }
+      if (!response.ok) break;
       
       const html = await response.text();
       
-      // Verschiedene Patterns für Item-Links
-      const patterns = [
-        /href="(\/items\/\d+[^"?#]*)"/g,
-        /href="https:\/\/www\.vinted\.de\/items\/\d+[^"?#]*"/g,
-        /"url":"\/items\/\d+[^"]*"/g
-      ];
-      
+      // Suche nach Item-Links
+      const itemMatches = html.matchAll(/href="(\/items\/\d+[^"?#]*)"/g);
       let found = 0;
-      for (const pattern of patterns) {
-        const matches = html.matchAll(pattern);
-        for (const match of matches) {
-          let fullUrl = match[1];
-          if (fullUrl && fullUrl.startsWith('/')) {
-            fullUrl = `https://www.vinted.de${fullUrl}`;
-          }
-          if (fullUrl && fullUrl.includes('/items/') && !urls.includes(fullUrl)) {
-            urls.push(fullUrl);
-            found++;
-          }
+      for (const match of itemMatches) {
+        const fullUrl = `https://www.vinted.de${match[1]}`;
+        if (!urls.includes(fullUrl)) {
+          urls.push(fullUrl);
+          found++;
         }
       }
       
-      console.log(`[Vinted] Page ${page}: found ${found} items (total: ${urls.length})`);
+      console.log(`[Vinted] Page ${page}: found ${found} items`);
       
-      // Prüfe auf nächste Seite
-      const hasNext = html.includes(`page=${page + 1}`) || 
-                      html.includes('pagination-next') ||
-                      html.includes('>Weiter<') ||
-                      html.includes('rel="next"');
-      
-      if (!hasNext || found === 0) {
-        console.log(`[Vinted] No more pages - stopping`);
-        break;
-      }
+      const hasNext = html.includes(`page=${page + 1}`) || html.includes('rel="next"');
+      if (!hasNext || found === 0) break;
       
       page++;
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 1000));
     } catch (err) {
-      console.error(`[Vinted] Error fetching page ${page}:`, err);
+      console.error(`[Vinted] Error:`, err);
       break;
     }
   }
   
-  // Entferne Duplikate
-  const unique = [...new Set(urls)];
-  console.log(`[Vinted] Total unique items found: ${unique.length}`);
-  return unique;
+  console.log(`[Vinted] Total found: ${urls.length} items`);
+  return urls;
 }
 
 // ⭐⭐⭐ POST MUSS ZUERST KOMMEN ⭐⭐⭐
