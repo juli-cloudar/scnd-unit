@@ -38,38 +38,72 @@ interface ScrapeResult {
 
 // HILFSFUNKTIONEN
 function extractItemFromHTML(html: string, url: string): ScrapeResult {
-  // STATUS CHECK
-  const statusIndicators = {
-    sold: [
-      /Dieser Artikel ist bereits verkauft/i,
-      /Artikel nicht verfügbar/i,
-      /reserviert/i,
-      /sold/i,
-      /verkauft/i,
-      /nicht mehr verfügbar/i,
-      /data-testid="item-sold"/i,
-      /class="[^"]*item-sold[^"]*"/i,
-      /Dieser Artikel ist reserviert/i,
-    ],
-    reserved: [
-      /reserviert/i,
-      /reserved/i,
-      /vorübergehend nicht verfügbar/i,
-      /Dieser Artikel ist reserviert/i,
-    ]
-  };
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // STATUS CHECK - VERBESSERT 2024
+  // ═══════════════════════════════════════════════════════════════════════════════
+  
+  // Zuerst prüfen ob die Seite überhaupt ein Produkt enthält
+  const hasProductData = html.includes('item-details') || 
+                         html.includes('item-header') ||
+                         html.includes('data-testid="item-page"') ||
+                         html.includes('application/ld+json') ||
+                         /"@type"\s*:\s*"Product"/i.test(html);
+
+  // Wenn keine Produktdaten gefunden, ist es wahrscheinlich ein Fehler/404
+  if (!hasProductData && (html.includes('404') || html.includes('nicht gefunden'))) {
+    return { 
+      itemId: null,
+      url, 
+      status: 'sold', 
+      name: '',
+      price: '',
+      size: '',
+      condition: '',
+      category: 'Sonstiges',
+      images: [],
+      error: true,
+      message: 'Seite nicht gefunden (404)',
+      lastChecked: new Date().toISOString(),
+    };
+  }
+
+  // Verkauft/Reserviert Indikatoren - NUR zuverlässige Signale
+  const soldIndicators = [
+    // Starke Indikatoren (Seite existiert aber Item nicht verfügbar)
+    /<h1[^>]*>[^<]*nicht verfügbar/i,
+    /Dieser Artikel ist (bereits )?verkauft/i,
+    /Artikel wurde (bereits )?verkauft/i,
+    /Dieser Artikel ist nicht mehr verfügbar/i,
+    /Item not available/i,
+    /This item has been sold/i,
+    /data-testid="item-not-available"/i,
+    /class="[^"]*item-sold-out[^"]*"/i,
+    // HTTP Status im HTML
+    /"statusCode":\s*404/,
+    /"availability":\s*"https:\/\/schema\.org\/OutOfStock"/i,
+  ];
+
+  const reservedIndicators = [
+    /Dieser Artikel ist reserviert/i,
+    /This item is reserved/i,
+    /Reserviert für/i,
+    /data-testid="item-reserved"/i,
+    /"availability":\s*"https:\/\/schema\.org\/PreOrder"/i,
+  ];
 
   let itemStatus: 'available' | 'sold' | 'reserved' = 'available';
-  
-  for (const pattern of statusIndicators.sold) {
+
+  // Prüfe auf "verkauft" - aber nur wenn wirklich sicher
+  for (const pattern of soldIndicators) {
     if (pattern.test(html)) {
       itemStatus = 'sold';
       break;
     }
   }
-  
+
+  // Prüfe auf "reserviert" nur wenn nicht bereits verkauft
   if (itemStatus === 'available') {
-    for (const pattern of statusIndicators.reserved) {
+    for (const pattern of reservedIndicators) {
       if (pattern.test(html)) {
         itemStatus = 'reserved';
         break;
@@ -77,14 +111,17 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // BILDER
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // BILDER - VERBESSERT
+  // ═══════════════════════════════════════════════════════════════════════════════
   const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
   const seen = new Set<string>();
   const images: string[] = [];
   
   for (const m of imgMatches) {
     let fullUrl = m[0];
-    if (!fullUrl.includes('/f800/')) continue;
+    // Nur hochauflösende Bilder (f800 oder ähnlich)
+    if (!fullUrl.includes('/f800/') && !fullUrl.includes('/t/')) continue;
     fullUrl = fullUrl.replace(/&amp;/g, '&');
     const base = fullUrl.split('?')[0];
     if (!seen.has(base)) {
@@ -93,56 +130,123 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // NAME
-  const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
-  const titleMatch = html.match(/<title>\s*([^|<]+)/i);
-  const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // NAME - VERBESSERT
+  // ═══════════════════════════════════════════════════════════════════════════════
+  let name = '';
+  
+  // Versuch 1: JSON-LD Product name
+  const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
+  if (jsonLdMatch) {
+    try {
+      const jsonData = JSON.parse(jsonLdMatch[1]);
+      if (jsonData.name && typeof jsonData.name === 'string') {
+        name = jsonData.name.trim();
+      }
+    } catch (e) {}
+  }
 
-  // GRÖSSE
+  // Versuch 2: Meta title
+  if (!name) {
+    const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/i) ||
+                      html.match(/<title>([^<]+)<\/title>/i);
+    if (titleMatch) {
+      name = titleMatch[1].replace(/\s*\|\s*Vinted$/i, '').trim();
+    }
+  }
+
+  // Versuch 3: H1
+  if (!name) {
+    const h1Match = html.match(/<h1[^>]*data-testid="item-title"[^>]*>([^<]+)<\/h1>/i) ||
+                   html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    if (h1Match) name = h1Match[1].trim();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // GRÖSSE - VERBESSERT 2024
+  // ═══════════════════════════════════════════════════════════════════════════════
   let size = '';
-  const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) ||
-                       html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) ||
-                       html.match(/"size_title"[:\s]*"([^"]{1,20})"/i);
-  if (sizeJsonMatch) size = sizeJsonMatch[1].trim();
 
+  // Versuch 1: JSON-LD Größe (neuere Vinted Version)
+  if (jsonLdMatch) {
+    try {
+      const jsonData = JSON.parse(jsonLdMatch[1]);
+      // Suche in verschachtelten Objekten nach size
+      const findSize = (obj: any): string | null => {
+        if (!obj) return null;
+        if (obj.size && typeof obj.size === 'string') return obj.size;
+        if (obj.size_name && typeof obj.size_name === 'string') return obj.size_name;
+        if (obj.sizes && Array.isArray(obj.sizes)) return obj.sizes[0];
+        for (const key in obj) {
+          if (typeof obj[key] === 'object') {
+            const found = findSize(obj[key]);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      const foundSize = findSize(jsonData);
+      if (foundSize) size = foundSize;
+    } catch (e) {}
+  }
+
+  // Versuch 2: Neue Vinted UI Struktur (data-testid)
   if (!size) {
-    const sizePatterns = [
-      /data-testid="item-details-size"[^>]*>([^<]{1,20})/i,
-      /class="[^"]*item-details[^"]*"[^>]*>[^<]*Größe[^<]*<[^>]*>([^<]{1,20})/i,
-      /Größe\s*<\/[^>]+>\s*<[^>]+>\s*([^<]{1,20})/i,
-      /Größe[^<]{0,30}<[^>]+>([^<]{1,20})/i,
-      /"Größe"[^:]*:[^"]*"([^"]{1,20})"/i,
+    const sizeMatch = html.match(/data-testid="item-details-size"[^>]*>\s*([^<]+)/i) ||
+                     html.match(/data-testid="size"[^>]*>\s*([^<]+)/i) ||
+                     html.match(/Größe[:\s]*<\/[^>]+>\s*<[^>]+>\s*([^<]{1,15})/i);
+    if (sizeMatch) {
+      size = sizeMatch[1].trim();
+    }
+  }
+
+  // Versuch 3: Item Details Section
+  if (!size) {
+    // Suche nach "Größe" gefolgt von Wert in der Nähe
+    const detailSection = html.match(/item-details|item-description|product-details/i);
+    if (detailSection) {
+      const sizeInContext = html.match(/(?:Größe|Size)[\s:]*([A-Z0-9]{1,4}(?:\/[A-Z0-9]{1,4})?)/i) ||
+                           html.match(/(?:Größe|Size)[\s:]*(\d{2,3})/i);
+      if (sizeInContext) size = sizeInContext[1].trim();
+    }
+  }
+
+  // Versuch 4: Breite Suche nach gängigen Größenmustern
+  if (!size) {
+    const commonSizes = [
+      /(?:Größe|Size|Taille)[\s:]*((?:XXS|XS|S|M|L|XL|XXL|XXXL|3XL|4XL|5XL))/i,
+      /(?:Größe|Size)[\s:]*(\d{2,3}\s*(?:cm)?)/i,
+      /(?:Größe|Size)[\s:]*(One Size|Einheitsgröße|UNI)/i,
+      /Gr\.\s*([A-Z0-9]{1,4})/i,
     ];
-    for (const pattern of sizePatterns) {
+    for (const pattern of commonSizes) {
       const match = html.match(pattern);
-      if (match?.[1]) {
-        size = match[1].trim().replace(/[·\/\-]/g, '').trim();
-        if (size.length > 0 && size.length < 20) break;
+      if (match) {
+        size = match[1].trim();
+        break;
       }
     }
   }
 
-  if (!size) {
-    const broadMatch = html.match(/(?:Größe|Grösse|Size)[^\w]{0,10}(XXS|XS|S|M|L|XL|XXL|XXXL|4XL|5XL|One Size|Einheitsgröße|UNI|\d{2,3})/i);
-    if (broadMatch) size = broadMatch[1].trim();
-  }
-
-  if (!size) {
-    const numericMatch = html.match(/(?:Größe|Size)[^\d]{0,15}(\d{2,3})\b/i);
-    if (numericMatch) size = numericMatch[1];
-  }
-
-  // PREIS
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // PREIS - VERBESSERT
+  // ═══════════════════════════════════════════════════════════════════════════════
   let price = '';
-  const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
-  for (const jsonMatch of jsonLdMatches) {
+
+  // Versuch 1: JSON-LD
+  if (jsonLdMatch) {
     try {
-      const jsonData = JSON.parse(jsonMatch[1]);
+      const jsonData = JSON.parse(jsonLdMatch[1]);
       const findPrice = (obj: any): string | null => {
         if (!obj) return null;
-        if (obj.price) return obj.price.toString().replace('.', ',');
-        if (typeof obj === 'object') {
-          for (const key in obj) {
+        if (obj.price && (typeof obj.price === 'string' || typeof obj.price === 'number')) {
+          return String(obj.price).replace('.', ',');
+        }
+        if (obj.offers && obj.offers.price) {
+          return String(obj.offers.price).replace('.', ',');
+        }
+        for (const key in obj) {
+          if (typeof obj[key] === 'object') {
             const found = findPrice(obj[key]);
             if (found) return found;
           }
@@ -150,20 +254,27 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
         return null;
       };
       const foundPrice = findPrice(jsonData);
-      if (foundPrice) {
-        price = foundPrice;
-        break;
-      }
+      if (foundPrice) price = foundPrice;
     } catch (e) {}
   }
 
+  // Versuch 2: Meta tags
   if (!price) {
-    const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
-    const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
-    if (priceMatch) price = priceMatch[1];
+    const priceMeta = html.match(/<meta property="product:price:amount" content="([^"]+)"/i) ||
+                     html.match(/"price":\s*"?(\d+[.,]?\d*)/i);
+    if (priceMeta) price = priceMeta[1].replace('.', ',');
   }
 
-  // ZUSTAND
+  // Versuch 3: Im Text suchen (nur wenn nicht zu weit unten)
+  if (!price) {
+    const priceSection = html.substring(0, 50000); // Nur erster Teil
+    const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(?:€|EUR|€)/i);
+    if (priceMatch) price = priceMatch[1].replace('.', ',');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // ZUSTAND - VERBESSERT
+  // ═══════════════════════════════════════════════════════════════════════════════
   const condMap: Record<string, string> = {
     'neu mit etikett': 'Neu mit Etikett',
     'neu ohne etikett': 'Neu ohne Etikett',
@@ -175,30 +286,29 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   };
 
   let condition = '';
-  const directMatch = html.match(/>(Neu mit Etikett|Neu ohne Etikett|Sehr gut|Zufriedenstellend|Schlecht|Gut|Neu)</i);
-  if (directMatch) condition = directMatch[1];
 
-  if (!condition) {
-    const condJsonMatch = html.match(/"condition"[:\s]*"([^"]+)"/i) ||
-                         html.match(/"item_condition"[:\s]*"([^"]+)"/i);
-    if (condJsonMatch) {
-      const raw = condJsonMatch[1].toLowerCase();
-      for (const [key, val] of Object.entries(condMap)) {
-        if (raw.includes(key)) { condition = val; break; }
+  // Versuch 1: JSON-LD
+  if (jsonLdMatch) {
+    try {
+      const jsonData = JSON.parse(jsonLdMatch[1]);
+      const itemCondition = jsonData.itemCondition || 
+                           (jsonData.offers && jsonData.offers.itemCondition);
+      if (itemCondition) {
+        const conditionUrl = itemCondition.toString().toLowerCase();
+        if (conditionUrl.includes('newcondition')) condition = 'Neu';
+        else if (conditionUrl.includes('usedcondition')) condition = 'Gut';
       }
-    }
+    } catch (e) {}
   }
 
-  if (!condition) {
-    const contextMatch = html.match(/Zustand[^<]{0,50}(Neu mit Etikett|Neu ohne Etikett|Sehr gut|Zufriedenstellend|Schlecht|Gut|Neu)/i);
-    if (contextMatch) condition = contextMatch[1];
-  }
-
+  // Versuch 2: Direkte Text-Suche (nur ganze Wörter)
   if (!condition) {
     const htmlLower = html.toLowerCase();
-    const order = ['neu mit etikett', 'neu ohne etikett', 'sehr gut', 'zufriedenstellend', 'schlecht', 'gut'];
-    for (const key of order) {
-      const pattern = new RegExp(`[>\\s"']${key}[<\\s"'·]`, 'i');
+    // Sortiert nach Länge (längere zuerst)
+    const conditions = ['neu mit etikett', 'neu ohne etikett', 'sehr gut', 'zufriedenstellend', 'schlecht', 'gut', 'neu'];
+    for (const key of conditions) {
+      // Word boundary check
+      const pattern = new RegExp(`(?:^|[\\s>"])${key}(?:[\\s<".,]|$)`, 'i');
       if (pattern.test(htmlLower)) {
         condition = condMap[key];
         break;
@@ -206,7 +316,20 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
+  // Versuch 3: In der Nähe von "Zustand"
+  if (!condition) {
+    const contextMatch = html.match(/Zustand[:\s]*([^<.,]{3,30})/i);
+    if (contextMatch) {
+      const raw = contextMatch[1].toLowerCase().trim();
+      for (const [key, val] of Object.entries(condMap)) {
+        if (raw.includes(key)) { condition = val; break; }
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
   // KATEGORIE
+  // ═══════════════════════════════════════════════════════════════════════════════
   const catMap: Record<string, string> = {
     'jacke': 'Jacken', 'jacket': 'Jacken', 'mantel': 'Jacken', 'coat': 'Jacken',
     'pullover': 'Pullover', 'hoodie': 'Pullover', 'strickjacke': 'Pullover', 'sweater': 'Pullover',
