@@ -124,7 +124,7 @@ export default function ManagementPanel() {
     const savedUser = sessionStorage.getItem('scnd_user');
     if (savedAuth === 'admin') {
       setAuthed(true); setAuthMode('admin');
-      setCurrentUser({ id: 0, username: 'Admin', role: 'Admin', password: '', login_count: 0, total_work_hours: 0, online: true,
+      setCurrentUser({ id: 0, username: 'Mastercontrol', role: 'Admin', password: '', login_count: 0, total_work_hours: 0, online: true,
         permissions: { canAddProducts: true, canEditProducts: true, canDeleteProducts: true, canViewStats: true, canManageEmployees: true }
       });
     } else if (savedAuth === 'employee' && savedUser) {
