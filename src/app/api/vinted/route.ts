@@ -31,9 +31,6 @@ interface ScrapeResult {
   warning?: string;
 }
 
-// ─────────────────────────────────────────────
-// FETCH MIT TIMEOUT
-// ─────────────────────────────────────────────
 async function fetchWithTimeout(url: string, timeoutMs = 7000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -53,9 +50,6 @@ async function fetchWithTimeout(url: string, timeoutMs = 7000): Promise<Response
   }
 }
 
-// ─────────────────────────────────────────────
-// HTML PARSER
-// ─────────────────────────────────────────────
 function extractItemFromHTML(html: string, url: string): ScrapeResult {
   const soldPatterns = [
     /Dieser Artikel ist bereits verkauft/i,
@@ -79,7 +73,6 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     for (const p of reservedPatterns) { if (p.test(html)) { itemStatus = 'reserved'; break; } }
   }
 
-  // BILDER
   const seen = new Set<string>();
   const images: string[] = [];
   for (const m of html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)) {
@@ -90,12 +83,10 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     if (!seen.has(base)) { seen.add(base); images.push(`/api/image-proxy?url=${encodeURIComponent(fullUrl)}`); }
   }
 
-  // NAME
   const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
   const titleMatch = html.match(/<title>\s*([^|<]+)/i);
   const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
-  // GRÖSSE
   let size = '';
   const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) || html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) || html.match(/"size_title"[:\s]*"([^"]{1,20})"/i);
   if (sizeJsonMatch) size = sizeJsonMatch[1].trim();
@@ -110,7 +101,6 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     if (m) size = m[1].trim();
   }
 
-  // PREIS
   let price = '';
   for (const m of html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)) {
     try {
@@ -130,7 +120,6 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     if (m) price = m[1];
   }
 
-  // ZUSTAND
   const condMap: Record<string, string> = {
     'neu mit etikett': 'Neu mit Etikett', 'neu ohne etikett': 'Neu ohne Etikett',
     'sehr gut': 'Sehr gut', 'zufriedenstellend': 'Zufriedenstellend',
@@ -150,7 +139,6 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // KATEGORIE
   const catMap: Record<string, string> = {
     'jacke': 'Jacken', 'jacket': 'Jacken', 'mantel': 'Jacken', 'coat': 'Jacken',
     'pullover': 'Pullover', 'hoodie': 'Pullover', 'strickjacke': 'Pullover', 'sweater': 'Pullover',
@@ -189,9 +177,6 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   return extractItemFromHTML(await response.text(), url);
 }
 
-// ─────────────────────────────────────────────
-// MEMBER PATH EXTRAKTION
-// ─────────────────────────────────────────────
 function extractMemberPath(input: string): string {
   const cleaned = input.trim().replace(/\/$/, '');
   const urlMatch = cleaned.match(/vinted\.[a-z]+\/member\/([^?&#\s]+)/i);
@@ -200,9 +185,6 @@ function extractMemberPath(input: string): string {
   return cleaned.replace(/^@/, '');
 }
 
-// ─────────────────────────────────────────────
-// ALLE ITEM-URLS EINES ACCOUNTS
-// ─────────────────────────────────────────────
 async function getAllUserItems(memberInput: string): Promise<string[]> {
   const urls: string[] = [];
   let page = 1;
@@ -250,9 +232,6 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
   return unique;
 }
 
-// ─────────────────────────────────────────────
-// BULK SCRAPER (sequenziell)
-// ─────────────────────────────────────────────
 async function bulkScrapeItems(urls: string[]): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
   for (const url of urls) {
@@ -265,9 +244,6 @@ async function bulkScrapeItems(urls: string[]): Promise<ScrapeResult[]> {
   return results;
 }
 
-// ─────────────────────────────────────────────
-// API ROUTES
-// ─────────────────────────────────────────────
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -287,7 +263,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { url, username, userId, profileUrl, mode = 'single', autoRemove = false, quick = false, offset = 0 } = body;
+    
+    // ⭐ WICHTIG: Hier 'urls' zum Destructuring hinzufügen ⭐
+    const { url, username, userId, profileUrl, urls, mode = 'single', autoRemove = false, quick = false, offset = 0 } = body;
 
     // ── SINGLE ──
     if (mode === 'single' && url) {
@@ -299,7 +277,23 @@ export async function POST(request: Request) {
       return NextResponse.json(data, { headers: CORS });
     }
 
-    // ── BULK ──
+    // ⭐ NEU: Bulk mit direktem URLs-Array (für bessere Performance) ⭐
+    if (mode === 'bulk' && urls && Array.isArray(urls) && urls.length > 0) {
+      console.log(`[Vinted] Direktes Bulk-Scraping von ${urls.length} URLs`);
+      const results = await bulkScrapeItems(urls);
+      return NextResponse.json({ 
+        items: results,
+        summary: {
+          total: results.length,
+          available: results.filter(r => r.status === 'available').length,
+          sold: results.filter(r => r.status === 'sold').length,
+          reserved: results.filter(r => r.status === 'reserved').length,
+          errors: results.filter(r => r.error).length,
+        }
+      }, { headers: CORS });
+    }
+
+    // ── BULK (profilbasiert) ──
     if (mode === 'bulk') {
       const identifier = username || userId || profileUrl;
       if (!identifier) return NextResponse.json({ message: 'profileUrl erforderlich' }, { status: 400, headers: CORS });
@@ -307,17 +301,14 @@ export async function POST(request: Request) {
       const allUrls = await getAllUserItems(identifier);
       if (allUrls.length === 0) return NextResponse.json({ message: 'Keine Items gefunden für: ' + identifier }, { status: 404, headers: CORS });
 
-      // Quick: nur Anzahl + alle URLs zurückgeben
       if (quick === true) {
         return NextResponse.json({
           totalItems: allUrls.length,
-          // Alle URLs auf einmal zurückgeben – Frontend filtert bereits vorhandene heraus
           itemUrls: allUrls,
           message: `${allUrls.length} Items gefunden.`,
         }, { headers: CORS });
       }
 
-      // Batch: 5 Items pro Request (Vercel Free sicher)
       const BATCH_SIZE = 5;
       const batch = allUrls.slice(offset, offset + BATCH_SIZE);
       const isLastBatch = offset + BATCH_SIZE >= allUrls.length;
