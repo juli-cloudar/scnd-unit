@@ -295,7 +295,6 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
     </div>
   );
 }
-
 // =================== NEU: VINTED TOOLS TAB ===================
 function VintedToolsTab({ user, toast, confirm }: {
   user: Employee | null,
@@ -303,12 +302,442 @@ function VintedToolsTab({ user, toast, confirm }: {
   confirm: (msg: string, onConfirm: () => void) => void
 }) {
   const [activeSubTab, setActiveSubTab] = useState<'bulk' | 'status'>('bulk');
-  const [profileUrl, setProfileUrl] = useState(''); // NEU: statt username
+  const [profileUrl, setProfileUrl] = useState('');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [autoRemove, setAutoRemove] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
+
+  // ═══════════════════════════════════════════════════════════
+  // BULK SCRAPE - Account importieren
+  // ═══════════════════════════════════════════════════════════
+  const scrapeBulk = async () => {
+    if (!profileUrl) {
+      toast('Bitte Profil-URL oder Username eingeben', 'error');
+      return;
+    }
+
+    let username = profileUrl;
+    if (profileUrl.includes('vinted')) {
+      const match = profileUrl.match(/member\/\d+-([^/?]+)/) || 
+                    profileUrl.match(/member\/([^/?]+)/);
+      if (match) username = match[1];
+    }
+    username = username.replace(/^@/, '');
+
+    setLoading(true);
+    setResult(null);
+    setProgress({ current: 0, total: 0 });
+
+    try {
+      const quickRes = await fetch('/api/vinted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          mode: 'bulk', 
+          username,
+          quick: true 
+        }),
+      });
+
+      const quickData = await quickRes.json();
+      if (!quickRes.ok) {
+        toast(quickData.message || 'Fehler beim Finden der Items', 'error');
+        setLoading(false);
+        return;
+      }
+
+      setProgress({ current: 0, total: quickData.totalItems });
+      toast(`${quickData.totalItems} Items gefunden. Starte Scraping...`, 'info');
+
+      const res = await fetch('/api/vinted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          mode: 'bulk', 
+          username,
+          autoRemove 
+        }),
+      });
+
+      const data = await res.json();
+      setResult(data);
+
+      if (data.items?.added?.length > 0) {
+        let savedCount = 0;
+        for (const item of data.items.added) {
+          const newProduct = {
+            name: item.name,
+            category: item.category || 'Sonstiges',
+            price: item.price?.replace(/^€/, '') || '0',
+            size: item.size || '–',
+            condition: item.condition || 'Gut',
+            images: item.images || [],
+            vinted_url: item.url,
+            sold: false
+          };
+          
+          const { error } = await supabase.from('products').insert(newProduct);
+          if (!error) savedCount++;
+          setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+        }
+        
+        toast(`${savedCount} von ${data.items.added.length} Items gespeichert`, 'success');
+        logActivity(user!.id, user!.username, 'Bulk Import', `${savedCount} Items importiert`);
+      }
+
+      if (data.items?.skipped?.length > 0) {
+        toast(`${data.items.skipped.length} verkaufte/reservierte Items übersprungen`, 'info');
+      }
+
+    } catch (e) {
+      toast('Fehler beim Bulk-Scrapen: ' + String(e), 'error');
+    } finally {
+      setLoading(false);
+      setProgress({ current: 0, total: 0 });
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // EINZELNES ITEM CHECKEN
+  // ═══════════════════════════════════════════════════════════
+  const checkSingleItem = async () => {
+    if (!url) {
+      toast('Bitte URL eingeben', 'error');
+      return;
+    }
+
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const res = await fetch('/api/vinted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'single', url, autoRemove }),
+      });
+
+      const data = await res.json();
+      setResult(data);
+
+      if (data.status === 'sold') {
+        toast('⚠️ Item ist VERKAUFT!', 'error');
+        if (autoRemove) {
+          const { data: products } = await supabase.from('products').select('*').ilike('vinted_url', `%${url}%`);
+          if (products && products.length > 0) {
+            await supabase.from('products').update({ sold: true }).eq('id', products[0].id);
+            toast('Produkt als verkauft markiert', 'success');
+          }
+        }
+      } else if (data.status === 'reserved') {
+        toast('Item ist reserviert', 'info');
+      } else {
+        toast('Item ist verfügbar', 'success');
+      }
+
+    } catch (e) {
+      toast('Fehler: ' + String(e), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // STATUS CHECK - ALLE PRODUKTE PRÜFEN (DIESE FUNKTION FEHLTE!)
+  // ═══════════════════════════════════════════════════════════
+  const checkStatus = async () => {
+    setLoading(true);
+    setResult(null);
+
+    try {
+      const { data: products, error } = await supabase.from('products').select('*').eq('sold', false);
+      if (error) {
+        toast('Fehler beim Laden der Produkte', 'error');
+        setLoading(false);
+        return;
+      }
+
+      if (!products || products.length === 0) {
+        toast('Keine aktiven Produkte gefunden', 'info');
+        setLoading(false);
+        return;
+      }
+
+      setProgress({ current: 0, total: products.length });
+      toast(`Prüfe ${products.length} Produkte...`, 'info');
+
+      const soldItems: any[] = [];
+      const reservedItems: any[] = [];
+
+      for (let i = 0; i < products.length; i++) {
+        const product = products[i];
+        try {
+          const res = await fetch('/api/vinted', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: 'single', url: product.vinted_url }),
+          });
+
+          const data = await res.json();
+
+          if (data.status === 'sold') {
+            soldItems.push({ ...product, ...data });
+            if (autoRemove) {
+              await supabase.from('products').update({ sold: true }).eq('id', product.id);
+            }
+          } else if (data.status === 'reserved') {
+            reservedItems.push({ ...product, ...data });
+          }
+
+          setProgress(prev => ({ ...prev, current: i + 1 }));
+          await new Promise(r => setTimeout(r, 500));
+        } catch (e) {
+          console.error(`Fehler bei Produkt ${product.id}:`, e);
+        }
+      }
+
+      const resultData = {
+        timestamp: new Date().toISOString(),
+        summary: {
+          total: products.length,
+          checked: products.length,
+          sold: soldItems.length,
+          reserved: reservedItems.length,
+          available: products.length - soldItems.length - reservedItems.length,
+          autoRemoved: autoRemove ? soldItems.length : 0,
+        },
+        soldItems: soldItems.map(s => ({ id: s.id, name: s.name, url: s.vinted_url })),
+        reservedItems: reservedItems.map(r => ({ id: r.id, name: r.name, url: r.vinted_url })),
+        message: autoRemove && soldItems.length > 0
+          ? `✅ ${products.length} geprüft, ${soldItems.length} als verkauft markiert`
+          : `✅ ${products.length} geprüft, ${soldItems.length} verkauft, ${reservedItems.length} reserviert`,
+      };
+
+      setResult(resultData);
+      toast(resultData.message, soldItems.length > 0 ? 'info' : 'success');
+      
+      if (soldItems.length > 0 || reservedItems.length > 0) {
+        logActivity(user!.id, user!.username, 'Status Check', `${soldItems.length} verkauft, ${reservedItems.length} reserviert`);
+      }
+
+    } catch (e) {
+      toast('Fehler beim Status-Check: ' + String(e), 'error');
+    } finally {
+      setLoading(false);
+      setProgress({ current: 0, total: 0 });
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════
+  return (
+    <div className="space-y-6">
+      {/* Sub-Tabs */}
+      <div className="flex gap-2 border-b border-[#FF4400]/30 pb-4">
+        <button
+          onClick={() => setActiveSubTab('bulk')}
+          className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'bulk' ? 'bg-green-600 text-white' : 'border border-green-600/30 text-green-500'}`}
+        >
+          <Globe className="w-4 h-4 inline mr-1"/> Bulk Import
+        </button>
+        <button
+          onClick={() => setActiveSubTab('status')}
+          className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'status' ? 'bg-blue-600 text-white' : 'border border-blue-600/30 text-blue-500'}`}
+        >
+          <RefreshCw className="w-4 h-4 inline mr-1"/> Status Check
+        </button>
+      </div>
+
+      {/* Auto-Remove Toggle */}
+      <div className="bg-[#111] border border-red-500/30 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-500" />
+          <div>
+            <p className="text-sm font-bold text-red-400">Auto-Remove Modus</p>
+            <p className="text-xs text-gray-500">Verkaufte Items automatisch aus dem Inventar entfernen</p>
+          </div>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoRemove}
+            onChange={(e) => setAutoRemove(e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+        </label>
+      </div>
+
+      {/* BULK IMPORT TAB */}
+      {activeSubTab === 'bulk' && (
+        <div className="bg-[#111] border border-green-500/30 p-6 space-y-4">
+          <h3 className="text-lg font-bold text-green-400 flex items-center gap-2">
+            <Globe className="w-5 h-5"/> Vinted Account Import
+          </h3>
+          <p className="text-sm text-gray-400">
+            Profil-URL einfügen (z.B. https://www.vinted.de/member/123456-username)
+          </p>
+          
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="https://www.vinted.de/member/... oder @username"
+              value={profileUrl}
+              onChange={(e) => setProfileUrl(e.target.value)}
+              className="flex-1 bg-[#1A1A1A] border border-green-500/30 px-4 py-3 text-sm"
+            />
+            <button
+              onClick={scrapeBulk}
+              disabled={loading}
+              className="px-6 py-3 bg-green-600 text-white text-xs font-bold uppercase disabled:opacity-50"
+            >
+              {loading ? `⏳ ${progress.current}/${progress.total}` : '📦 Importieren'}
+            </button>
+          </div>
+
+          {loading && progress.total > 0 && (
+            <div className="w-full bg-gray-800 rounded-full h-2">
+              <div 
+                className="bg-green-600 h-2 rounded-full transition-all"
+                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+              ></div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* STATUS CHECK TAB */}
+      {activeSubTab === 'status' && (
+        <div className="bg-[#111] border border-blue-500/30 p-6 space-y-4">
+          <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+            <RefreshCw className="w-5 h-5"/> Status Überwachung
+          </h3>
+          <p className="text-sm text-gray-400">
+            Prüft alle Produkte im Inventar auf Verfügbarkeit
+          </p>
+
+          {/* Einzelnes Item */}
+          <div className="border border-gray-700 p-4 space-y-2">
+            <p className="text-xs uppercase text-gray-500">Einzelnes Item prüfen</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Vinted URL..."
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"
+              />
+              <button
+                onClick={checkSingleItem}
+                disabled={loading}
+                className="px-4 py-3 bg-blue-600 text-white text-xs font-bold uppercase disabled:opacity-50"
+              >
+                {loading ? '...' : '🔍 Check'}
+              </button>
+            </div>
+          </div>
+
+          {/* Alle Items */}
+          <div className="border border-gray-700 p-4">
+            <button
+              onClick={checkStatus}
+              disabled={loading}
+              className="w-full py-4 bg-blue-600 text-white text-sm font-bold uppercase disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? `Prüfe... ${progress.current}/${progress.total}` : '🔄 Alle Produkte checken'}
+            </button>
+          </div>
+
+          {loading && progress.total > 0 && (
+            <div className="w-full bg-gray-800 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all"
+                style={{ width: `${(progress.current / progress.total) * 100}%` }}
+              ></div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ERGEBNIS ANZEIGE */}
+      {result && (
+        <div className="bg-[#111] border border-[#FF4400]/30 p-6">
+          <h3 className="text-lg font-bold text-[#FF4400] mb-4">Ergebnis</h3>
+          
+          {/* Summary */}
+          {result.summary && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+              <div className="bg-blue-500/10 border border-blue-500/30 p-3 text-center">
+                <div className="text-2xl font-bold text-blue-400">{result.summary.total}</div>
+                <div className="text-xs text-gray-500 uppercase">Gesamt</div>
+              </div>
+              <div className="bg-green-500/10 border border-green-500/30 p-3 text-center">
+                <div className="text-2xl font-bold text-green-400">{result.summary.available || (result.summary.total - result.summary.sold - (result.summary.reserved || 0))}</div>
+                <div className="text-xs text-gray-500 uppercase">Verfügbar</div>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 p-3 text-center">
+                <div className="text-2xl font-bold text-red-400">{result.summary.sold}</div>
+                <div className="text-xs text-gray-500 uppercase">Verkauft</div>
+              </div>
+              {result.summary.reserved !== undefined && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 text-center">
+                  <div className="text-2xl font-bold text-yellow-400">{result.summary.reserved}</div>
+                  <div className="text-xs text-gray-500 uppercase">Reserviert</div>
+                </div>
+              )}
+              <div className="bg-gray-500/10 border border-gray-500/30 p-3 text-center">
+                <div className="text-2xl font-bold text-gray-400">{result.summary.errors || 0}</div>
+                <div className="text-xs text-gray-500 uppercase">Fehler</div>
+              </div>
+            </div>
+          )}
+
+          {/* Status Badges */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {result.status && (
+              <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${
+                result.status === 'available' ? 'bg-green-500 text-white' :
+                result.status === 'sold' ? 'bg-red-500 text-white' :
+                result.status === 'reserved' ? 'bg-yellow-500 text-black' :
+                'bg-gray-500 text-white'
+              }`}>
+                {result.status}
+              </span>
+            )}
+          </div>
+
+          {result.message && <p className="text-sm text-gray-300 mb-4">{result.message}</p>}
+
+          {/* Verkaufte Items */}
+          {result.soldItems && result.soldItems.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-bold text-red-400 mb-2">🚨 Verkaufte Items ({result.soldItems.length})</h4>
+              <div className="bg-red-950/30 border border-red-500/30 rounded p-3 max-h-48 overflow-y-auto space-y-2">
+                {result.soldItems.map((item: any, i: number) => (
+                  <div key={i} className="text-sm border-b border-red-500/20 pb-2 last:border-0">
+                    <p className="font-medium text-gray-300">{item.name || 'Unbekannt'}</p>
+                    <p className="text-xs text-gray-500 truncate">{item.url}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Debug */}
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300 uppercase">Rohdaten</summary>
+            <pre className="mt-2 bg-black p-4 rounded text-xs text-gray-400 overflow-x-auto">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </details>
+        </div>
+      )}
+    </div>
+  );
+}
 
   // ═══════════════════════════════════════════════════════════
   // NEU - EINFÜGEN
