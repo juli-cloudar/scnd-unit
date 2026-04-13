@@ -299,15 +299,16 @@ function InventoryTab({ user, toast, confirm }: {
     return () => { supabase.removeChannel(channel); };
   }, [loadProducts]);
 
-  const markSold = (id: number, currentSold: boolean, productName: string) => {
-    if (!user?.permissions.canEditProducts) { toast('Keine Berechtigung!', 'error'); return; }
-    supabase.from('products').update({ sold: !currentSold }).eq('id', id).then(({ error }) => {
-      if (error) { toast('Fehler: ' + error.message, 'error'); return; }
-      const newStatus = !currentSold;
-      toast(newStatus ? 'Produkt als verkauft markiert' : 'Produkt reaktiviert', 'info');
-      logActivity(user.id, user.username, newStatus ? 'Produkt verkauft' : 'Produkt reaktiviert', `"${productName}"`);
-    });
-  };
+ const markSold = (id: number, currentSold: boolean, productName: string) => {
+  console.log('user:', user?.username, 'id:', user?.id);
+  if (!user?.permissions.canEditProducts) { toast('Keine Berechtigung!', 'error'); return; }
+  supabase.from('products').update({ sold: !currentSold }).eq('id', id).then(({ error }) => {
+    if (error) { toast('Fehler: ' + error.message, 'error'); return; }
+    const newStatus = !currentSold;
+    toast(newStatus ? 'Produkt als verkauft markiert' : 'Produkt reaktiviert', 'info');
+    logActivity(user.id, user.username, newStatus ? 'Produkt verkauft' : 'Produkt reaktiviert', `"${productName}"`);
+  });
+};
 
   const removeProduct = (id: number, productName: string) => {
     if (!user?.permissions.canDeleteProducts) { toast('Keine Berechtigung!', 'error'); return; }
