@@ -57,7 +57,6 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   if (isSold) status = 'sold';
   else if (isReserved) status = 'reserved';
 
-  // Bilder extrahieren
   const images: string[] = [];
   const imgMatches = html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g);
   for (const m of imgMatches) {
@@ -69,27 +68,22 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // Name extrahieren
   const titleMatch = html.match(/<title>([^<]+)/i);
   const name = titleMatch ? titleMatch[1].replace(' | Vinted', '').trim() : '';
 
-  // Preis extrahieren
   let price = '';
   const priceMatch = html.match(/(\d{1,3}(?:[.,]\d{2})?)\s*€/);
   if (priceMatch) price = priceMatch[1].replace(',', '.');
 
-  // Größe extrahieren
   let size = '';
   const sizeMatch = html.match(/Größe<\/dt>\s*<dd[^>]*>([^<]+)/i) || 
                     html.match(/"size"[:\s]*"([^"]+)"/i);
   if (sizeMatch) size = sizeMatch[1].trim();
 
-  // Zustand extrahieren
   let condition = '';
   const conditionMatch = html.match(/Zustand<\/dt>\s*<dd[^>]*>([^<]+)/i);
   if (conditionMatch) condition = conditionMatch[1].trim();
 
-  // Kategorie bestimmen
   let category = 'Sonstiges';
   const nameLower = name.toLowerCase();
   if (nameLower.includes('jacke') || nameLower.includes('jacket')) category = 'Jacken';
@@ -116,9 +110,11 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
 }
 
 async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
+  console.log(`[Scrape] Fetching: ${url}`);
   try {
     const response = await fetchWithTimeout(url);
     if (!response.ok) {
+      console.log(`[Scrape] HTTP ${response.status} for ${url}`);
       return { 
         itemId: null, url, status: 'sold', name: '', price: '', size: '', 
         condition: '', category: 'Sonstiges', images: [], 
@@ -126,8 +122,12 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
         message: `HTTP ${response.status}` 
       };
     }
-    return extractItemFromHTML(await response.text(), url);
+    const html = await response.text();
+    const result = extractItemFromHTML(html, url);
+    console.log(`[Scrape] Success: ${result.name} - ${result.status}`);
+    return result;
   } catch (error) {
+    console.error(`[Scrape] Error for ${url}:`, error);
     return { 
       itemId: null, url, status: 'sold', name: '', price: '', size: '', 
       condition: '', category: 'Sonstiges', images: [], 
@@ -137,30 +137,58 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   }
 }
 
-async function getAllUserItems(memberUrl: string): Promise<string[]> {
+// ⭐⭐⭐ VERBESSERTE getAllUserItems - unterstützt verschiedene Eingabeformate ⭐⭐⭐
+async function getAllUserItems(memberInput: string): Promise<string[]> {
   const urls: string[] = [];
+  
+  // Extrahiere die numerische Member-ID aus verschiedenen Formaten
+  let memberId = '';
+  
+  // Entferne Leerzeichen
+  memberInput = memberInput.trim();
+  
+  // Fall 1: Nur eine Zahl
+  if (/^\d+$/.test(memberInput)) {
+    memberId = memberInput;
+  }
+  // Fall 2: URL mit /member/Zahl-Name
+  else {
+    const match = memberInput.match(/\/member\/(\d+)/);
+    if (match) {
+      memberId = match[1];
+    } else {
+      // Fall 3: Nur die Zahl mit eventuellem Text dahinter (z.B. "3138250645-scndunit")
+      const numMatch = memberInput.match(/^(\d+)/);
+      if (numMatch) {
+        memberId = numMatch[1];
+      }
+    }
+  }
+  
+  if (!memberId) {
+    console.error('[Vinted] Could not extract member ID from:', memberInput);
+    return [];
+  }
+  
+  console.log(`[Vinted] Member ID: ${memberId}`);
+  
   let page = 1;
   const maxPages = 20;
   
-  // Extrahiere Member-ID aus URL
-  const memberMatch = memberUrl.match(/\/member\/(\d+)-[^\/?#]+/);
-  if (!memberMatch) {
-    console.error('Invalid member URL:', memberUrl);
-    return [];
-  }
-  const memberId = memberMatch[1];
-
   while (page <= maxPages) {
     const profileUrl = `https://www.vinted.de/member/${memberId}?page=${page}`;
-    console.log(`Fetching page ${page}: ${profileUrl}`);
+    console.log(`[Vinted] Fetching page ${page}: ${profileUrl}`);
     
     try {
       const response = await fetchWithTimeout(profileUrl, 10000);
-      if (!response.ok) break;
+      if (!response.ok) {
+        console.log(`[Vinted] HTTP ${response.status} on page ${page}`);
+        break;
+      }
       
       const html = await response.text();
       
-      // Finde alle Item-Links
+      // Finde alle Item-Links mit verschiedenen Patterns
       const itemMatches = html.matchAll(/href="(\/items\/\d+[^"?#]*)"/g);
       let found = 0;
       for (const match of itemMatches) {
@@ -171,25 +199,31 @@ async function getAllUserItems(memberUrl: string): Promise<string[]> {
         }
       }
       
-      console.log(`Page ${page}: found ${found} items`);
+      console.log(`[Vinted] Page ${page}: found ${found} items (total: ${urls.length})`);
       
       // Prüfe auf nächste Seite
-      const hasNext = html.includes(`page=${page + 1}`) || html.includes('rel="next"');
-      if (!hasNext || found === 0) break;
+      const hasNext = html.includes(`page=${page + 1}`) || 
+                      html.includes('rel="next"') ||
+                      html.includes('>Weiter<');
+      
+      if (!hasNext || found === 0) {
+        console.log(`[Vinted] No more pages`);
+        break;
+      }
       
       page++;
       await new Promise(r => setTimeout(r, 500));
     } catch (err) {
-      console.error(`Error fetching page ${page}:`, err);
+      console.error(`[Vinted] Error fetching page ${page}:`, err);
       break;
     }
   }
   
-  console.log(`Total unique items found: ${urls.length}`);
+  console.log(`[Vinted] Total unique items found: ${urls.length}`);
   return urls;
 }
 
-// ⭐⭐⭐ POST MUSS ZUERST KOMMEN ⭐⭐⭐
+// ⭐⭐⭐ POST - Unterstützt Single und Bulk ⭐⭐⭐
 export async function POST(request: Request) {
   console.log('[API] POST received');
   
@@ -199,11 +233,19 @@ export async function POST(request: Request) {
     
     const { mode, profileUrl, url, quick = false } = body;
 
-    // ── BULK MODE (Member-URL) ──
+    // ── SINGLE MODE (Item-URL) ──
+    if (mode === 'single' && url) {
+      console.log('[API] Single mode for:', url);
+      const data = await scrapeSingleItem(url);
+      return NextResponse.json(data, { headers: CORS });
+    }
+
+    // ── BULK MODE (Member-URL oder Member-ID) ──
     if (mode === 'bulk' && profileUrl) {
       console.log('[API] Bulk mode for:', profileUrl);
       
       const allUrls = await getAllUserItems(profileUrl);
+      console.log(`[API] Found ${allUrls.length} total items`);
       
       if (quick === true) {
         return NextResponse.json({
@@ -215,8 +257,9 @@ export async function POST(request: Request) {
       
       // Bulk mit Scraping
       const results: ScrapeResult[] = [];
-      for (const itemUrl of allUrls) {
-        const result = await scrapeSingleItem(itemUrl);
+      for (let i = 0; i < allUrls.length; i++) {
+        console.log(`[API] Scraping ${i + 1}/${allUrls.length}`);
+        const result = await scrapeSingleItem(allUrls[i]);
         results.push(result);
         await new Promise(r => setTimeout(r, 300));
       }
@@ -234,13 +277,6 @@ export async function POST(request: Request) {
         items: available,
         message: `${available.length} verfügbare Items gefunden`
       }, { headers: CORS });
-    }
-
-    // ── SINGLE MODE (Item-URL) ──
-    if (mode === 'single' && url) {
-      console.log('[API] Single mode for:', url);
-      const data = await scrapeSingleItem(url);
-      return NextResponse.json(data, { headers: CORS });
     }
 
     return NextResponse.json({ 
