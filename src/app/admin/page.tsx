@@ -227,7 +227,14 @@ function VintedToolsTab({ user, toast, confirm }: {
   const [singleResult, setSingleResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
- 
+ // ⭐⭐⭐ JSON IMPORT - Datei-Upload Handler ⭐⭐⭐
+const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setUploadedFile(file);
+  setImportResult(null);
+};
+  
   const processImport = async () => {
   if (!uploadedFile) {
     toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
