@@ -6,8 +6,8 @@ import {
   Instagram, MessageCircle, ArrowRight, MapPin,
   Clock, Shield, ExternalLink, Menu, X, Filter,
   Upload, RefreshCw, AlertCircle, CheckCircle, Database,
-  LayoutGrid, List, Minimize2
-} from 'lucide-react'
+  LayoutGrid, List, Minimize2, Search
+} from 'lucide-react';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
