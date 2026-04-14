@@ -142,6 +142,7 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
 async function getAllUserItems(memberInput: string): Promise<string[]> {
   const urls: string[] = [];
   
+  // Extrahiere Member-ID
   let memberId = '';
   memberInput = memberInput.trim();
   
@@ -162,6 +163,38 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
   
   console.log(`[Vinted] Member ID: ${memberId}`);
   
+  // ⭐ VERSUCHE ZUERST DIE VINTED API ⭐
+  try {
+    const apiUrl = `https://www.vinted.de/api/v2/members/${memberId}/items?page=1&per_page=100`;
+    console.log(`[Vinted] Trying API: ${apiUrl}`);
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+        'Referer': 'https://www.vinted.de/',
+      },
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.items && Array.isArray(data.items)) {
+        for (const item of data.items) {
+          if (item.url) {
+            const fullUrl = item.url.startsWith('http') ? item.url : `https://www.vinted.de${item.url}`;
+            urls.push(fullUrl);
+          }
+        }
+        console.log(`[Vinted] API found ${urls.length} items`);
+        if (urls.length > 0) return urls;
+      }
+    }
+  } catch (err) {
+    console.log('[Vinted] API failed, trying HTML scraping');
+  }
+  
+  // ⭐ FALLBACK: HTML SCRAPING (dein bestehender Code)
   let page = 1;
   const maxPages = 20;
   
@@ -170,7 +203,16 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
     console.log(`[Vinted] Fetching page ${page}: ${profileUrl}`);
     
     try {
-      const response = await fetchWithTimeout(profileUrl, 10000);
+      const response = await fetch(profileUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+          'Cache-Control': 'no-cache',
+          'Referer': 'https://www.vinted.de/',
+        },
+      });
+      
       if (!response.ok) {
         console.log(`[Vinted] HTTP ${response.status} on page ${page}`);
         break;
@@ -194,15 +236,12 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
                       html.includes('rel="next"') ||
                       html.includes('>Weiter<');
       
-      if (!hasNext || found === 0) {
-        console.log(`[Vinted] No more pages`);
-        break;
-      }
+      if (!hasNext || found === 0) break;
       
       page++;
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 1000));
     } catch (err) {
-      console.error(`[Vinted] Error fetching page ${page}:`, err);
+      console.error(`[Vinted] Error:`, err);
       break;
     }
   }
@@ -210,7 +249,6 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
   console.log(`[Vinted] Total unique items found: ${urls.length}`);
   return urls;
 }
-
 // ⭐⭐⭐ BULK API ENDPUNKT ⭐⭐⭐
 export async function POST(request: Request) {
   console.log('[Bulk API] POST received');
