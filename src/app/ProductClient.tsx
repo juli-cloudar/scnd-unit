@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
-  Clock, Shield, ExternalLink, Menu, X, Filter
+  Clock, Shield, ExternalLink, Menu, X, Filter,
+  Upload, RefreshCw, AlertCircle, CheckCircle, Database
 } from 'lucide-react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -104,12 +106,165 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
   )
 }
 
+// ============================================
+// NEU: Vinted Import Komponente (nur für Admins)
+// ============================================
+function VintedImportButton({ onImportComplete }: { onImportComplete: () => void }) {
+  const [isImporting, setIsImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; error?: string } | null>(null)
+  const supabase = createClientComponentClient()
+
+  const handleImport = async () => {
+    setIsImporting(true)
+    setImportResult(null)
+    
+    try {
+      // 1. Lade die JSON-Datei aus dem public-Ordner
+      const response = await fetch('/vinted-items.json')
+      if (!response.ok) {
+        throw new Error('Keine vinted-items.json Datei gefunden. Bitte zuerst mit der Chrome Extension exportieren!')
+      }
+      
+      const items = await response.json()
+      
+      let success = 0
+      let failed = 0
+      
+      // 2. Importiere jeden Artikel in Supabase
+      for (const item of items) {
+        const photoUrl = item.photo || (item.photos && item.photos[0]) || ''
+        
+        const { error } = await supabase
+          .from('products')
+          .upsert({
+            id: item.id,
+            name: item.title,
+            price: item.price,
+            size: item.size || '',
+            condition: item.status || item.condition || 'Gut',
+            images: [photoUrl],
+            vinted_url: item.url,
+            category: item.brand || 'Vintage',
+            sold: false,
+          }, { onConflict: 'id' })
+        
+        if (error) {
+          failed++
+          console.error(`Fehler bei ${item.title}:`, error)
+        } else {
+          success++
+        }
+      }
+      
+      setImportResult({ success, failed })
+      
+      // 3. Lade die Seite neu, um die neuen Produkte anzuzeigen
+      if (success > 0) {
+        setTimeout(() => {
+          onImportComplete()
+        }, 1500)
+      }
+      
+    } catch (error: any) {
+      setImportResult({ success: 0, failed: 0, error: error.message })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  return (
+    <div className="mb-8 p-4 bg-[#1A1A1A] border border-[#FF4400]/30 rounded-lg">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <Database className="w-5 h-5 text-[#FF4400]" />
+          <div>
+            <h3 className="font-bold uppercase tracking-widest text-sm">Vinted Import</h3>
+            <p className="text-xs text-gray-500">Importiere die exportierte JSON-Datei in die Datenbank</p>
+          </div>
+        </div>
+        <button
+          onClick={handleImport}
+          disabled={isImporting}
+          className="flex items-center gap-2 px-4 py-2 bg-[#FF4400] text-white text-sm uppercase tracking-widest hover:bg-[#FF4400]/80 disabled:opacity-50 transition-all"
+        >
+          {isImporting ? (
+            <><RefreshCw className="w-4 h-4 animate-spin" /> Importiere...</>
+          ) : (
+            <><Upload className="w-4 h-4" /> JSON importieren</>
+          )}
+        </button>
+      </div>
+      
+      {importResult && (
+        <div className={`mt-3 p-3 text-sm rounded ${importResult.error ? 'bg-red-500/10 text-red-400 border border-red-500/30' : 'bg-green-500/10 text-green-400 border border-green-500/30'}`}>
+          {importResult.error ? (
+            <div className="flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {importResult.error}</div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              ✅ {importResult.success} Artikel importiert {importResult.failed > 0 && `, ❌ ${importResult.failed} fehlgeschlagen`}
+            </div>
+          )}
+        </div>
+      )}
+      
+      <div className="mt-3 text-xs text-gray-600 border-t border-[#0A0A0A] pt-3">
+        <p className="uppercase tracking-wider">📋 So funktioniert's:</p>
+        <ol className="list-decimal list-inside mt-1 space-y-1">
+          <li>Öffne Chrome und gehe zu <span className="text-[#FF4400]">vinted.de/member/3138250645-scndunit</span></li>
+          <li>Klicke auf die <span className="text-[#FF4400]">"Vinted Scraper - One-Click Data Export"</span> Extension</li>
+          <li>Wähle <span className="text-[#FF4400]">"Export" → Format: JSON</span></li>
+          <li>Die Datei landet automatisch im <span className="text-[#FF4400]">/public</span> Ordner</li>
+          <li>Klicke oben auf <span className="text-[#FF4400]">"JSON importieren"</span></li>
+        </ol>
+      </div>
+    </div>
+  )
+}
+
 export function ProductClient({ initialProducts }: ProductClientProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [loading, setLoading] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [activeCategory, setActiveCategory] = useState("Alle")
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Prüfe ob Admin (optional: mit Supabase Auth)
+  useEffect(() => {
+    // Du kannst hier deine Admin-Prüfung einbauen
+    // Z.B. über einen Environment Variable oder Supabase Session
+    const checkAdmin = async () => {
+      // Option 1: Über Supabase Session
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsAdmin(!!session)
+      
+      // Option 2: Über Environment Variable (nur für Entwicklung)
+      // setIsAdmin(process.env.NEXT_PUBLIC_ADMIN_MODE === 'true')
+    }
+    checkAdmin()
+  }, [])
+
+  // Funktion zum Neuladen der Produkte nach Import
+  const refreshProducts = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/products')
+      if (response.ok) {
+        const newProducts = await response.json()
+        setProducts(newProducts)
+      } else {
+        // Fallback: Seite neu laden
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error('Fehler beim Neuladen:', error)
+      window.location.reload()
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50)
@@ -197,6 +352,10 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">CURRENT_<span className="text-[#FF4400]">INVENTORY</span></h2>
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
+          
+          {/* NEU: Vinted Import Button (nur für Admins sichtbar) */}
+          {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
+          
           <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-12 flex-wrap">
             <Filter className="w-4 h-4 text-[#FF4400]" />
             {allCategories.map(cat => (
@@ -206,6 +365,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
               </button>
             ))}
           </motion.div>
+          
           {loading ? (
             <div className="text-center py-20 text-gray-500 uppercase tracking-widest">Lade...</div>
           ) : (
@@ -234,6 +394,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
               </motion.div>
             </AnimatePresence>
           )}
+          
           <div className="mt-16 text-center">
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest">
               Alle Artikel auf Vinted <ExternalLink className="w-4 h-4" />
