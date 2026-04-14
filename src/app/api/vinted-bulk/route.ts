@@ -1,7 +1,6 @@
-// src/app/api/vinted-bulk/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const SCRAPINGANT_API_KEY = process.env.SCRAPINGANT_API_KEY;
+const BROWSABLE_API_KEY = process.env.BROWSABLE_API_KEY;
 
 function extractMemberId(input: string): string | null {
   const clean = input.trim();
@@ -11,18 +10,6 @@ function extractMemberId(input: string): string | null {
   const urlMatch = clean.match(/member\/(\d+)/);
   if (urlMatch) return urlMatch[1];
   return null;
-}
-
-function extractDomain(input: string): string {
-  try {
-    if (input.includes('vinted.')) {
-      const url = new URL(input.trim());
-      return url.hostname.replace('www.', '');
-    }
-  } catch {
-    return 'vinted.de';
-  }
-  return 'vinted.de';
 }
 
 export async function OPTIONS() {
@@ -38,130 +25,92 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[API] Request received');
-
-    const contentType = request.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
+    if (!BROWSABLE_API_KEY) {
       return NextResponse.json(
-        { error: `Invalid Content-Type: ${contentType}` },
-        { status: 400 }
-      );
-    }
-
-    if (!SCRAPINGANT_API_KEY) {
-      return NextResponse.json(
-        { error: 'API key not configured' },
+        { error: 'BROWSABLE_API_KEY nicht konfiguriert' },
         { status: 500 }
       );
     }
 
-    // ✅ Body parsen (unterstützt BEIDE Formate)
-    let body;
-    try {
-      body = await request.json();
-      console.log('[API] Body:', body);
-    } catch (parseError) {
-      return NextResponse.json(
-        { error: 'Invalid JSON' },
-        { status: 400 }
-      );
-    }
+    const body = await request.json();
+    const { profileUrl, urls } = body;
 
-    // ✅ BEIDE Formate unterstützen:
-    // Format 1: { urls: ['...'] }  (neu)
-    // Format 2: { profileUrl: '...', quick: true }  (alt/Frontend)
-    
-    let urls: string[] = [];
-    
-    if (body.urls && Array.isArray(body.urls)) {
-      // Neues Format
-      urls = body.urls;
-    } else if (body.profileUrl && typeof body.profileUrl === 'string') {
-      // Altes Format (Frontend sendet das!)
-      urls = [body.profileUrl];
+    // Unterstütze beide Formate
+    let targetUrls: string[] = [];
+    if (profileUrl && typeof profileUrl === 'string') {
+      targetUrls = [profileUrl];
+    } else if (urls && Array.isArray(urls)) {
+      targetUrls = urls;
     } else {
       return NextResponse.json(
-        { error: 'Expected { urls: string[] } or { profileUrl: string }' },
+        { error: 'profileUrl oder urls erforderlich' },
         { status: 400 }
       );
     }
 
-    if (urls.length === 0) {
+    if (targetUrls.length === 0) {
       return NextResponse.json(
-        { error: 'No URLs provided' },
-        { status: 400 }
-      );
-    }
-
-    if (urls.length > 3) {
-      return NextResponse.json(
-        { error: 'Max 3 URLs allowed' },
+        { error: 'Keine URLs angegeben' },
         { status: 400 }
       );
     }
 
     const results: Record<string, any> = {};
 
-    for (const urlInput of urls) {
-      if (typeof urlInput !== 'string') {
-        results[String(urlInput)] = { 
-          success: false, 
-          error: `URL must be string, got ${typeof urlInput}` 
-        };
-        continue;
-      }
-
-      const cleanUrl = urlInput.trim();
+    for (const url of targetUrls) {
+      const cleanUrl = url.trim();
       const memberId = extractMemberId(cleanUrl);
-      const domain = extractDomain(cleanUrl);
 
       if (!memberId) {
-        results[cleanUrl] = { 
-          success: false, 
-          error: `Could not extract member ID from: ${cleanUrl}` 
-        };
+        results[cleanUrl] = { success: false, error: 'Konnte Member ID nicht extrahieren' };
         continue;
       }
 
       try {
-        const targetUrl = `https://www.${domain}/api/v2/users/${memberId}/items?page=1&per_page=48`;
-        const encodedTarget = encodeURIComponent(targetUrl);
-        
-        const proxyUrl = `https://api.scrapingant.com/v2/general?url=${encodedTarget}&x-api-key=${SCRAPINGANT_API_KEY}&browser=false`;
+        // Browsable API - Vinted Member Items
+        const apiUrl = `https://api.browsable.app/v1/vinted/member/items?member_url=${encodeURIComponent(cleanUrl)}&pages=1&per_page=48`;
 
-        console.log(`[API] Calling ScrapingAnt for ${cleanUrl}`);
+        console.log(`[Browsable] Request: ${apiUrl}`);
 
-        const response = await fetch(proxyUrl, {
+        const response = await fetch(apiUrl, {
           method: 'GET',
-          headers: { 'Accept': 'application/json' },
+          headers: {
+            'Authorization': `Bearer ${BROWSABLE_API_KEY}`,
+            'Accept': 'application/json',
+          },
         });
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`ScrapingAnt error ${response.status}: ${errorText}`);
+          throw new Error(`Browsable API Fehler ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
+        console.log(`[Browsable] Response:`, data);
 
-        const items = (data.items || []).map((item: any) => ({
-          id: item.id,
-          title: item.title || 'Unknown',
-          price: item.price ? `${item.price.amount} ${item.price.currency}` : 'N/A',
-          url: `https://www.${domain}/items/${item.id}`,
-          thumbnail: item.photos?.[0]?.url,
-        }));
+        // Browsable gibt items direkt zurück oder in data.items
+        const items = data.items || data.data?.items || [];
 
         results[cleanUrl] = {
           success: true,
-          items,
+          items: items.map((item: any) => ({
+            id: item.id || item.item_id,
+            title: item.title || 'Unbekannt',
+            price: item.price ? `${item.price} ${item.currency || 'EUR'}` : 'Preis unbekannt',
+            url: item.url || `https://www.vinted.de/items/${item.id}`,
+            thumbnail: item.photo?.url || item.thumbnail || item.image,
+            brand: item.brand,
+            size: item.size,
+          })),
           count: items.length,
+          source: 'browsable',
         };
 
       } catch (error: any) {
-        console.error(`[API] Error for ${cleanUrl}:`, error);
-        results[cleanUrl] = { 
-          success: false, 
-          error: error.message 
+        console.error(`[Browsable] Fehler für ${cleanUrl}:`, error);
+        results[cleanUrl] = {
+          success: false,
+          error: error.message,
         };
       }
     }
@@ -173,9 +122,9 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[API] Unhandled error:', error);
+    console.error('[API] Fehler:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Server Fehler', details: error.message },
       { status: 500 }
     );
   }
@@ -183,9 +132,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    status: 'Vinted Bulk Scraper (ScrapingAnt)',
-    version: '3.1',
-    apiKeyConfigured: !!SCRAPINGANT_API_KEY,
-    formats: ['{ urls: string[] }', '{ profileUrl: string }'],
+    status: 'Vinted Bulk Scraper (Browsable API)',
+    version: '4.0',
+    apiKeyConfigured: !!BROWSABLE_API_KEY,
+    endpoints: {
+      POST: '/api/vinted-bulk - Body: { profileUrl: string } oder { urls: string[] }',
+    },
   });
 }
