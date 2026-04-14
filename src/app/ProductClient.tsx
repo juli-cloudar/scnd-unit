@@ -7,7 +7,6 @@ import {
   Clock, Shield, ExternalLink, Menu, X, Filter,
   Upload, RefreshCw, AlertCircle, CheckCircle, Database
 } from 'lucide-react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -107,12 +106,11 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
 }
 
 // ============================================
-// NEU: Vinted Import Komponente (nur für Admins)
+// Vinted Import Komponente (ohne zusätzliche Pakete)
 // ============================================
 function VintedImportButton({ onImportComplete }: { onImportComplete: () => void }) {
   const [isImporting, setIsImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ success: number; failed: number; error?: string } | null>(null)
-  const supabase = createClientComponentClient()
 
   const handleImport = async () => {
     setIsImporting(true)
@@ -127,39 +125,19 @@ function VintedImportButton({ onImportComplete }: { onImportComplete: () => void
       
       const items = await response.json()
       
-      let success = 0
-      let failed = 0
+      // 2. Importiere jeden Artikel (via API-Route)
+      const importResponse = await fetch('/api/import-vinted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items })
+      })
       
-      // 2. Importiere jeden Artikel in Supabase
-      for (const item of items) {
-        const photoUrl = item.photo || (item.photos && item.photos[0]) || ''
-        
-        const { error } = await supabase
-          .from('products')
-          .upsert({
-            id: item.id,
-            name: item.title,
-            price: item.price,
-            size: item.size || '',
-            condition: item.status || item.condition || 'Gut',
-            images: [photoUrl],
-            vinted_url: item.url,
-            category: item.brand || 'Vintage',
-            sold: false,
-          }, { onConflict: 'id' })
-        
-        if (error) {
-          failed++
-          console.error(`Fehler bei ${item.title}:`, error)
-        } else {
-          success++
-        }
-      }
+      const result = await importResponse.json()
       
-      setImportResult({ success, failed })
+      setImportResult({ success: result.success, failed: result.failed })
       
       // 3. Lade die Seite neu, um die neuen Produkte anzuzeigen
-      if (success > 0) {
+      if (result.success > 0) {
         setTimeout(() => {
           onImportComplete()
         }, 1500)
@@ -230,20 +208,14 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [activeCategory, setActiveCategory] = useState("Alle")
   const [isAdmin, setIsAdmin] = useState(false)
 
-  // Prüfe ob Admin (optional: mit Supabase Auth)
+  // Prüfe ob Admin (einfache Lösung: über Environment Variable oder localStorage)
   useEffect(() => {
-    // Du kannst hier deine Admin-Prüfung einbauen
-    // Z.B. über einen Environment Variable oder Supabase Session
-    const checkAdmin = async () => {
-      // Option 1: Über Supabase Session
-      const supabase = createClientComponentClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      setIsAdmin(!!session)
-      
-      // Option 2: Über Environment Variable (nur für Entwicklung)
-      // setIsAdmin(process.env.NEXT_PUBLIC_ADMIN_MODE === 'true')
-    }
-    checkAdmin()
+    // Option: Über localStorage (kannst du manuell setzen)
+    const adminMode = localStorage.getItem('admin_mode') === 'true'
+    setIsAdmin(adminMode)
+    
+    // Oder: Über Meta-Environment (für Entwicklung)
+    // setIsAdmin(process.env.NODE_ENV === 'development')
   }, [])
 
   // Funktion zum Neuladen der Produkte nach Import
@@ -255,7 +227,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         const newProducts = await response.json()
         setProducts(newProducts)
       } else {
-        // Fallback: Seite neu laden
         window.location.reload()
       }
     } catch (error) {
@@ -353,7 +324,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
           
-          {/* NEU: Vinted Import Button (nur für Admins sichtbar) */}
+          {/* Vinted Import Button (nur für Admins sichtbar) */}
           {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
           
           <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-12 flex-wrap">
