@@ -339,15 +339,15 @@ const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filt
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
           
-                    {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
+                             {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
           
-          {/* Verbesserte Filter mit Custom Scrollbar */}
+          {/* Filter mit horizontalem Scroll und Sortierung */}
           <div className="mb-8 space-y-6">
-            {/* Marken - alphabetisch sortiert */}
+            {/* Marken - alphabetisch sortiert mit horizontalem Scroll */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 bg-[#FF4400]"></div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest">Nach Marke filtern</p>
+                <p className="text-xs text-gray-400 uppercase tracking-widest">Marken</p>
               </div>
               <div className="relative">
                 <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
@@ -373,17 +373,17 @@ const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filt
                       </button>
                     ))}
                 </div>
-                {/* Gradient für Scroll-Indikator (links/rechts) */}
+                {/* Gradient für Scroll-Indikator */}
                 <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
                 <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
               </div>
             </div>
             
-            {/* Kategorien - mit definierter Reihenfolge */}
+            {/* Kategorien - mit definierter Reihenfolge und horizontalem Scroll */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 bg-[#FF4400]"></div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest">Nach Kategorie filtern</p>
+                <p className="text-xs text-gray-400 uppercase tracking-widest">Kategorien</p>
               </div>
               <div className="relative">
                 <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
@@ -423,7 +423,7 @@ const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filt
             </div>
           </div>
           
-          {loading ? (    
+          {loading ? (
             <div className="text-center py-20 text-gray-500 uppercase tracking-widest">Lade...</div>
           ) : (
             <AnimatePresence mode="wait">
