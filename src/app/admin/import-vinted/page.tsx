@@ -2,12 +2,11 @@
 'use client';
 
 import { useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabaseServer } from '@/lib/supabase';
 
 export default function ImportVintedPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
-  const supabase = createClientComponentClient();
 
   const handleImport = async () => {
     setLoading(true);
@@ -26,13 +25,12 @@ export default function ImportVintedPage() {
       
       // Importiere jeden Artikel in Supabase
       for (const item of items) {
-        // Extrahiere die erste Foto-URL
         const photoUrl = item.photo || (item.photos && item.photos[0]) || '';
         
-        const { error } = await supabase
+        const { error } = await supabaseServer
           .from('products')
           .upsert({
-            id: item.id, // Vinted ID als eigene ID verwenden
+            id: item.id,
             name: item.title,
             price: item.price,
             size: item.size || '',
@@ -52,6 +50,13 @@ export default function ImportVintedPage() {
       }
       
       setResult({ success, failed, errors });
+      
+      if (success > 0) {
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      }
+      
     } catch (error: any) {
       setResult({ success: 0, failed: 0, errors: [error.message] });
     } finally {
