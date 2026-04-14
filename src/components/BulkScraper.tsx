@@ -1,7 +1,7 @@
 // src/components/BulkScraper.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface ScrapeResult {
   success: boolean;
@@ -17,13 +17,15 @@ export default function BulkScraper() {
   const [loading, setLoading] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
-  const handleScrape = async () => {
-    // ✅ URLs bereinigen (Leerzeichen entfernen!)
-    const urlList = urls
+  // ✅ urlList als useMemo (immer verfügbar)
+  const urlList = useMemo(() => {
+    return urls
       .split('\n')
       .map(u => u.trim())
       .filter(u => u.length > 0);
+  }, [urls]);
 
+  const handleScrape = async () => {
     console.log('[DEBUG] URLs nach Bereinigung:', urlList);
 
     if (urlList.length === 0) {
@@ -57,11 +59,9 @@ export default function BulkScraper() {
       });
 
       console.log('[DEBUG] Response Status:', response.status);
-      console.log('[DEBUG] Response Headers:', Object.fromEntries(response.headers.entries()));
 
       setDebugInfo(`Status: ${response.status}`);
 
-      // ✅ Wichtig: Response Text holen für Debugging
       const responseText = await response.text();
       console.log('[DEBUG] Response Text:', responseText.substring(0, 500));
 
@@ -94,7 +94,6 @@ export default function BulkScraper() {
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
       <h1>Vinted Bulk Scraper</h1>
       
-      {/* ✅ Debug Info anzeigen */}
       {debugInfo && (
         <div style={{ 
           padding: '10px', 
