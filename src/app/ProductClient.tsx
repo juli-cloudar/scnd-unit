@@ -1,11 +1,12 @@
-'use client' 
+'use client'
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
   Clock, Shield, ExternalLink, Menu, X, Filter,
-  Upload, RefreshCw, AlertCircle, CheckCircle, Database
+  Upload, RefreshCw, AlertCircle, CheckCircle, Database,
+  LayoutGrid, List, Minimize2
 } from 'lucide-react'
 
 const fadeIn = {
@@ -205,14 +206,14 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [scrolled, setScrolled] = useState(false)
   const [activeCategory, setActiveCategory] = useState("Alle")
   const [activeBrand, setActiveBrand] = useState("Alle")
-  const [isAdmin, setIsAdmin] = useState(false)  // ⭐ NUR EINMAL!
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'compact'>('grid')
 
   useEffect(() => {
     const adminMode = localStorage.getItem('admin_mode') === 'true'
     setIsAdmin(adminMode)
   }, [])
 
-  // ⭐ refreshProducts Funktion
   const refreshProducts = async () => {
     setLoading(true)
     try {
@@ -237,7 +238,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // ⭐ Filter Definitionen
   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
   const allCategories = ["Alle", ...fixedCategories];
   const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
@@ -247,6 +247,15 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false
     return true
   })
+
+  const viewButtonClass = (mode: 'grid' | 'list' | 'compact') => `
+    p-2 transition-all duration-200 rounded-sm
+    ${viewMode === mode 
+      ? 'bg-[#FF4400] text-white' 
+      : 'bg-[#1A1A1A] border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'
+    }
+  `;
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
@@ -323,11 +332,11 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
           
-                             {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
+          {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
           
-          {/* Filter mit horizontalem Scroll und Sortierung */}
+          {/* Filter mit horizontalem Scroll */}
           <div className="mb-8 space-y-6">
-            {/* Marken - alphabetisch sortiert mit horizontalem Scroll */}
+            {/* Marken Filter */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -343,27 +352,23 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                     }`}>
                     Alle
                   </button>
-                  {allBrands
-                    .filter(b => b !== "Alle")
-                    .sort((a, b) => a.localeCompare(b, 'de'))
-                    .map(b => (
-                      <button key={b} onClick={() => setActiveBrand(b)}
-                        className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
-                          activeBrand === b 
-                            ? 'bg-[#FF4400] text-white' 
-                            : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                        }`}>
-                        {b}
-                      </button>
-                    ))}
+                  {allBrands.filter(b => b !== "Alle").map(b => (
+                    <button key={b} onClick={() => setActiveBrand(b)}
+                      className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                        activeBrand === b 
+                          ? 'bg-[#FF4400] text-white' 
+                          : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                      }`}>
+                      {b}
+                    </button>
+                  ))}
                 </div>
-                {/* Gradient für Scroll-Indikator */}
                 <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
                 <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
               </div>
             </div>
             
-            {/* Kategorien - mit definierter Reihenfolge und horizontalem Scroll */}
+            {/* Kategorien Filter */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -379,27 +384,16 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                     }`}>
                     Alle
                   </button>
-                  {allCategories
-                    .filter(c => c !== "Alle")
-                    .sort((a, b) => {
-                      const order = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
-                      const indexA = order.indexOf(a);
-                      const indexB = order.indexOf(b);
-                      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                      if (indexA !== -1) return -1;
-                      if (indexB !== -1) return 1;
-                      return a.localeCompare(b, 'de');
-                    })
-                    .map(cat => (
-                      <button key={cat} onClick={() => setActiveCategory(cat)}
-                        className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
-                          activeCategory === cat 
-                            ? 'bg-[#FF4400] text-white' 
-                            : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                        }`}>
-                        {cat}
-                      </button>
-                    ))}
+                  {allCategories.filter(c => c !== "Alle").map(cat => (
+                    <button key={cat} onClick={() => setActiveCategory(cat)}
+                      className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                        activeCategory === cat 
+                          ? 'bg-[#FF4400] text-white' 
+                          : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                      }`}>
+                      {cat}
+                    </button>
+                  ))}
                 </div>
                 <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
                 <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
@@ -407,40 +401,109 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             </div>
           </div>
           
+          {/* Suchleiste, View Toggle und Refresh Button */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
+                <input type="text" placeholder="Suchen..." value="" onChange={e => {}} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64"/>
+              </div>
+              <button onClick={refreshProducts} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10">
+                <RefreshCw className="w-4 h-4"/>
+              </button>
+            </div>
+            
+            {/* View Toggle Buttons */}
+            <div className="flex gap-1">
+              <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')} title="Grid Ansicht">
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('list')} className={viewButtonClass('list')} title="Listen Ansicht">
+                <List className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')} title="Kompakt Ansicht">
+                <Minimize2 className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="text-xs text-gray-500">
+              {filteredProducts.length} von {products.length} Artikeln
+            </div>
+          </div>
+          
           {loading ? (
             <div className="text-center py-20 text-gray-500 uppercase tracking-widest">Lade...</div>
           ) : (
             <AnimatePresence mode="wait">
-              <motion.div key={activeCategory + activeBrand} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProducts.map((product, index) => (
-                  <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
-                    className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
-                    <ImageSlider images={product.images} alt={product.name} condition={product.condition} />
-                    <div className="p-6">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="min-w-0 pr-2">
-                          <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">
-                            {product.brand || product.category}
-                          </p>
-                          <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">
-                            {product.name}
-                          </h3>
+              <motion.div key={viewMode + activeCategory + activeBrand} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                
+                {/* Grid Ansicht */}
+                {viewMode === 'grid' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProducts.map((product, index) => (
+                      <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
+                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
+                        className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
+                        <ImageSlider images={product.images} alt={product.name} condition={product.condition} />
+                        <div className="p-6">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="min-w-0 pr-2">
+                              <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">{product.brand || product.category}</p>
+                              <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">{product.name}</h3>
+                            </div>
+                            <span className="text-xl font-bold text-[#FF4400] shrink-0">{product.price}</span>
+                          </div>
+                          <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
+                            <span className="text-sm text-gray-400 uppercase tracking-widest">{product.size !== "–" ? `Size ${product.size}` : ""}</span>
+                            <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">View <ExternalLink className="w-4 h-4" /></span>
+                          </div>
                         </div>
-                        <span className="text-xl font-bold text-[#FF4400] shrink-0">{product.price}</span>
-                      </div>
-                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
-                        <span className="text-sm text-gray-400 uppercase tracking-widest">
-                          {product.size !== "–" ? `Size ${product.size}` : ""}
-                          {product.category && product.category !== "Sonstiges" && ` • ${product.category}`}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">
-                          View <ExternalLink className="w-4 h-4" />
-                        </span>
-                      </div>
-                    </div>
-                  </motion.a>
-                ))}
+                      </motion.a>
+                    ))}
+                  </div>
+                )}
+
+                {/* Listen Ansicht */}
+                {viewMode === 'list' && (
+                  <div className="space-y-3">
+                    {filteredProducts.map((product) => (
+                      <a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
+                        className="flex gap-4 bg-[#1A1A1A] p-4 hover:ring-1 hover:ring-[#FF4400] transition-all group">
+                        <div className="w-24 h-24 shrink-0 bg-[#0A0A0A] overflow-hidden">
+                          <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || product.category}</p>
+                          <h3 className="font-bold truncate group-hover:text-[#FF4400] transition-colors">{product.name}</h3>
+                          <div className="flex flex-wrap items-center gap-3 mt-1">
+                            <span className="text-[#FF4400] font-bold">{product.price}</span>
+                            <span className="text-xs text-gray-500">{product.size !== "–" && `Size ${product.size}`}</span>
+                          </div>
+                        </div>
+                        <div className="shrink-0 p-2 border border-[#FF4400]/30 text-[#FF4400] group-hover:bg-[#FF4400]/10 transition-all">
+                          <ExternalLink className="w-4 h-4" />
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
+
+                {/* Kompakt Ansicht */}
+                {viewMode === 'compact' && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                    {filteredProducts.map((product) => (
+                      <a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
+                        className="bg-[#1A1A1A] p-2 hover:ring-1 hover:ring-[#FF4400] transition-all text-center group">
+                        <div className="aspect-square bg-[#0A0A0A] overflow-hidden mb-1">
+                          <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
+                        </div>
+                        <p className="text-xs font-bold truncate group-hover:text-[#FF4400] transition-colors">{product.name}</p>
+                        <p className="text-xs text-[#FF4400]">{product.price}</p>
+                      </a>
+                    ))}
+                  </div>
+                )}
+
               </motion.div>
             </AnimatePresence>
           )}
