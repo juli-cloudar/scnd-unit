@@ -1,3 +1,4 @@
+// src/components/BulkScraper.tsx
 'use client';
 
 import { useState } from 'react';
@@ -14,42 +15,75 @@ export default function BulkScraper() {
   const [urls, setUrls] = useState('');
   const [results, setResults] = useState<Record<string, ScrapeResult> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   const handleScrape = async () => {
-    // ✅ URLs bereinigen (Leerzeichen entfernen)
+    // ✅ URLs bereinigen (Leerzeichen entfernen!)
     const urlList = urls
       .split('\n')
       .map(u => u.trim())
       .filter(u => u.length > 0);
+
+    console.log('[DEBUG] URLs nach Bereinigung:', urlList);
 
     if (urlList.length === 0) {
       alert('Bitte URLs eingeben');
       return;
     }
 
-    if (urlList.length > 5) {
-      alert('Maximal 5 URLs erlaubt');
+    if (urlList.length > 3) {
+      alert('Maximal 3 URLs erlaubt (Vercel Limit)');
       return;
     }
 
     setLoading(true);
-    
+    setDebugInfo('Sende Request...');
+    setResults(null);
+
     try {
-      const response = await fetch('/api/vinted-bulk', {
+      const apiUrl = '/api/vinted-bulk';
+      console.log('[DEBUG] API URL:', apiUrl);
+
+      const requestBody = { urls: urlList };
+      console.log('[DEBUG] Request Body:', JSON.stringify(requestBody));
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls: urlList }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('[DEBUG] Response Status:', response.status);
+      console.log('[DEBUG] Response Headers:', Object.fromEntries(response.headers.entries()));
+
+      setDebugInfo(`Status: ${response.status}`);
+
+      // ✅ Wichtig: Response Text holen für Debugging
+      const responseText = await response.text();
+      console.log('[DEBUG] Response Text:', responseText.substring(0, 500));
+
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { error: responseText };
+        }
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = JSON.parse(responseText);
+      console.log('[DEBUG] Parsed Data:', data);
+
       setResults(data.data);
+      setDebugInfo(`Erfolg: ${data.success}, ${Object.keys(data.data).length} URLs verarbeitet`);
+
     } catch (error: any) {
-      console.error('Fehler:', error);
+      console.error('[ERROR] Fetch fehlgeschlagen:', error);
+      setDebugInfo(`Fehler: ${error.message}`);
       alert('Fehler: ' + error.message);
     } finally {
       setLoading(false);
@@ -60,10 +94,23 @@ export default function BulkScraper() {
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
       <h1>Vinted Bulk Scraper</h1>
       
+      {/* ✅ Debug Info anzeigen */}
+      {debugInfo && (
+        <div style={{ 
+          padding: '10px', 
+          background: '#f0f0f0', 
+          marginBottom: '10px',
+          fontFamily: 'monospace',
+          fontSize: '12px'
+        }}>
+          <strong>Debug:</strong> {debugInfo}
+        </div>
+      )}
+
       <textarea
         value={urls}
         onChange={(e) => setUrls(e.target.value)}
-        placeholder="Maximal 5 URLs (eine pro Zeile)&#10;z.B.: https://www.vinted.de/member/3138250645-scndunit"
+        placeholder="Maximal 3 URLs (eine pro Zeile)&#10;z.B.: https://www.vinted.de/member/3138250645-scndunit"
         rows={5}
         style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
       />
@@ -79,7 +126,7 @@ export default function BulkScraper() {
           cursor: loading ? 'not-allowed' : 'pointer'
         }}
       >
-        {loading ? 'Scraping...' : `Scrapen starten (${urls.split('\n').filter(u => u.trim()).length} URLs)`}
+        {loading ? 'Scraping...' : `Scrapen starten (${urlList.length} URLs)`}
       </button>
 
       {results && (
