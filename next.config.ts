@@ -9,12 +9,14 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '**.vinted.**', // Alle Vinted-Domains erlauben
+        hostname: '**.vinted.**',
       },
     ],
   },
   
-  // ⭐ CORS-Headers für API
+  // ✅ KORRIGIERT für Next.js 16
+  serverExternalPackages: ['undici'],
+  
   async headers() {
     return [
       {
@@ -27,12 +29,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
-  },
-  
-  // ⭐ Wichtig für API-Routes mit externen Requests
-  experimental: {
-    // Erlaubt Server-Fetch zu Vinted ohne Probleme
-    serverComponentsExternalPackages: ['undici'],
   },
 };
 
