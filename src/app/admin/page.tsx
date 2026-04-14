@@ -208,6 +208,7 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
   );
 }
 
+
 // =================== VINTED TOOLS TAB (NEU: mit Datei-Upload) ===================
 function VintedToolsTab({ user, toast, confirm }: {
   user: Employee | null,
@@ -564,7 +565,6 @@ function VintedToolsTab({ user, toast, confirm }: {
     </div>
   );
 }
-
 // =================== INVENTORY TAB ===================
 function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
