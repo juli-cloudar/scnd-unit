@@ -208,127 +208,158 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
   );
 }
 
-// =================== VINTED TOOLS TAB ===================
+// =================== VINTED TOOLS TAB (NEU: mit Datei-Upload) ===================
 function VintedToolsTab({ user, toast, confirm }: {
   user: Employee | null,
   toast: (msg: string, type?: ToastType) => void,
   confirm: (msg: string, onConfirm: () => void) => void
 }) {
-  const [activeSubTab, setActiveSubTab] = useState<'bulk' | 'status'>('bulk');
+  const [activeSubTab, setActiveSubTab] = useState<'import' | 'status'>('import');
   const [autoRemove, setAutoRemove] = useState(false);
-  const [memberUrl, setMemberUrl] = useState('3138250645');
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, batch: 0, totalBatches: 0, skippedDupes: 0 });
-  const [bulkResult, setBulkResult] = useState<any>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
   const [singleUrl, setSingleUrl] = useState('');
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusProgress, setStatusProgress] = useState({ current: 0, total: 0 });
   const [statusResult, setStatusResult] = useState<any>(null);
   const [singleResult, setSingleResult] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ⭐⭐⭐ BULK IMPORT - verwendet /api/vinted-bulk ⭐⭐⭐
-  const scrapeBulk = async () => {
-    if (!memberUrl) { toast('Bitte Member-URL oder ID eingeben', 'error'); return; }
-    setBulkLoading(true);
-    setBulkResult(null);
-    setBulkProgress({ current: 0, total: 0, batch: 0, totalBatches: 0, skippedDupes: 0 });
+  // ⭐⭐⭐ JSON IMPORT (ersetzt den Bulk Import) ⭐⭐⭐
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFile(file);
+    setImportResult(null);
+  };
+
+  const processImport = async () => {
+    if (!uploadedFile) {
+      toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
+      return;
+    }
+
+    setImportLoading(true);
+    setImportResult(null);
 
     try {
-      // Quick-Scan über die neue Bulk-API
-      const quickRes = await fetch('/api/vinted-bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileUrl: memberUrl, quick: true }),
-      });
-      const quickData = await quickRes.json();
-      if (!quickRes.ok) { toast(quickData.message || 'Fehler beim Laden', 'error'); setBulkLoading(false); return; }
-
-      const allVintedUrls: string[] = quickData.itemUrls;
-      const totalItems = allVintedUrls.length;
-
-      if (totalItems === 0) {
-        toast('Keine Items gefunden für diesen Member', 'error');
-        setBulkLoading(false);
-        return;
+      // Lese die JSON-Datei
+      const text = await uploadedFile.text();
+      let items = JSON.parse(text);
+      
+      // Normalisiere das Format (unterschiedliche Extension-Formate)
+      if (!Array.isArray(items)) {
+        if (items.items && Array.isArray(items.items)) {
+          items = items.items;
+        } else if (items.data && Array.isArray(items.data)) {
+          items = items.data;
+        } else {
+          throw new Error('Ungültiges JSON-Format: Erwarte ein Array von Artikeln');
+        }
       }
 
-      const { data: existingProducts } = await supabase.from('products').select('vinted_url');
-      const existingUrls = new Set<string>(
-        (existingProducts || []).map((p: any) => {
-          try { const url = new URL(p.vinted_url); return url.pathname.replace(/\/$/, ''); } catch { return p.vinted_url; }
-        })
-      );
+      toast(`${items.length} Artikel in JSON gefunden`, 'info');
 
-      const newUrls = allVintedUrls.filter(u => {
-        try { return !existingUrls.has(new URL(u).pathname.replace(/\/$/, '')); } catch { return !existingUrls.has(u); }
-      });
+      let success = 0;
+      let failed = 0;
+      let skipped = 0;
 
-      const dupeCount = totalItems - newUrls.length;
-
-      if (newUrls.length === 0) {
-        toast(`Alle ${totalItems} Items bereits in der Datenbank`, 'info');
-        setBulkResult({ summary: { total: totalItems, available: 0, sold: 0, reserved: 0, errors: 0, dupes: dupeCount }, message: `✅ Alle ${totalItems} Items bereits vorhanden` });
-        setBulkLoading(false);
-        return;
-      }
-
-      toast(`${totalItems} Items gefunden · ${dupeCount} bereits vorhanden · ${newUrls.length} neu`, 'info');
-
-      let totalAdded = 0;
-      let totalSkipped = 0;
-      let totalErrors = 0;
-
-      for (let i = 0; i < newUrls.length; i++) {
-        const itemUrl = newUrls[i];
-        try {
-          // Single-Requests bleiben auf /api/vinted
-          const scrapeRes = await fetch('/api/vinted', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mode: 'single', url: itemUrl }),
-          });
-          const itemData = await scrapeRes.json();
-          
-          if (itemData.status === 'available' && itemData.name) {
-            const { data: existing } = await supabase.from('products').select('id').eq('vinted_url', itemUrl).maybeSingle();
-            if (!existing) {
-              const newProduct = {
-                name: itemData.name || 'Unbekannt',
-                category: itemData.category || 'Sonstiges',
-                price: `${(itemData.price || '0').toString().replace(/^€/, '').replace(',', '.')} €`,
-                size: itemData.size || '–',
-                condition: itemData.condition || 'Gut',
-                images: itemData.images || [],
-                vinted_url: itemUrl,
-                sold: false,
-              };
-              const { error: insertError } = await supabase.from('products').insert(newProduct);
-              if (!insertError) totalAdded++;
-              else totalErrors++;
-            } else { totalSkipped++; }
-          } else if (itemData.status === 'sold') { totalSkipped++; }
-          else { totalErrors++; }
-        } catch (err) { totalErrors++; }
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         
-        setBulkProgress(prev => ({ ...prev, current: i + 1, total: newUrls.length }));
-        await new Promise(r => setTimeout(r, 400));
+        // Extrahiere die benötigten Felder (unterschiedliche Benennungen möglich)
+        const id = item.id || item.item_id;
+        const title = item.title || item.name || item.ItemTitle;
+        const priceRaw = item.price || item.ItemPrice || item.amount;
+        const price = typeof priceRaw === 'number' ? `${priceRaw} €` : String(priceRaw).replace(/^€/, '').trim() + ' €';
+        const brand = item.brand || item.ItemBrand || item.marke || '';
+        const size = item.size || item.ItemSize || item.groesse || '–';
+        const condition = item.condition || item.ItemStatus || item.zustand || 'Gut';
+        const url = item.url || item.ItemURL || item.link || '';
+        const photos = item.photos || item.AllPhotos || item.images || [];
+        const photoUrl = Array.isArray(photos) ? photos[0] : (typeof photos === 'string' ? photos.split('||')[0] : '');
+
+        if (!title || !url) {
+          failed++;
+          continue;
+        }
+
+        // Prüfe ob bereits vorhanden
+        const { data: existing } = await supabase
+          .from('products')
+          .select('id')
+          .eq('vinted_url', url)
+          .maybeSingle();
+
+        if (existing) {
+          skipped++;
+          continue;
+        }
+
+        // Neues Produkt erstellen
+        const newProduct = {
+          name: title.substring(0, 100),
+          category: brand || 'Vintage',
+          price: price,
+          size: size || '–',
+          condition: condition,
+          images: [photoUrl],
+          vinted_url: url,
+          sold: false,
+        };
+
+        const { error } = await supabase.from('products').insert(newProduct);
+        if (error) {
+          failed++;
+          console.error('Insert Fehler:', error);
+        } else {
+          success++;
+        }
+
+        // Fortschritt anzeigen
+        setImportResult(prev => ({ 
+          ...prev, 
+          current: i + 1, 
+          total: items.length,
+          success,
+          failed,
+          skipped
+        }));
+        
+        await new Promise(r => setTimeout(r, 100)); // Kleine Pause
       }
 
       const finalResult = {
-        summary: { total: totalItems, available: totalAdded, sold: totalSkipped, reserved: 0, errors: totalErrors, dupes: dupeCount },
-        message: `✅ Fertig: ${totalAdded} neu gespeichert · ${dupeCount} Duplikate · ${totalSkipped} verkauft/fehlerhaft`,
+        summary: { 
+          total: items.length, 
+          imported: success, 
+          skipped: skipped, 
+          failed: failed,
+          errors: failed
+        },
+        message: `✅ Fertig: ${success} importiert, ${skipped} Duplikate, ${failed} Fehler`,
       };
-      setBulkResult(finalResult);
+      setImportResult(finalResult);
       toast(finalResult.message, 'success');
-    } catch (e) {
-      console.error('Bulk error:', e);
-      toast('Fehler: ' + String(e), 'error');
+      
+      // Optional: Seite neu laden oder Event auslösen
+      if (success > 0) {
+        setTimeout(() => {
+          window.dispatchEvent(new Event('products-updated'));
+        }, 500);
+      }
+
+    } catch (error: any) {
+      console.error('Import Fehler:', error);
+      toast('Fehler beim Verarbeiten der JSON: ' + error.message, 'error');
+      setImportResult({ message: 'Fehler: ' + error.message, summary: { total: 0, imported: 0, skipped: 0, failed: 1 } });
     } finally {
-      setBulkLoading(false);
+      setImportLoading(false);
     }
   };
 
-  // ⭐⭐⭐ SINGLE ITEM CHECK - bleibt auf /api/vinted ⭐⭐⭐
+  // ⭐⭐⭐ SINGLE ITEM CHECK ⭐⭐⭐
   const checkSingleItem = async () => {
     if (!singleUrl) { toast('Bitte URL eingeben', 'error'); return; }
     setStatusLoading(true);
@@ -362,7 +393,7 @@ function VintedToolsTab({ user, toast, confirm }: {
     }
   };
 
-  // ⭐⭐⭐ ALLE PRODUKTE PRÜFEN - bleibt auf /api/vinted ⭐⭐⭐
+  // ⭐⭐⭐ ALLE PRODUKTE PRÜFEN ⭐⭐⭐
   const checkAllStatus = async () => {
     setStatusLoading(true);
     setStatusResult(null);
@@ -410,8 +441,8 @@ function VintedToolsTab({ user, toast, confirm }: {
   return (
     <div className="space-y-6">
       <div className="flex gap-2 border-b border-[#FF4400]/30 pb-4">
-        <button onClick={() => setActiveSubTab('bulk')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'bulk' ? 'bg-green-600 text-white' : 'border border-green-600/30 text-green-500'}`}>
-          <Globe className="w-4 h-4 inline mr-1"/>Bulk Import
+        <button onClick={() => setActiveSubTab('import')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'import' ? 'bg-green-600 text-white' : 'border border-green-600/30 text-green-500'}`}>
+          <Upload className="w-4 h-4 inline mr-1"/>JSON Import
         </button>
         <button onClick={() => setActiveSubTab('status')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'status' ? 'bg-blue-600 text-white' : 'border border-blue-600/30 text-blue-500'}`}>
           <RefreshCw className="w-4 h-4 inline mr-1"/>Status Check
@@ -429,21 +460,75 @@ function VintedToolsTab({ user, toast, confirm }: {
         </label>
       </div>
 
-      {activeSubTab === 'bulk' && (
+      {activeSubTab === 'import' && (
         <div className="bg-[#111] border border-green-500/30 p-6 space-y-4">
-          <h3 className="text-lg font-bold text-green-400 flex items-center gap-2"><Globe className="w-5 h-5"/>Vinted Account Import</h3>
-          <p className="text-xs text-gray-500">Gib die Member-ID oder URL ein (z.B. 3138250645 oder https://www.vinted.de/member/...)</p>
-          <div className="flex gap-2">
-            <input type="text" value={memberUrl} onChange={e => setMemberUrl(e.target.value)} placeholder="Member-ID oder URL" className="flex-1 bg-[#1A1A1A] border border-green-500/30 px-4 py-3 text-sm font-mono"/>
-            <button onClick={scrapeBulk} disabled={bulkLoading} className="px-6 py-3 bg-green-600 text-white text-xs font-bold uppercase tracking-widest disabled:opacity-50">{bulkLoading ? `⏳ ${bulkProgress.current}/${bulkProgress.total}` : '📦 Importieren'}</button>
+          <h3 className="text-lg font-bold text-green-400 flex items-center gap-2"><Upload className="w-5 h-5"/>JSON Import (Vinted Extension)</h3>
+          
+          <div className="border border-dashed border-green-500/50 p-6 text-center">
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              accept=".json" 
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            {!uploadedFile ? (
+              <div className="space-y-3">
+                <p className="text-gray-400 text-sm">Exportiere die JSON-Datei mit der Chrome Extension</p>
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-6 py-3 bg-green-600 text-white text-sm font-bold uppercase"
+                >
+                  📁 JSON-Datei auswählen
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-center gap-2 text-green-400">
+                  <CheckCircle className="w-6 h-6"/>
+                  <span className="font-mono text-sm">{uploadedFile.name}</span>
+                  <button onClick={() => { setUploadedFile(null); setImportResult(null); }} className="text-gray-500 hover:text-red-400">×</button>
+                </div>
+                <button 
+                  onClick={processImport} 
+                  disabled={importLoading}
+                  className="px-6 py-3 bg-[#FF4400] text-white text-sm font-bold uppercase disabled:opacity-50"
+                >
+                  {importLoading ? '⏳ Importiere...' : '📥 In Datenbank importieren'}
+                </button>
+              </div>
+            )}
           </div>
-          {bulkLoading && bulkProgress.total > 0 && (
+
+          {/* Fortschrittsanzeige */}
+          {importLoading && importResult && importResult.current !== undefined && (
             <div className="space-y-2">
-              <div className="w-full bg-gray-800 rounded-full h-2"><div className="bg-green-600 h-2 rounded-full transition-all" style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}/></div>
-              <p className="text-xs text-gray-600 text-center">{bulkProgress.current} / {bulkProgress.total} Items</p>
+              <div className="w-full bg-gray-800 rounded-full h-2">
+                <div className="bg-green-600 h-2 rounded-full transition-all" style={{ width: `${(importResult.current / importResult.total) * 100}%` }}/>
+              </div>
+              <p className="text-xs text-gray-600 text-center">
+                {importResult.current} / {importResult.total} · 
+                ✅ {importResult.success || 0} · 
+                ⏭️ {importResult.skipped || 0} · 
+                ❌ {importResult.failed || 0}
+              </p>
             </div>
           )}
-          {bulkResult && <ResultDisplay result={bulkResult} />}
+
+          {importResult && importResult.summary && (
+            <ResultDisplay result={importResult} />
+          )}
+
+          <div className="mt-4 p-3 bg-green-950/20 border border-green-500/20 text-xs text-gray-400">
+            <p className="font-bold text-green-400 mb-2">📋 Anleitung:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Installiere die <span className="text-green-400">"Vinted Scraper - One-Click Data Export"</span> Extension in Chrome</li>
+              <li>Gehe zu <span className="text-green-400">https://www.vinted.de/member/3138250645-scndunit</span></li>
+              <li>Klicke auf das Extension-Icon → <span className="text-green-400">"Export" → Format: JSON</span></li>
+              <li>Lade die heruntergeladene JSON-Datei hier hoch</li>
+              <li>Klicke auf <span className="text-green-400">"In Datenbank importieren"</span></li>
+            </ol>
+          </div>
         </div>
       )}
 
