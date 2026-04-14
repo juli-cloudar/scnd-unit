@@ -1,4 +1,3 @@
-// src/components/BulkScraper.tsx
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -17,7 +16,7 @@ export default function BulkScraper() {
   const [loading, setLoading] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
-  // ✅ urlList als useMemo (immer verfügbar)
+  // ✅ urlList als useMemo
   const urlList = useMemo(() => {
     return urls
       .split('\n')
@@ -26,15 +25,15 @@ export default function BulkScraper() {
   }, [urls]);
 
   const handleScrape = async () => {
-    console.log('[DEBUG] URLs nach Bereinigung:', urlList);
+    console.log('[DEBUG] urlList:', urlList);
 
-    if (urlList.length === 0) {
+    if (!urlList || urlList.length === 0) {
       alert('Bitte URLs eingeben');
       return;
     }
 
     if (urlList.length > 3) {
-      alert('Maximal 3 URLs erlaubt (Vercel Limit)');
+      alert('Maximal 3 URLs erlaubt');
       return;
     }
 
@@ -43,13 +42,15 @@ export default function BulkScraper() {
     setResults(null);
 
     try {
-      const apiUrl = '/api/vinted-bulk';
-      console.log('[DEBUG] API URL:', apiUrl);
-
-      const requestBody = { urls: urlList };
+      // ✅ WICHTIG: Frontend sendet { profileUrl, quick } Format!
+      const requestBody = { 
+        profileUrl: urlList[0],  // Erste URL
+        quick: true 
+      };
+      
       console.log('[DEBUG] Request Body:', JSON.stringify(requestBody));
 
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/vinted-bulk', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -59,7 +60,6 @@ export default function BulkScraper() {
       });
 
       console.log('[DEBUG] Response Status:', response.status);
-
       setDebugInfo(`Status: ${response.status}`);
 
       const responseText = await response.text();
@@ -78,8 +78,13 @@ export default function BulkScraper() {
       const data = JSON.parse(responseText);
       console.log('[DEBUG] Parsed Data:', data);
 
+      // ✅ SICHERE Prüfung: data.data existiert?
+      if (!data || !data.data) {
+        throw new Error('Ungültige Response: data.data fehlt');
+      }
+
       setResults(data.data);
-      setDebugInfo(`Erfolg: ${data.success}, ${Object.keys(data.data).length} URLs verarbeitet`);
+      setDebugInfo(`Erfolg: ${Object.keys(data.data).length} URLs verarbeitet`);
 
     } catch (error: any) {
       console.error('[ERROR] Fetch fehlgeschlagen:', error);
@@ -89,6 +94,11 @@ export default function BulkScraper() {
       setLoading(false);
     }
   };
+
+  // ✅ SICHERE Anzeige: urlList existiert?
+  const buttonText = loading 
+    ? 'Scraping...' 
+    : `Scrapen starten (${urlList?.length || 0} URLs)`;
 
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
@@ -125,27 +135,28 @@ export default function BulkScraper() {
           cursor: loading ? 'not-allowed' : 'pointer'
         }}
       >
-        {loading ? 'Scraping...' : `Scrapen starten (${urlList.length} URLs)`}
+        {buttonText}
       </button>
 
-      {results && (
+      {/* ✅ SICHERE Prüfung: results existiert? */}
+      {results && typeof results === 'object' && (
         <div style={{ marginTop: '20px' }}>
           <h2>Ergebnisse:</h2>
           {Object.entries(results).map(([url, result]: [string, any]) => (
             <div key={url} style={{ 
               margin: '10px 0', 
               padding: '10px', 
-              background: result.success ? '#d4edda' : '#f8d7da',
+              background: result?.success ? '#d4edda' : '#f8d7da',
               borderRadius: '5px'
             }}>
               <strong>{url}</strong><br/>
-              {result.success ? (
+              {result?.success ? (
                 <span>
-                  ✅ {result.count} Items gefunden 
+                  ✅ {result.count || 0} Items gefunden 
                   {result.hasMore && ' (mehr verfügbar)'}
                 </span>
               ) : (
-                <span>❌ Fehler: {result.error}</span>
+                <span>❌ Fehler: {result?.error || 'Unbekannter Fehler'}</span>
               )}
             </div>
           ))}
