@@ -241,7 +241,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 const validCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
 // Definiere feste Kategorien (nicht aus Datenbank)
   // ⭐ Feste Kategorien (nicht aus Datenbank)
-  const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
+   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
   const allCategories = ["Alle", ...fixedCategories];
   
   // ⭐ Marken aus Datenbank (gefiltert und sortiert)
@@ -252,16 +252,7 @@ const validCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false
     return true
-  })
-
-// Marken kommen weiterhin aus der Datenbank
-const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'de'));
-
-  const filteredProducts = products.filter(p => {
-    if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
-    if (activeCategory !== "Alle" && p.category !== activeCategory) return false
-    return true
-  })
+  }) 
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
