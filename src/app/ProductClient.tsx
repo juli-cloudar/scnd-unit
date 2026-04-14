@@ -240,7 +240,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   // ⭐ Filter Definitionen
   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
   const allCategories = ["Alle", ...fixedCategories];
-  const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'de'));
+  const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
+  const allBrands = ["Alle", ...brandList];
   const filteredProducts = products.filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false
