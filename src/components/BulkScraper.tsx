@@ -1,167 +1,78 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-
-interface ScrapeResult {
-  success: boolean;
-  items?: any[];
-  count?: number;
-  error?: string;
-  hasMore?: boolean;
-}
+import { useState } from 'react';
 
 export default function BulkScraper() {
   const [urls, setUrls] = useState('');
-  const [results, setResults] = useState<Record<string, ScrapeResult> | null>(null);
+  const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
-
-  // ✅ urlList als useMemo
-  const urlList = useMemo(() => {
-    return urls
-      .split('\n')
-      .map(u => u.trim())
-      .filter(u => u.length > 0);
-  }, [urls]);
 
   const handleScrape = async () => {
-    console.log('[DEBUG] urlList:', urlList);
-
-    if (!urlList || urlList.length === 0) {
+    // Einfache Berechnung ohne useMemo
+    const urlList = urls.split('\n').map(u => u.trim()).filter(u => u);
+    
+    if (urlList.length === 0) {
       alert('Bitte URLs eingeben');
       return;
     }
 
-    if (urlList.length > 3) {
-      alert('Maximal 3 URLs erlaubt');
-      return;
-    }
-
     setLoading(true);
-    setDebugInfo('Sende Request...');
-    setResults(null);
-
+    
     try {
-      // ✅ WICHTIG: Frontend sendet { profileUrl, quick } Format!
-      const requestBody = { 
-        profileUrl: urlList[0],  // Erste URL
-        quick: true 
-      };
-      
-      console.log('[DEBUG] Request Body:', JSON.stringify(requestBody));
-
       const response = await fetch('/api/vinted-bulk', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestBody),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          profileUrl: urlList[0],
+          quick: true 
+        }),
       });
 
-      console.log('[DEBUG] Response Status:', response.status);
-      setDebugInfo(`Status: ${response.status}`);
-
-      const responseText = await response.text();
-      console.log('[DEBUG] Response Text:', responseText.substring(0, 500));
-
+      const data = await response.json();
+      
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = JSON.parse(responseText);
-        } catch {
-          errorData = { error: responseText };
-        }
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-
-      const data = JSON.parse(responseText);
-      console.log('[DEBUG] Parsed Data:', data);
-
-      // ✅ SICHERE Prüfung: data.data existiert?
-      if (!data || !data.data) {
-        throw new Error('Ungültige Response: data.data fehlt');
+        throw new Error(data.error || 'Request failed');
       }
 
       setResults(data.data);
-      setDebugInfo(`Erfolg: ${Object.keys(data.data).length} URLs verarbeitet`);
-
     } catch (error: any) {
-      console.error('[ERROR] Fetch fehlgeschlagen:', error);
-      setDebugInfo(`Fehler: ${error.message}`);
       alert('Fehler: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ SICHERE Anzeige: urlList existiert?
-  const buttonText = loading 
-    ? 'Scraping...' 
-    : `Scrapen starten (${urlList?.length || 0} URLs)`;
+  // Einfache Anzeige
+  const count = urls.split('\n').filter(u => u.trim()).length;
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: 20 }}>
       <h1>Vinted Bulk Scraper</h1>
       
-      {debugInfo && (
-        <div style={{ 
-          padding: '10px', 
-          background: '#f0f0f0', 
-          marginBottom: '10px',
-          fontFamily: 'monospace',
-          fontSize: '12px'
-        }}>
-          <strong>Debug:</strong> {debugInfo}
-        </div>
-      )}
-
       <textarea
         value={urls}
         onChange={(e) => setUrls(e.target.value)}
-        placeholder="Maximal 3 URLs (eine pro Zeile)&#10;z.B.: https://www.vinted.de/member/3138250645-scndunit"
+        placeholder="URLs hier eingeben..."
         rows={5}
-        style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
+        style={{ width: '100%', marginBottom: 10 }}
       />
       
       <button 
         onClick={handleScrape}
         disabled={loading}
-        style={{ 
-          padding: '10px 20px', 
-          background: loading ? '#ccc' : '#0070f3',
-          color: 'white',
-          border: 'none',
-          cursor: loading ? 'not-allowed' : 'pointer'
-        }}
       >
-        {buttonText}
+        {loading ? 'Scraping...' : `Start (${count} URLs)`}
       </button>
 
-      {/* ✅ SICHERE Prüfung: results existiert? */}
-      {results && typeof results === 'object' && (
-        <div style={{ marginTop: '20px' }}>
-          <h2>Ergebnisse:</h2>
-          {Object.entries(results).map(([url, result]: [string, any]) => (
-            <div key={url} style={{ 
-              margin: '10px 0', 
-              padding: '10px', 
-              background: result?.success ? '#d4edda' : '#f8d7da',
-              borderRadius: '5px'
-            }}>
-              <strong>{url}</strong><br/>
-              {result?.success ? (
-                <span>
-                  ✅ {result.count || 0} Items gefunden 
-                  {result.hasMore && ' (mehr verfügbar)'}
-                </span>
-              ) : (
-                <span>❌ Fehler: {result?.error || 'Unbekannter Fehler'}</span>
-              )}
-            </div>
-          ))}
+      {results && Object.entries(results).map(([url, result]: [string, any]) => (
+        <div key={url} style={{ marginTop: 10, padding: 10, background: result?.success ? '#d4edda' : '#f8d7da' }}>
+          <strong>{url}</strong><br/>
+          {result?.success 
+            ? `✅ ${result.count || 0} Items` 
+            : `❌ ${result?.error || 'Fehler'}`
+          }
         </div>
-      )}
+      ))}
     </div>
   );
 }
