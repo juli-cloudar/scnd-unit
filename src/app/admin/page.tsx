@@ -269,15 +269,10 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       // ⭐ ANPASSUNG: Extrahiere Felder aus deinem JSON-Format ⭐
       const id = item.id;
       const title = item['Item Title'] || item.title || item.name;
-      const priceRaw = item['Item Price'] || item.price || item.amount;
      const priceRaw = item['Item Price'] || item.price || item.amount;
 // Extrahiere nur die Zahl (entferne alles außer Ziffern, Komma und Punkt)
 let priceNumber = String(priceRaw).replace(/[^0-9,.-]/g, '').replace(',', '.');
 let priceValue = parseFloat(priceNumber);
-// Runde auf ganze Euro (keine Dezimalstellen)
-priceValue = Math.round(priceValue);
-// Formatiere als "32€" (ohne Leerzeichen, Eurozeichen hinten)
-const price = `${priceValue}€`;
       const brand = item['Item Brand'] || item.brand || '';
       const size = item['Item Size'] || item.size || '–';
       const condition = item['Item Status'] || item.condition || 'Gut';
