@@ -7,9 +7,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.vinted.net',
       },
+      {
+        protocol: 'https',
+        hostname: '**.vinted.**', // Alle Vinted-Domains erlauben
+      },
     ],
   },
-  // ⭐ CORS-Headers für API hinzufügen ⭐
+  
+  // ⭐ CORS-Headers für API
   async headers() {
     return [
       {
@@ -22,6 +27,12 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  
+  // ⭐ Wichtig für API-Routes mit externen Requests
+  experimental: {
+    // Erlaubt Server-Fetch zu Vinted ohne Probleme
+    serverComponentsExternalPackages: ['undici'],
   },
 };
 
