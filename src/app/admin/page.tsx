@@ -210,6 +210,7 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
 
 
 // =================== VINTED TOOLS TAB (NEU: mit Datei-Upload) ===================
+// =================== VINTED TOOLS TAB ===================
 function VintedToolsTab({ user, toast, confirm }: {
   user: Employee | null,
   toast: (msg: string, type?: ToastType) => void,
@@ -227,138 +228,162 @@ function VintedToolsTab({ user, toast, confirm }: {
   const [singleResult, setSingleResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
- // ⭐⭐⭐ JSON IMPORT - Datei-Upload Handler ⭐⭐⭐
-const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  setUploadedFile(file);
-  setImportResult(null);
-};
+  // ⭐⭐⭐ JSON IMPORT - Datei-Upload Handler ⭐⭐⭐
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFile(file);
+    setImportResult(null);
+  };
+
+  // ⭐⭐⭐ JSON IMPORT (ersetzt den Bulk Import) ⭐⭐⭐
   const processImport = async () => {
-  if (!uploadedFile) {
-    toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
-    return;
-  }
-
-  setImportLoading(true);
-  setImportResult(null);
-
-  try {
-    const text = await uploadedFile.text();
-    let items = JSON.parse(text);
-    
-    if (!Array.isArray(items)) {
-      if (items.items && Array.isArray(items.items)) {
-        items = items.items;
-      } else if (items.data && Array.isArray(items.data)) {
-        items = items.data;
-      } else {
-        throw new Error('Ungültiges JSON-Format: Erwarte ein Array von Artikeln');
-      }
+    if (!uploadedFile) {
+      toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
+      return;
     }
 
-    toast(`${items.length} Artikel in JSON gefunden`, 'info');
+    setImportLoading(true);
+    setImportResult(null);
 
-    let success = 0;
-    let failed = 0;
-    let skipped = 0;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+    try {
+      const text = await uploadedFile.text();
+      let items = JSON.parse(text);
       
-     // ⭐ ANPASSUNG: Extrahiere Felder aus deinem JSON-Format ⭐
-const id = item.id;
-const title = item['Item Title'] || item.title || item.name;
-const priceRaw = item['Item Price'] || item.price || item.amount;
-// Extrahiere nur die Zahl (entferne alles außer Ziffern, Komma und Punkt)
-let priceNumber = String(priceRaw).replace(/[^0-9,.-]/g, '').replace(',', '.');
-let priceValue = parseFloat(priceNumber);
-// ⭐ RUNDEN UND PREIS FORMATIEREN ⭐
-const price = `${Math.round(priceValue)}€`;
-const brand = item['Item Brand'] || item.brand || '';
-const size = item['Item Size'] || item.size || '–';
-const condition = item['Item Status'] || item.condition || 'Gut';
-const url = item['Item URL'] || item.url || item.link || '';
-
-// Sammle alle Fotos
-const photoUrls = [];
-for (let p = 1; p <= 10; p++) {
-  const photo = item[`Item Photo ${p}`];
-  if (photo) photoUrls.push(photo);
-}
-
-      // Prüfe ob bereits vorhanden
-      const { data: existing } = await supabase
-        .from('products')
-        .select('id')
-        .eq('vinted_url', url)
-        .maybeSingle();
-
-      if (existing) {
-        skipped++;
-        continue;
+      if (!Array.isArray(items)) {
+        if (items.items && Array.isArray(items.items)) {
+          items = items.items;
+        } else if (items.data && Array.isArray(items.data)) {
+          items = items.data;
+        } else {
+          throw new Error('Ungültiges JSON-Format: Erwarte ein Array von Artikeln');
+        }
       }
 
-      // Neues Produkt erstellen
-      const newProduct = {
-        name: title.substring(0, 100),
-        category: brand || 'Vintage',
-        price: price,
-        size: size || '–',
-        condition: condition,
-        images: photoUrls.length > 0 ? photoUrls : [],
-        vinted_url: url,
-        sold: false,
+      toast(`${items.length} Artikel in JSON gefunden`, 'info');
+
+      let success = 0;
+      let failed = 0;
+      let skipped = 0;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        // ⭐ ANPASSUNG: Extrahiere Felder aus deinem JSON-Format ⭐
+        const id = item.id;
+        const title = item['Item Title'] || item.title || item.name;
+        
+        // Preis formatieren
+        const priceRaw = item['Item Price'] || item.price || item.amount;
+        let priceNumber = String(priceRaw).replace(/[^0-9,.-]/g, '').replace(',', '.');
+        let priceValue = parseFloat(priceNumber);
+        const price = `${Math.round(priceValue)}€`;
+        
+        // Marke
+        const brand = item['Item Brand'] || item.brand || '';
+        
+        // Größe
+        const size = item['Item Size'] || item.size || '–';
+        
+        // Zustand
+        const condition = item['Item Status'] || item.condition || 'Gut';
+        
+        // URL
+        const url = item['Item URL'] || item.url || item.link || '';
+        
+        // ⭐ Kategorie aus Titel ableiten ⭐
+        let categoryFromTitle = 'Sonstiges';
+        const titleLower = title.toLowerCase();
+        if (titleLower.includes('jacke') || titleLower.includes('jacket')) categoryFromTitle = 'Jacken';
+        else if (titleLower.includes('pullover') || titleLower.includes('sweater')) categoryFromTitle = 'Pullover';
+        else if (titleLower.includes('sweatshirt') || titleLower.includes('crewneck')) categoryFromTitle = 'Sweatshirts';
+        else if (titleLower.includes('top') || titleLower.includes('shirt') || titleLower.includes('polo')) categoryFromTitle = 'Tops';
+        else if (titleLower.includes('sweat')) categoryFromTitle = 'Sweatshirts';
+        
+        // Sammle alle Fotos
+        const photoUrls = [];
+        for (let p = 1; p <= 10; p++) {
+          const photo = item[`Item Photo ${p}`];
+          if (photo) photoUrls.push(photo);
+        }
+
+        if (!title || !url) {
+          failed++;
+          continue;
+        }
+
+        // Prüfe ob bereits vorhanden
+        const { data: existing } = await supabase
+          .from('products')
+          .select('id')
+          .eq('vinted_url', url)
+          .maybeSingle();
+
+        if (existing) {
+          skipped++;
+          continue;
+        }
+
+        // ⭐ NEUES PRODUKT mit brand und category ⭐
+        const newProduct = {
+          name: title.substring(0, 100),
+          brand: brand,
+          category: categoryFromTitle,
+          price: price,
+          size: size || '–',
+          condition: condition,
+          images: photoUrls.length > 0 ? photoUrls : [],
+          vinted_url: url,
+          sold: false,
+        };
+
+        const { error } = await supabase.from('products').insert(newProduct);
+        if (error) {
+          failed++;
+          console.error('Insert Fehler:', error);
+        } else {
+          success++;
+        }
+
+        setImportResult((prev: any) => ({ 
+          ...prev, 
+          current: i + 1, 
+          total: items.length,
+          success,
+          failed,
+          skipped
+        }));
+        
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      const finalResult = {
+        summary: { 
+          total: items.length, 
+          imported: success, 
+          skipped: skipped, 
+          failed: failed,
+          errors: failed
+        },
+        message: `✅ Fertig: ${success} importiert, ${skipped} Duplikate, ${failed} Fehler`,
       };
-
-      const { error } = await supabase.from('products').insert(newProduct);
-      if (error) {
-        failed++;
-        console.error('Insert Fehler:', error);
-      } else {
-        success++;
+      setImportResult(finalResult);
+      toast(finalResult.message, 'success');
+      
+      if (success > 0) {
+        setTimeout(() => {
+          window.dispatchEvent(new Event('products-updated'));
+        }, 500);
       }
 
-      setImportResult((prev: any) => ({ 
-        ...prev, 
-        current: i + 1, 
-        total: items.length,
-        success,
-        failed,
-        skipped
-      }));
-      
-      await new Promise(r => setTimeout(r, 50));
+    } catch (error: any) {
+      console.error('Import Fehler:', error);
+      toast('Fehler beim Verarbeiten der JSON: ' + error.message, 'error');
+      setImportResult({ message: 'Fehler: ' + error.message, summary: { total: 0, imported: 0, skipped: 0, failed: 1 } });
+    } finally {
+      setImportLoading(false);
     }
-
-    const finalResult = {
-      summary: { 
-        total: items.length, 
-        imported: success, 
-        skipped: skipped, 
-        failed: failed,
-        errors: failed
-      },
-      message: `✅ Fertig: ${success} importiert, ${skipped} Duplikate, ${failed} Fehler`,
-    };
-    setImportResult(finalResult);
-    toast(finalResult.message, 'success');
-    
-    if (success > 0) {
-      setTimeout(() => {
-        window.dispatchEvent(new Event('products-updated'));
-      }, 500);
-    }
-
-  } catch (error: any) {
-    console.error('Import Fehler:', error);
-    toast('Fehler beim Verarbeiten der JSON: ' + error.message, 'error');
-    setImportResult({ message: 'Fehler: ' + error.message, summary: { total: 0, imported: 0, skipped: 0, failed: 1 } });
-  } finally {
-    setImportLoading(false);
-  }
-};
- 
+  };
 
   // ⭐⭐⭐ SINGLE ITEM CHECK ⭐⭐⭐
   const checkSingleItem = async () => {
@@ -547,7 +572,7 @@ for (let p = 1; p <= 10; p++) {
                   <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded ${singleResult.status === 'available' ? 'bg-green-500 text-white' : singleResult.status === 'sold' ? 'bg-red-500 text-white' : 'bg-yellow-500 text-black'}`}>{singleResult.status}</span>
                   {singleResult.name && <span className="font-bold truncate">{singleResult.name}</span>}
                 </div>
-                {singleResult.price && <p className="text-xs text-gray-400">€{singleResult.price} · {singleResult.size}</p>}
+                {singleResult.price && <p className="text-xs text-gray-400">{singleResult.price} · {singleResult.size}</p>}
               </div>
             )}
           </div>
