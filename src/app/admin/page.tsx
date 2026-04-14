@@ -617,8 +617,9 @@ function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: 
 
   useEffect(() => { loadProducts(); const channel = supabase.channel('products-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => loadProducts()).subscribe(); return () => { supabase.removeChannel(channel); }; }, [loadProducts]);
 
-  // Marken aus Datenbank (alphabetisch sortiert)
-  const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'de'));
+  // Marken sortieren, "Alle" immer an erster Stelle
+  const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
+  const allBrands = ["Alle", ...brandList];
   
   // Feste Kategorien
   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
