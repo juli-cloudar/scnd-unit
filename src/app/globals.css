@@ -2,18 +2,35 @@
 
 /* Cache bust So 22. Mär 03:16:14 CET 2026 */
 
-/* Custom Scrollbar für Filter - horizontales Scrollen */
-.scrollbar-thin::-webkit-scrollbar {
-  height: 4px;
+/* ========== CUSTOM SCROLLBAR für Filter ========== */
+.scrollbar-custom {
+  scrollbar-width: thin;
+  scrollbar-color: #FF4400 #1A1A1A;
 }
-.scrollbar-thin::-webkit-scrollbar-track {
+
+.scrollbar-custom::-webkit-scrollbar {
+  height: 3px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
   background: #1A1A1A;
-  border-radius: 4px;
+  border-radius: 10px;
 }
-.scrollbar-thin::-webkit-scrollbar-thumb {
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
   background: #FF4400;
-  border-radius: 4px;
+  border-radius: 10px;
 }
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
   background: #FF6644;
+}
+
+/* Gradient-Indikatoren für mehr/weniger Inhalt */
+.scroll-gradient-left {
+  background: linear-gradient(to right, #0A0A0A, transparent);
+}
+
+.scroll-gradient-right {
+  background: linear-gradient(to left, #0A0A0A, transparent);
 }
