@@ -228,7 +228,7 @@ function VintedToolsTab({ user, toast, confirm }: {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
  
-        const processImport = async () => {
+  const processImport = async () => {
   if (!uploadedFile) {
     toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
     return;
@@ -305,7 +305,6 @@ function VintedToolsTab({ user, toast, confirm }: {
         success++;
       }
 
-      // ⭐ HIER IST DIE KORRIGIERTE ZEILE ⭐
       setImportResult((prev: any) => ({ 
         ...prev, 
         current: i + 1, 
@@ -344,38 +343,7 @@ function VintedToolsTab({ user, toast, confirm }: {
   } finally {
     setImportLoading(false);
   }
-};
-        await new Promise(r => setTimeout(r, 100)); // Kleine Pause
-      }
-
-      const finalResult = {
-        summary: { 
-          total: items.length, 
-          imported: success, 
-          skipped: skipped, 
-          failed: failed,
-          errors: failed
-        },
-        message: `✅ Fertig: ${success} importiert, ${skipped} Duplikate, ${failed} Fehler`,
-      };
-      setImportResult(finalResult);
-      toast(finalResult.message, 'success');
-      
-      // Optional: Seite neu laden oder Event auslösen
-      if (success > 0) {
-        setTimeout(() => {
-          window.dispatchEvent(new Event('products-updated'));
-        }, 500);
-      }
-
-    } catch (error: any) {
-      console.error('Import Fehler:', error);
-      toast('Fehler beim Verarbeiten der JSON: ' + error.message, 'error');
-      setImportResult({ message: 'Fehler: ' + error.message, summary: { total: 0, imported: 0, skipped: 0, failed: 1 } });
-    } finally {
-      setImportLoading(false);
-    }
-  };
+};      
 
   // ⭐⭐⭐ SINGLE ITEM CHECK ⭐⭐⭐
   const checkSingleItem = async () => {
