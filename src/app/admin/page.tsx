@@ -6,7 +6,7 @@ import {
   Trash2, ExternalLink, RefreshCw, ShoppingBag, Plus,
   Wand2, ImageIcon, Users, Package, BarChart3, Eye, EyeOff,
   Clock, LogOut, Edit3, UserPlus, Search, Key, Save, Download,
-  Globe, AlertTriangle, CheckCircle, XCircle
+  Globe, AlertTriangle, CheckCircle, XCircle, Upload
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
