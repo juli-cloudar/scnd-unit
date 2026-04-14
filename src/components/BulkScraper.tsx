@@ -1,5 +1,4 @@
-// src/components/BulkScraper.tsx
-'use client'; // Wichtig für Client-Side Komponente
+'use client';
 
 import { useState } from 'react';
 
@@ -8,6 +7,7 @@ interface ScrapeResult {
   items?: any[];
   count?: number;
   error?: string;
+  hasMore?: boolean;
 }
 
 export default function BulkScraper() {
@@ -15,12 +15,20 @@ export default function BulkScraper() {
   const [results, setResults] = useState<Record<string, ScrapeResult> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // ✅ Async Funktion für den Button-Click
   const handleScrape = async () => {
-    const urlList = urls.split('\n').filter(u => u.trim());
-    
+    // ✅ URLs bereinigen (Leerzeichen entfernen)
+    const urlList = urls
+      .split('\n')
+      .map(u => u.trim())
+      .filter(u => u.length > 0);
+
     if (urlList.length === 0) {
       alert('Bitte URLs eingeben');
+      return;
+    }
+
+    if (urlList.length > 5) {
+      alert('Maximal 5 URLs erlaubt');
       return;
     }
 
@@ -33,11 +41,16 @@ export default function BulkScraper() {
         body: JSON.stringify({ urls: urlList }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
       const data = await response.json();
       setResults(data.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Fehler:', error);
-      alert('Scraping fehlgeschlagen');
+      alert('Fehler: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -50,8 +63,8 @@ export default function BulkScraper() {
       <textarea
         value={urls}
         onChange={(e) => setUrls(e.target.value)}
-        placeholder="URLs eingeben (eine pro Zeile)&#10;z.B.: https://www.vinted.de/member/3138250645-scndunit"
-        rows={10}
+        placeholder="Maximal 5 URLs (eine pro Zeile)&#10;z.B.: https://www.vinted.de/member/3138250645-scndunit"
+        rows={5}
         style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
       />
       
@@ -66,13 +79,13 @@ export default function BulkScraper() {
           cursor: loading ? 'not-allowed' : 'pointer'
         }}
       >
-        {loading ? 'Scraping...' : 'Scrapen starten'}
+        {loading ? 'Scraping...' : `Scrapen starten (${urls.split('\n').filter(u => u.trim()).length} URLs)`}
       </button>
 
       {results && (
         <div style={{ marginTop: '20px' }}>
           <h2>Ergebnisse:</h2>
-          {Object.entries(results).map(([url, result]) => (
+          {Object.entries(results).map(([url, result]: [string, any]) => (
             <div key={url} style={{ 
               margin: '10px 0', 
               padding: '10px', 
@@ -81,7 +94,10 @@ export default function BulkScraper() {
             }}>
               <strong>{url}</strong><br/>
               {result.success ? (
-                <span>✅ {result.count} Items gefunden</span>
+                <span>
+                  ✅ {result.count} Items gefunden 
+                  {result.hasMore && ' (mehr verfügbar)'}
+                </span>
               ) : (
                 <span>❌ Fehler: {result.error}</span>
               )}
