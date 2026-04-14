@@ -217,7 +217,6 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
 }
 
 
-// =================== VINTED TOOLS TAB (NEU: mit Datei-Upload) ===================
 // =================== VINTED TOOLS TAB ===================
 function VintedToolsTab({ user, toast, confirm }: {
   user: Employee | null,
@@ -598,7 +597,7 @@ function VintedToolsTab({ user, toast, confirm }: {
     </div>
   );
 }
-// =================== INVENTORY TAB ===================
+
 // =================== INVENTORY TAB ===================
 function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -648,37 +647,54 @@ function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: 
 
   return (
     <div>
-      {/* Verbesserte Filter mit getrennten Marken und Kategorien */}
-      <div className="mb-6 space-y-4">
-        {/* Marken Filter */}
+      {/* Verbesserte Filter mit horizontalem Scroll */}
+      <div className="mb-6 space-y-6">
+        {/* Marken Filter mit horizontalem Scroll */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-1 h-3 bg-[#FF4400]"></div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest">Marken</p>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-4 bg-[#FF4400]"></div>
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Marken</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {allBrands.map(b => (
-              <button key={b} onClick={() => setActiveBrand(b)}
-                className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
-                {b}
-              </button>
-            ))}
+          <div className="relative">
+            <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
+              {allBrands.map(b => (
+                <button key={b} onClick={() => setActiveBrand(b)}
+                  className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                    activeBrand === b 
+                      ? 'bg-[#FF4400] text-white' 
+                      : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                  }`}>
+                  {b}
+                </button>
+              ))}
+            </div>
+            {/* Gradient für Scroll-Indikator */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
           </div>
         </div>
         
-        {/* Kategorien Filter */}
+        {/* Kategorien Filter mit horizontalem Scroll */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-1 h-3 bg-[#FF4400]"></div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest">Kategorien</p>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-4 bg-[#FF4400]"></div>
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Kategorien</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {allCategories.map(c => (
-              <button key={c} onClick={() => setActiveCategory(c)}
-                className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeCategory === c ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
-                {c}
-              </button>
-            ))}
+          <div className="relative">
+            <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
+              {allCategories.map(c => (
+                <button key={c} onClick={() => setActiveCategory(c)}
+                  className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                    activeCategory === c 
+                      ? 'bg-[#FF4400] text-white' 
+                      : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                  }`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
           </div>
         </div>
       </div>
@@ -752,7 +768,6 @@ function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: 
     </div>
   );
 }
-
 // =================== ADD TAB ===================
 function AddTab({ user, toast, onProductAdded }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, onProductAdded: () => void }) {
   const [url, setUrl] = useState('');
