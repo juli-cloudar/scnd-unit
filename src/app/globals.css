@@ -1,2 +1,19 @@
 @import "tailwindcss";
-/* cache bust So 22. Mär 03:16:14 CET 2026 */
+
+/* Cache bust So 22. Mär 03:16:14 CET 2026 */
+
+/* Custom Scrollbar für Filter - horizontales Scrollen */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #1A1A1A;
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #FF4400;
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #FF6644;
+}
