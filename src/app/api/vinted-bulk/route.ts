@@ -15,8 +15,6 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
-// ⭐⭐⭐ HIER DIE ECHTE SCRAPING-LOGIK AUS DEINER ORIGINALEN route.ts ⭐⭐⭐
-
 interface ScrapeResult {
   itemId: string | null;
   url: string;
@@ -32,6 +30,7 @@ interface ScrapeResult {
   message?: string;
 }
 
+// ⭐ AKTUALISIERTER User-Agent für fetchWithTimeout ⭐
 async function fetchWithTimeout(url: string, timeoutMs = 7000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -39,7 +38,7 @@ async function fetchWithTimeout(url: string, timeoutMs = 7000): Promise<Response
     return await fetch(url, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 OPR/109.0.0.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
         'Cache-Control': 'no-cache',
@@ -138,11 +137,10 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   }
 }
 
-// ⭐⭐⭐ ECHTE getAllUserItems Funktion ⭐⭐⭐
+// ⭐ AKTUALISIERTE getAllUserItems Funktion mit besserem User-Agent ⭐
 async function getAllUserItems(memberInput: string): Promise<string[]> {
   const urls: string[] = [];
   
-  // Extrahiere Member-ID
   let memberId = '';
   memberInput = memberInput.trim();
   
@@ -163,14 +161,14 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
   
   console.log(`[Vinted] Member ID: ${memberId}`);
   
-  // ⭐ VERSUCHE ZUERST DIE VINTED API ⭐
+  // ⭐ VERSUCHE ZUERST DIE VINTED API (mit aktualisiertem User-Agent) ⭐
   try {
     const apiUrl = `https://www.vinted.de/api/v2/members/${memberId}/items?page=1&per_page=100`;
     console.log(`[Vinted] Trying API: ${apiUrl}`);
     
     const response = await fetch(apiUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 OPR/109.0.0.0',
         'Accept': 'application/json',
         'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
         'Referer': 'https://www.vinted.de/',
@@ -189,12 +187,14 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
         console.log(`[Vinted] API found ${urls.length} items`);
         if (urls.length > 0) return urls;
       }
+    } else {
+      console.log(`[Vinted] API returned ${response.status}`);
     }
   } catch (err) {
     console.log('[Vinted] API failed, trying HTML scraping');
   }
   
-  // ⭐ FALLBACK: HTML SCRAPING (dein bestehender Code)
+  // ⭐ FALLBACK: HTML SCRAPING (mit aktualisiertem User-Agent) ⭐
   let page = 1;
   const maxPages = 20;
   
@@ -205,7 +205,7 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
     try {
       const response = await fetch(profileUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 OPR/109.0.0.0',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
           'Cache-Control': 'no-cache',
@@ -249,6 +249,7 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
   console.log(`[Vinted] Total unique items found: ${urls.length}`);
   return urls;
 }
+
 // ⭐⭐⭐ BULK API ENDPUNKT ⭐⭐⭐
 export async function POST(request: Request) {
   console.log('[Bulk API] POST received');
@@ -266,7 +267,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         totalItems: 0,
         itemUrls: [],
-        message: 'Keine Items gefunden'
+        message: 'Keine Items gefunden für diesen Member'
       }, { headers: CORS });
     }
     
