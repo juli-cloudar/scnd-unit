@@ -1,444 +1,397 @@
-// src/app/api/vinted-bulk/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
-export const maxDuration = 60;
-export const dynamic = 'force-dynamic';
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: CORS });
-}
-
-interface ScrapeResult {
-  itemId: string | null;
-  url: string;
-  status: 'available' | 'sold' | 'reserved';
-  name: string;
-  price: string;
-  size: string;
-  condition: string;
-  category: string;
-  images: string[];
-  lastChecked: string;
-  error?: boolean;
-  message?: string;
-}
-
-// ──────────────────────────────────────────────
-// Gemeinsame Headers (Browser-Imitation)
-// ──────────────────────────────────────────────
+// Browser-ähnliche Headers für den initialen Cookie-Request
 const BROWSER_HEADERS = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-    '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
-  'Cache-Control': 'no-cache',
-  Referer: 'https://www.vinted.de/',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'max-age=0',
+  'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 };
 
-async function fetchWithTimeout(url: string, timeoutMs = 8000): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+// API-Headers (XHR-Request)
+const API_HEADERS = {
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"Windows"',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'same-origin',
+  'X-Requested-With': 'XMLHttpRequest',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+};
+
+interface VintedItem {
+  id: number;
+  title: string;
+  price: string;
+  url: string;
+  thumbnail?: string;
+  brand?: string;
+  size?: string;
+  status?: string;
+}
+
+// Schritt 1: Cookie von Vinted Startseite holen
+async function getVintedCookies(domain: string): Promise<{ sessionCookie: string; datadomeCookie: string; anonId: string }> {
   try {
-    return await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        ...BROWSER_HEADERS,
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      },
+    const homeUrl = `https://www.${domain}/`;
+    
+    console.log(`[Cookie] Hole Cookies von ${homeUrl}...`);
+    
+    const response = await fetch(homeUrl, {
+      method: 'GET',
+      headers: BROWSER_HEADERS,
+      cache: 'no-store'
     });
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
-// ──────────────────────────────────────────────
-// Member-ID zuverlässig extrahieren
-// Unterstützt:
-//   "3138250645"
-//   "3138250645-scndunit"
-//   "https://www.vinted.de/member/3138250645-scndunit"
-//   "https://www.vinted.de/member/3138250645"
-// ──────────────────────────────────────────────
-function extractMemberId(input: string): string | null {
-  const s = input.trim();
-
-  // Vollständige URL oder Pfad mit /member/
-  const fromUrl = s.match(/\/member\/(\d+)/);
-  if (fromUrl) return fromUrl[1];
-
-  // Nur Zahlen (pure ID)
-  if (/^\d+$/.test(s)) return s;
-
-  // "12345-username" Format
-  const fromSlug = s.match(/^(\d+)-/);
-  if (fromSlug) return fromSlug[1];
-
-  return null;
-}
-
-// ──────────────────────────────────────────────
-// HTML-Item-Extraktion (für Einzel-Scraping)
-// ──────────────────────────────────────────────
-function extractItemFromHTML(html: string, url: string): ScrapeResult {
-  const isSold =
-    /Dieser Artikel ist bereits verkauft|Artikel nicht verfügbar|bereits verkauft/i.test(html);
-  const isReserved = /Dieser Artikel ist reserviert|reserviert/i.test(html);
-
-  let status: 'available' | 'sold' | 'reserved' = 'available';
-  if (isSold) status = 'sold';
-  else if (isReserved) status = 'reserved';
-
-  const images: string[] = [];
-  const imgMatches = html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g);
-  for (const m of imgMatches) {
-    let imgUrl = m[0];
-    if (imgUrl.includes('/f800/')) {
-      imgUrl = imgUrl.split('?')[0];
-      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(imgUrl)}`;
-      if (!images.includes(proxyUrl)) images.push(proxyUrl);
+    if (!response.ok) {
+      throw new Error(`Fehler beim Holen der Startseite: ${response.status}`);
     }
+
+    const setCookieHeader = response.headers.get('set-cookie') || '';
+    const cookies = setCookieHeader.split(',').map(c => c.trim());
+    
+    let sessionCookie = '';
+    let datadomeCookie = '';
+    let anonId = '';
+
+    for (const cookie of cookies) {
+      if (cookie.includes('_vinted_fr_session=')) {
+        sessionCookie = cookie.match(/(_vinted_fr_session=[^;]+)/)?.[1] || '';
+      }
+      if (cookie.includes('datadome=')) {
+        datadomeCookie = cookie.match(/(datadome=[^;]+)/)?.[1] || '';
+      }
+      if (cookie.includes('anon_id=')) {
+        anonId = cookie.match(/(anon_id=[^;]+)/)?.[1] || '';
+      }
+    }
+
+    if (!anonId) {
+      anonId = `anon_id=${generateUUID()}`;
+    }
+
+    console.log(`[Cookie] Session: ${sessionCookie ? '✓' : '✗'}, Datadome: ${datadomeCookie ? '✓' : '✗'}`);
+
+    if (!sessionCookie && !datadomeCookie) {
+      throw new Error('Keine gültigen Cookies erhalten');
+    }
+
+    return { sessionCookie, datadomeCookie, anonId };
+  } catch (error) {
+    console.error('[Cookie] Fehler:', error);
+    throw error;
+  }
+}
+
+// Schritt 2: API-Request mit Cookies (User Items)
+async function fetchUserItems(
+  domain: string, 
+  userId: string, 
+  page: number, 
+  cookies: { sessionCookie: string; datadomeCookie: string; anonId: string }
+): Promise<{ items: VintedItem[]; totalPages: number }> {
+  
+  const apiUrl = `https://www.${domain}/api/v2/users/${userId}/items?page=${page}&per_page=96`;
+  
+  const cookieString = [
+    cookies.anonId,
+    cookies.sessionCookie,
+    cookies.datadomeCookie,
+    'ab.optOut=This-cookie-will-expire-in-2024'
+  ].filter(Boolean).join('; ');
+
+  const headers = {
+    ...API_HEADERS,
+    'Cookie': cookieString,
+    'Referer': `https://www.${domain}/member/${userId}`
+  };
+
+  console.log(`[API] Request: ${apiUrl}`);
+
+  const response = await fetch(apiUrl, {
+    method: 'GET',
+    headers,
+    cache: 'no-store'
+  });
+
+  if (response.status === 403) {
+    throw new Error('Datadome blockiert (403)');
   }
 
-  const titleMatch = html.match(/<title>([^<]+)/i);
-  const name = titleMatch ? titleMatch[1].replace(' | Vinted', '').trim() : '';
+  if (response.status === 401) {
+    throw new Error('Session abgelaufen (401)');
+  }
 
-  let price = '';
-  const priceMatch = html.match(/(\d{1,3}(?:[.,]\d{2})?)\s*€/);
-  if (priceMatch) price = priceMatch[1].replace(',', '.');
+  if (!response.ok) {
+    throw new Error(`API Fehler: ${response.status}`);
+  }
 
-  let size = '';
-  const sizeMatch =
-    html.match(/Größe<\/dt>\s*<dd[^>]*>([^<]+)/i) ||
-    html.match(/"size"[:\s]*"([^"]+)"/i);
-  if (sizeMatch) size = sizeMatch[1].trim();
-
-  let condition = '';
-  const conditionMatch = html.match(/Zustand<\/dt>\s*<dd[^>]*>([^<]+)/i);
-  if (conditionMatch) condition = conditionMatch[1].trim();
-
-  const category = inferCategory(name);
-  const itemIdMatch = url.match(/\/items\/(\d+)/);
+  const data = await response.json();
+  
+  const items: VintedItem[] = (data.items || []).map((item: any) => ({
+    id: item.id,
+    title: item.title || 'Unbekannter Artikel',
+    price: item.price ? `${item.price.amount} ${item.price.currency}` : 'Preis unbekannt',
+    url: `https://www.${domain}/items/${item.id}`,
+    thumbnail: item.photos?.[0]?.url || item.photos?.[0]?.thumbnails?.[0]?.url,
+    brand: item.brand?.title,
+    size: item.size?.title,
+    status: item.status
+  }));
 
   return {
-    itemId: itemIdMatch?.[1] ?? null,
-    url,
-    status,
-    name,
-    price,
-    size,
-    condition,
-    category,
-    images: images.slice(0, 5),
-    lastChecked: new Date().toISOString(),
+    items,
+    totalPages: data.pagination?.total_pages || 1
   };
 }
 
-function inferCategory(name: string): string {
-  const n = name.toLowerCase();
-  if (n.includes('jacke') || n.includes('jacket') || n.includes('coat')) return 'Jacken';
-  if (n.includes('pullover') || n.includes('hoodie') || n.includes('knit')) return 'Pullover';
-  if (n.includes('sweat')) return 'Sweatshirts';
-  if (n.includes('shirt') || n.includes('top') || n.includes('tee')) return 'Tops';
-  if (n.includes('kleid') || n.includes('dress')) return 'Kleider';
-  if (n.includes('hose') || n.includes('jeans') || n.includes('pants')) return 'Hosen';
-  if (n.includes('schuh') || n.includes('sneaker') || n.includes('boot')) return 'Schuhe';
-  return 'Sonstiges';
+// Fallback: Catalog API
+async function fetchUserItemsViaCatalog(
+  domain: string,
+  userId: string,
+  page: number,
+  cookies: { sessionCookie: string; datadomeCookie: string; anonId: string }
+): Promise<{ items: VintedItem[]; totalPages: number }> {
+  
+  const apiUrl = `https://www.${domain}/api/v2/catalog/items?user_id=${userId}&page=${page}&per_page=96`;
+  
+  const cookieString = [
+    cookies.anonId,
+    cookies.sessionCookie,
+    cookies.datadomeCookie
+  ].filter(Boolean).join('; ');
+
+  const headers = {
+    ...API_HEADERS,
+    'Cookie': cookieString,
+    'Referer': `https://www.${domain}/member/${userId}`
+  };
+
+  console.log(`[Catalog API] Request: ${apiUrl}`);
+
+  const response = await fetch(apiUrl, {
+    method: 'GET',
+    headers,
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Catalog API Fehler: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  const items: VintedItem[] = (data.items || []).map((item: any) => ({
+    id: item.id,
+    title: item.title || 'Unbekannter Artikel',
+    price: item.price ? `${item.price.amount} ${item.price.currency}` : 'Preis unbekannt',
+    url: `https://www.${domain}/items/${item.id}`,
+    thumbnail: item.photos?.[0]?.url,
+    brand: item.brand?.title,
+    size: item.size?.title,
+    status: item.status
+  }));
+
+  return {
+    items,
+    totalPages: data.pagination?.total_pages || 1
+  };
 }
 
-// ──────────────────────────────────────────────
-// Einzelnes Item scrapen
-// ──────────────────────────────────────────────
-async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
-  console.log(`[Scrape] Fetching: ${url}`);
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+function extractMemberId(input: string): string | null {
+  if (/^\d+$/.test(input)) return input;
+  
+  const match = input.match(/^(\d+)-/);
+  if (match) return match[1];
+  
+  const urlMatch = input.match(/member\/(\d+)/);
+  if (urlMatch) return urlMatch[1];
+  
+  return null;
+}
+
+function extractDomain(input: string): string {
   try {
-    const response = await fetchWithTimeout(url);
-    if (!response.ok) {
-      return {
-        itemId: null, url, status: 'sold', name: '', price: '', size: '',
-        condition: '', category: 'Sonstiges', images: [],
-        lastChecked: new Date().toISOString(), error: true,
-        message: `HTTP ${response.status}`,
-      };
+    if (input.includes('vinted.')) {
+      const url = new URL(input);
+      return url.hostname.replace('www.', '');
     }
-    const html = await response.text();
-    const result = extractItemFromHTML(html, url);
-    console.log(`[Scrape] OK: "${result.name}" → ${result.status}`);
-    return result;
-  } catch (error) {
-    console.error(`[Scrape] Error for ${url}:`, error);
-    return {
-      itemId: null, url, status: 'sold', name: '', price: '', size: '',
-      condition: '', category: 'Sonstiges', images: [],
-      lastChecked: new Date().toISOString(), error: true,
-      message: String(error),
-    };
-  }
-}
-
-// ──────────────────────────────────────────────
-// ⭐ HAUPT-FIX: Alle Item-URLs eines Users holen
-//
-// Vinted ist eine Next.js-SPA → das Profil-HTML
-// enthält KEINE Item-Links. Einziger verlässlicher
-// Weg: die interne JSON-API.
-//
-// Endpunkte (ohne Auth, öffentlich):
-//   /api/v2/users/{id}/items?page=N&per_page=96
-//
-// Falls die API blockiert: wir parsen das
-// eingebettete __NEXT_DATA__ JSON aus dem HTML.
-// ──────────────────────────────────────────────
-async function getAllUserItems(memberInput: string): Promise<string[]> {
-  const memberId = extractMemberId(memberInput);
-  if (!memberId) {
-    console.error('[Vinted] Konnte Member-ID nicht extrahieren aus:', memberInput);
-    return [];
-  }
-  console.log(`[Vinted] Member-ID: ${memberId}`);
-
-  // ── Versuch 1: Öffentliche JSON-API (/api/v2/users/{id}/items) ──
-  try {
-    const urls = await fetchViaJsonApi(memberId);
-    if (urls.length > 0) return urls;
-  } catch (err) {
-    console.warn('[Vinted] JSON-API fehlgeschlagen:', err);
-  }
-
-  // ── Versuch 2: __NEXT_DATA__ aus Profil-HTML parsen ──
-  try {
-    const urls = await fetchViaNextData(memberId);
-    if (urls.length > 0) return urls;
-  } catch (err) {
-    console.warn('[Vinted] __NEXT_DATA__ fehlgeschlagen:', err);
-  }
-
-  console.error('[Vinted] Alle Methoden fehlgeschlagen. 0 Items gefunden.');
-  return [];
-}
-
-// ── Methode 1: Öffentliche Vinted JSON-API ──────────────────────
-async function fetchViaJsonApi(memberId: string): Promise<string[]> {
-  const urls: string[] = [];
-  let page = 1;
-  const perPage = 96;
-
-  while (true) {
-    // Vinted nutzt /api/v2/users/{id}/items (nicht /members/)
-    const apiUrl =
-      `https://www.vinted.de/api/v2/users/${memberId}/items` +
-      `?page=${page}&per_page=${perPage}&order=newest_first`;
-
-    console.log(`[API] GET ${apiUrl}`);
-
-    const res = await fetch(apiUrl, {
-      headers: {
-        ...BROWSER_HEADERS,
-        Accept: 'application/json, text/plain, */*',
-        // X-Requested-With hilft manchmal, den JSON-Zweig zu triggern
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-    });
-
-    if (!res.ok) {
-      console.warn(`[API] Status ${res.status} auf Seite ${page}`);
-      // 401/403 → kein Auth-Token → Methode abbrechen
-      break;
-    }
-
-    const data = await res.json();
-    const items: any[] = data?.items ?? data?.data?.items ?? [];
-
-    if (items.length === 0) break;
-
-    for (const item of items) {
-      const rawUrl: string = item.url ?? item.path ?? '';
-      if (!rawUrl) continue;
-      const fullUrl = rawUrl.startsWith('http')
-        ? rawUrl
-        : `https://www.vinted.de${rawUrl}`;
-      if (!urls.includes(fullUrl)) urls.push(fullUrl);
-    }
-
-    console.log(`[API] Seite ${page}: ${items.length} Items (gesamt: ${urls.length})`);
-
-    const pagination = data?.pagination ?? data?.meta ?? {};
-    const totalPages: number =
-      pagination.total_pages ??
-      Math.ceil((pagination.total_count ?? 0) / perPage) ??
-      1;
-
-    if (page >= totalPages || items.length < perPage) break;
-    page++;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-
-  console.log(`[API] Insgesamt ${urls.length} URLs gefunden`);
-  return urls;
-}
-
-// ── Methode 2: __NEXT_DATA__ aus dem Profil-HTML ─────────────────
-// Vinted bettet manchmal initiale Items als JSON in die Seite ein.
-async function fetchViaNextData(memberId: string): Promise<string[]> {
-  const profileUrl = `https://www.vinted.de/member/${memberId}`;
-  console.log(`[NextData] GET ${profileUrl}`);
-
-  const res = await fetchWithTimeout(profileUrl, 10000);
-  if (!res.ok) {
-    console.warn(`[NextData] Status ${res.status}`);
-    return [];
-  }
-
-  const html = await res.text();
-
-  // __NEXT_DATA__ Script-Tag extrahieren
-  const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
-  if (!nextDataMatch) {
-    console.warn('[NextData] Kein __NEXT_DATA__ gefunden');
-    return [];
-  }
-
-  let nextData: any;
-  try {
-    nextData = JSON.parse(nextDataMatch[1]);
   } catch {
-    console.warn('[NextData] JSON parse fehlgeschlagen');
-    return [];
+    // Keine URL
   }
-
-  // Items tief im Objekt suchen
-  const urls: string[] = [];
-  const itemsArray = findItemsArray(nextData);
-
-  for (const item of itemsArray) {
-    const rawUrl: string = item.url ?? item.path ?? '';
-    if (!rawUrl) continue;
-    const fullUrl = rawUrl.startsWith('http')
-      ? rawUrl
-      : `https://www.vinted.de${rawUrl}`;
-    if (!urls.includes(fullUrl)) urls.push(fullUrl);
-  }
-
-  console.log(`[NextData] ${urls.length} Items aus __NEXT_DATA__ extrahiert`);
-  return urls;
+  return 'vinted.de';
 }
 
-// Rekursiv nach einem Array suchen, das nach Items aussieht
-function findItemsArray(obj: any, depth = 0): any[] {
-  if (depth > 10 || !obj || typeof obj !== 'object') return [];
-  if (Array.isArray(obj)) {
-    // Prüfen ob es ein Items-Array ist (Elemente haben .url oder .id + .price)
-    if (obj.length > 0 && obj[0] && (obj[0].url || (obj[0].id && obj[0].price))) {
-      return obj;
-    }
-    for (const el of obj) {
-      const found = findItemsArray(el, depth + 1);
-      if (found.length > 0) return found;
-    }
-    return [];
-  }
-  for (const key of Object.keys(obj)) {
-    if (['items', 'listings', 'products'].includes(key) && Array.isArray(obj[key])) {
-      return obj[key];
-    }
-  }
-  for (const val of Object.values(obj)) {
-    const found = findItemsArray(val, depth + 1);
-    if (found.length > 0) return found;
-  }
-  return [];
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ──────────────────────────────────────────────
-// POST Handler
-// ──────────────────────────────────────────────
-export async function POST(request: Request) {
-  console.log('[Bulk API] POST received');
-
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { profileUrl, quick = false } = body;
+    const { urls } = body;
 
-    if (!profileUrl) {
+    if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
-        { message: 'Fehlender Parameter: profileUrl' },
-        { status: 400, headers: CORS }
+        { error: 'Bitte mindestens eine URL angeben' },
+        { status: 400 }
       );
     }
 
-    console.log(`[Bulk API] Lade Items für: ${profileUrl}`);
-    const allUrls = await getAllUserItems(profileUrl);
+    const results: Record<string, any> = {};
+    
+    for (const urlInput of urls) {
+      let attempts = 0;
+      const maxAttempts = 3;
+      let success = false;
 
-    if (allUrls.length === 0) {
-      return NextResponse.json(
-        {
-          totalItems: 0,
-          itemUrls: [],
-          message:
-            'Keine Items gefunden. Mögliche Ursachen: privates Profil, ' +
-            'falsche Member-ID, oder Vinted blockiert den Zugriff.',
-        },
-        { headers: CORS }
-      );
+      while (attempts < maxAttempts && !success) {
+        attempts++;
+        console.log(`\n[Attempt ${attempts}/${maxAttempts}] für ${urlInput}`);
+
+        try {
+          const memberId = extractMemberId(urlInput);
+          const domain = extractDomain(urlInput);
+          
+          if (!memberId) {
+            results[urlInput] = { success: false, error: 'Konnte Member ID nicht extrahieren' };
+            break;
+          }
+
+          console.log(`[Info] Member ID: ${memberId}, Domain: ${domain}`);
+
+          // Cookies holen
+          const cookies = await getVintedCookies(domain);
+          
+          if (!cookies.sessionCookie && !cookies.datadomeCookie) {
+            throw new Error('Keine Cookies erhalten');
+          }
+
+          // Alle Items abrufen
+          const allItems: VintedItem[] = [];
+          let currentPage = 1;
+          let totalPages = 1;
+          let useCatalog = false;
+
+          do {
+            try {
+              let pageResult;
+              
+              if (!useCatalog) {
+                try {
+                  pageResult = await fetchUserItems(domain, memberId, currentPage, cookies);
+                } catch (error: any) {
+                  if (error.message.includes('403') || error.message.includes('401')) {
+                    console.log('[Fallback] Wechsle zu Catalog API...');
+                    useCatalog = true;
+                    pageResult = await fetchUserItemsViaCatalog(domain, memberId, currentPage, cookies);
+                  } else {
+                    throw error;
+                  }
+                }
+              } else {
+                pageResult = await fetchUserItemsViaCatalog(domain, memberId, currentPage, cookies);
+              }
+
+              allItems.push(...pageResult.items);
+              totalPages = pageResult.totalPages;
+              
+              console.log(`[Progress] Seite ${currentPage}/${totalPages}: ${pageResult.items.length} Items`);
+              
+              if (currentPage < totalPages) {
+                await sleep(1000 + Math.random() * 1000);
+              }
+              
+              currentPage++;
+            } catch (error: any) {
+              console.error(`[Error] Seite ${currentPage}:`, error.message);
+              break;
+            }
+          } while (currentPage <= totalPages && currentPage <= 10);
+
+          results[urlInput] = {
+            success: true,
+            items: allItems,
+            count: allItems.length,
+            userId: memberId,
+            domain: domain,
+            attempts: attempts
+          };
+          
+          success = true;
+
+        } catch (error: any) {
+          console.error(`[Attempt ${attempts}] Fehler:`, error.message);
+          
+          if (attempts >= maxAttempts) {
+            results[urlInput] = {
+              success: false,
+              error: `Fehlgeschlagen nach ${maxAttempts} Versuchen: ${error.message}`,
+              lastError: error.message
+            };
+          } else {
+            await sleep(2000 * attempts);
+          }
+        }
+      }
+
+      // Pause zwischen Usern
+      await sleep(3000);
     }
 
-    console.log(`[Bulk API] ${allUrls.length} URLs gefunden`);
+    return NextResponse.json({
+      success: true,
+      data: results,
+      totalUrls: urls.length,
+      successful: Object.values(results).filter((r: any) => r.success).length,
+      failed: Object.values(results).filter((r: any) => !r.success).length,
+      timestamp: new Date().toISOString()
+    });
 
-    if (quick === true) {
-      return NextResponse.json(
-        {
-          totalItems: allUrls.length,
-          itemUrls: allUrls,
-          message: `${allUrls.length} Items gefunden.`,
-        },
-        { headers: CORS }
-      );
-    }
-
-    // Vollständiges Scraping
-    const results: ScrapeResult[] = [];
-    for (let i = 0; i < allUrls.length; i++) {
-      console.log(`[Bulk API] Scraping ${i + 1}/${allUrls.length}: ${allUrls[i]}`);
-      const result = await scrapeSingleItem(allUrls[i]);
-      results.push(result);
-      await new Promise((r) => setTimeout(r, 300));
-    }
-
-    const available = results.filter((r) => r.status === 'available' && !r.error);
-    const sold = results.filter((r) => r.status === 'sold');
-    const reserved = results.filter((r) => r.status === 'reserved');
-    const errors = results.filter((r) => r.error);
-
+  } catch (error: any) {
+    console.error('[API] Allgemeiner Fehler:', error);
     return NextResponse.json(
-      {
-        summary: {
-          total: results.length,
-          available: available.length,
-          sold: sold.length,
-          reserved: reserved.length,
-          errors: errors.length,
-        },
-        items: {
-          added: available,
-          skipped: sold,
-          reserved: reserved,
-          failed: errors,
-        },
-        message: `${available.length} verfügbar, ${sold.length} verkauft, ${reserved.length} reserviert`,
-      },
-      { headers: CORS }
-    );
-  } catch (error) {
-    console.error('[Bulk API] Unerwarteter Fehler:', error);
-    return NextResponse.json(
-      { message: 'Serverfehler: ' + String(error) },
-      { status: 500, headers: CORS }
+      { error: 'Interner Serverfehler', details: error.message },
+      { status: 500 }
     );
   }
+}
+
+// GET für Status-Check
+export async function GET() {
+  return NextResponse.json({
+    status: 'Vinted Bulk Scraper (Option C - Datadome Cookie Mode)',
+    version: '2.0',
+    endpoints: {
+      POST: '/api/vinted-bulk - Body: { urls: string[] }'
+    },
+    features: [
+      'Automatische Cookie-Extraktion',
+      'Retry-Logik (3 Versuche)',
+      'User API + Catalog API Fallback',
+      'Pagination bis 10 Seiten',
+      'Rate Limiting'
+    ]
+  });
 }
