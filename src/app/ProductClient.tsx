@@ -1,4 +1,4 @@
-'use client'
+'use client' 
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -207,26 +207,47 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [activeBrand, setActiveBrand] = useState("Alle")
   const [isAdmin, setIsAdmin] = useState(false)
 
-   useEffect(() => {
+   const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    const adminMode = localStorage.getItem('admin_mode') === 'true'
+    setIsAdmin(adminMode)
+  }, [])
+
+  // ⭐ refreshProducts Funktion (MUSS VOR DEM FILTER SEIN!)
+  const refreshProducts = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/products')
+      if (response.ok) {
+        const newProducts = await response.json()
+        setProducts(newProducts)
+      } else {
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error('Fehler beim Neuladen:', error)
+      window.location.reload()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // ⭐ Feste Kategorien (nicht aus Datenbank)
+  // ⭐ Filter Definitionen
   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
   const allCategories = ["Alle", ...fixedCategories];
-  
-  // ⭐ Marken aus Datenbank (gefiltert und sortiert) - NUR EINMAL!
   const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'de'));
-
-  // ⭐ Gefilterte Produkte - NUR EINMAL!
   const filteredProducts = products.filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false
     return true
-  })
-
+  })   
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
