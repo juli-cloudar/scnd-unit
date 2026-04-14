@@ -12,8 +12,16 @@ import { supabase } from '@/lib/supabase';
 
 // =================== INTERFACES ===================
 interface Product {
-  id: number; name: string; category: string; price: string;
-  size: string; condition: string; images: string[]; vinted_url: string; sold: boolean;
+  id: number
+  name: string
+  brand: string      // ⭐ NEU: Marke hinzufügen
+  category: string
+  price: string
+  size: string
+  condition: string
+  images: string[]
+  vinted_url: string
+  sold: boolean
 }
 interface Employee {
   id: number; username: string; password: string; role: 'Mitarbeiter' | 'Manager' | 'Admin';
