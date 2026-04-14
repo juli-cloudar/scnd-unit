@@ -63,29 +63,29 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // AllOrigins Proxy - 100% kostenlos
+        // Direkter Fetch - manchmal funktioniert das
         const targetUrl = `https://www.${domain}/api/v2/users/${memberId}/items?page=1&per_page=48`;
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        
+        console.log(`[Direct] Fetching: ${targetUrl}`);
 
-        console.log(`[AllOrigins] Fetching: ${targetUrl}`);
-
-        const response = await fetch(proxyUrl, {
+        const response = await fetch(targetUrl, {
           method: 'GET',
-          headers: { 
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept': 'application/json',
+            'Accept-Language': 'de-DE,de;q=0.9',
           },
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          throw new Error(`HTTP ${response.status} - ${response.statusText}`);
         }
 
         const data = await response.json();
         
-        // Extrahiere Items aus der Response
         const items = data.items || [];
         
-        console.log(`[AllOrigins] Gefunden: ${items.length} Items`);
+        console.log(`[Direct] Gefunden: ${items.length} Items`);
 
         results[cleanUrl] = {
           success: true,
@@ -97,18 +97,18 @@ export async function POST(request: NextRequest) {
             thumbnail: item.photos?.[0]?.url || item.photos?.[0]?.thumbnails?.[0]?.url,
             brand: item.brand?.title,
             size: item.size?.title,
-            status: item.status,
           })),
           count: items.length,
           userId: memberId,
-          source: 'allorigins',
+          source: 'direct',
         };
 
       } catch (error: any) {
-        console.error(`[AllOrigins] Fehler für ${cleanUrl}:`, error);
+        console.error(`[Direct] Fehler für ${cleanUrl}:`, error);
         results[cleanUrl] = {
           success: false,
           error: error.message || 'Unbekannter Fehler',
+          details: `Failed to fetch from Vinted API`
         };
       }
     }
@@ -130,8 +130,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    status: 'Vinted Bulk Scraper (AllOrigins - kostenlos)',
-    version: '4.4',
+    status: 'Vinted Bulk Scraper (Direct)',
+    version: '4.5',
     endpoints: {
       POST: '/api/vinted-bulk - Body: { profileUrl: string }',
     },
