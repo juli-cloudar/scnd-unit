@@ -266,30 +266,26 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       
-      // ⭐ ANPASSUNG: Extrahiere Felder aus deinem JSON-Format ⭐
-      const id = item.id;
-      const title = item['Item Title'] || item.title || item.name;
-     const priceRaw = item['Item Price'] || item.price || item.amount;
+     // ⭐ ANPASSUNG: Extrahiere Felder aus deinem JSON-Format ⭐
+const id = item.id;
+const title = item['Item Title'] || item.title || item.name;
+const priceRaw = item['Item Price'] || item.price || item.amount;
 // Extrahiere nur die Zahl (entferne alles außer Ziffern, Komma und Punkt)
 let priceNumber = String(priceRaw).replace(/[^0-9,.-]/g, '').replace(',', '.');
 let priceValue = parseFloat(priceNumber);
-      const brand = item['Item Brand'] || item.brand || '';
-      const size = item['Item Size'] || item.size || '–';
-      const condition = item['Item Status'] || item.condition || 'Gut';
-      const url = item['Item URL'] || item.url || item.link || '';
-      
-      // Sammle alle Fotos
-      const photoUrls = [];
-      for (let p = 1; p <= 10; p++) {
-        const photo = item[`Item Photo ${p}`];
-        if (photo) photoUrls.push(photo);
-      }
-      const photoUrl = photoUrls[0] || '';
+// ⭐ RUNDEN UND PREIS FORMATIEREN ⭐
+const price = `${Math.round(priceValue)}€`;
+const brand = item['Item Brand'] || item.brand || '';
+const size = item['Item Size'] || item.size || '–';
+const condition = item['Item Status'] || item.condition || 'Gut';
+const url = item['Item URL'] || item.url || item.link || '';
 
-      if (!title || !url) {
-        failed++;
-        continue;
-      }
+// Sammle alle Fotos
+const photoUrls = [];
+for (let p = 1; p <= 10; p++) {
+  const photo = item[`Item Photo ${p}`];
+  if (photo) photoUrls.push(photo);
+}
 
       // Prüfe ob bereits vorhanden
       const { data: existing } = await supabase
