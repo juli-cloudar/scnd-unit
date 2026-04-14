@@ -227,107 +227,124 @@ function VintedToolsTab({ user, toast, confirm }: {
   const [singleResult, setSingleResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ⭐⭐⭐ JSON IMPORT (ersetzt den Bulk Import) ⭐⭐⭐
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadedFile(file);
-    setImportResult(null);
-  };
+ 
+        const processImport = async () => {
+  if (!uploadedFile) {
+    toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
+    return;
+  }
 
-  const processImport = async () => {
-    if (!uploadedFile) {
-      toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
-      return;
+  setImportLoading(true);
+  setImportResult(null);
+
+  try {
+    const text = await uploadedFile.text();
+    let items = JSON.parse(text);
+    
+    if (!Array.isArray(items)) {
+      if (items.items && Array.isArray(items.items)) {
+        items = items.items;
+      } else if (items.data && Array.isArray(items.data)) {
+        items = items.data;
+      } else {
+        throw new Error('Ungültiges JSON-Format: Erwarte ein Array von Artikeln');
+      }
     }
 
-    setImportLoading(true);
-    setImportResult(null);
+    toast(`${items.length} Artikel in JSON gefunden`, 'info');
 
-    try {
-      // Lese die JSON-Datei
-      const text = await uploadedFile.text();
-      let items = JSON.parse(text);
+    let success = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
       
-      // Normalisiere das Format (unterschiedliche Extension-Formate)
-      if (!Array.isArray(items)) {
-        if (items.items && Array.isArray(items.items)) {
-          items = items.items;
-        } else if (items.data && Array.isArray(items.data)) {
-          items = items.data;
-        } else {
-          throw new Error('Ungültiges JSON-Format: Erwarte ein Array von Artikeln');
-        }
+      const title = item.title || item.name || item.ItemTitle;
+      const priceRaw = item.price || item.ItemPrice || item.amount;
+      const price = typeof priceRaw === 'number' ? `${priceRaw} €` : String(priceRaw).replace(/^€/, '').trim() + ' €';
+      const brand = item.brand || item.ItemBrand || '';
+      const size = item.size || item.ItemSize || '–';
+      const condition = item.condition || item.ItemStatus || 'Gut';
+      const url = item.url || item.ItemURL || item.link || '';
+      const photos = item.photos || item.AllPhotos || item.images || [];
+      const photoUrl = Array.isArray(photos) ? photos[0] : (typeof photos === 'string' ? photos.split('||')[0] : '');
+
+      if (!title || !url) {
+        failed++;
+        continue;
       }
 
-      toast(`${items.length} Artikel in JSON gefunden`, 'info');
+      const { data: existing } = await supabase
+        .from('products')
+        .select('id')
+        .eq('vinted_url', url)
+        .maybeSingle();
 
-      let success = 0;
-      let failed = 0;
-      let skipped = 0;
+      if (existing) {
+        skipped++;
+        continue;
+      }
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        
-        // Extrahiere die benötigten Felder (unterschiedliche Benennungen möglich)
-        const id = item.id || item.item_id;
-        const title = item.title || item.name || item.ItemTitle;
-        const priceRaw = item.price || item.ItemPrice || item.amount;
-        const price = typeof priceRaw === 'number' ? `${priceRaw} €` : String(priceRaw).replace(/^€/, '').trim() + ' €';
-        const brand = item.brand || item.ItemBrand || item.marke || '';
-        const size = item.size || item.ItemSize || item.groesse || '–';
-        const condition = item.condition || item.ItemStatus || item.zustand || 'Gut';
-        const url = item.url || item.ItemURL || item.link || '';
-        const photos = item.photos || item.AllPhotos || item.images || [];
-        const photoUrl = Array.isArray(photos) ? photos[0] : (typeof photos === 'string' ? photos.split('||')[0] : '');
+      const newProduct = {
+        name: title.substring(0, 100),
+        category: brand || 'Vintage',
+        price: price,
+        size: size || '–',
+        condition: condition,
+        images: [photoUrl],
+        vinted_url: url,
+        sold: false,
+      };
 
-        if (!title || !url) {
-          failed++;
-          continue;
-        }
+      const { error } = await supabase.from('products').insert(newProduct);
+      if (error) {
+        failed++;
+        console.error('Insert Fehler:', error);
+      } else {
+        success++;
+      }
 
-        // Prüfe ob bereits vorhanden
-        const { data: existing } = await supabase
-          .from('products')
-          .select('id')
-          .eq('vinted_url', url)
-          .maybeSingle();
+      // ⭐ HIER IST DIE KORRIGIERTE ZEILE ⭐
+      setImportResult((prev: any) => ({ 
+        ...prev, 
+        current: i + 1, 
+        total: items.length,
+        success,
+        failed,
+        skipped
+      }));
+      
+      await new Promise(r => setTimeout(r, 100));
+    }
 
-        if (existing) {
-          skipped++;
-          continue;
-        }
+    const finalResult = {
+      summary: { 
+        total: items.length, 
+        imported: success, 
+        skipped: skipped, 
+        failed: failed,
+        errors: failed
+      },
+      message: `✅ Fertig: ${success} importiert, ${skipped} Duplikate, ${failed} Fehler`,
+    };
+    setImportResult(finalResult);
+    toast(finalResult.message, 'success');
+    
+    if (success > 0) {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('products-updated'));
+      }, 500);
+    }
 
-        // Neues Produkt erstellen
-        const newProduct = {
-          name: title.substring(0, 100),
-          category: brand || 'Vintage',
-          price: price,
-          size: size || '–',
-          condition: condition,
-          images: [photoUrl],
-          vinted_url: url,
-          sold: false,
-        };
-
-        const { error } = await supabase.from('products').insert(newProduct);
-        if (error) {
-          failed++;
-          console.error('Insert Fehler:', error);
-        } else {
-          success++;
-        }
-
-        // Fortschritt anzeigen
-        setImportResult(prev => ({ 
-          ...prev, 
-          current: i + 1, 
-          total: items.length,
-          success,
-          failed,
-          skipped
-        }));
-        
+  } catch (error: any) {
+    console.error('Import Fehler:', error);
+    toast('Fehler beim Verarbeiten der JSON: ' + error.message, 'error');
+    setImportResult({ message: 'Fehler: ' + error.message, summary: { total: 0, imported: 0, skipped: 0, failed: 1 } });
+  } finally {
+    setImportLoading(false);
+  }
+};
         await new Promise(r => setTimeout(r, 100)); // Kleine Pause
       }
 
