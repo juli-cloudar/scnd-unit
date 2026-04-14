@@ -321,35 +321,47 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
           
-          {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
+                {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
           
-          <div className="mb-8">
-            <div className="mb-6">
+          {/* Filter mit horizontalem Scroll und Sortierung */}
+          <div className="mb-8 space-y-6">
+            {/* Marken - alphabetisch sortiert mit horizontalem Scroll */}
+            <div>
               <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Marken</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex overflow-x-auto gap-2 pb-3 scrollbar-thin">
                 <button onClick={() => setActiveBrand("Alle")}
-                  className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeBrand === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+                  className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeBrand === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
                   Alle
                 </button>
-                {allBrands.filter(b => b !== "Alle").map(b => (
+                {allBrands.filter(b => b !== "Alle").sort((a, b) => a.localeCompare(b, 'de')).map(b => (
                   <button key={b} onClick={() => setActiveBrand(b)}
-                    className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+                    className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
                     {b}
                   </button>
                 ))}
               </div>
             </div>
             
+            {/* Kategorien - mit definierter Reihenfolge und horizontalem Scroll */}
             <div>
               <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Kategorien</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex overflow-x-auto gap-2 pb-3 scrollbar-thin">
                 <button onClick={() => setActiveCategory("Alle")}
-                  className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeCategory === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+                  className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeCategory === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
                   Alle
                 </button>
-                {allCategories.filter(c => c !== "Alle").map(cat => (
+                {allCategories.filter(c => c !== "Alle").sort((a, b) => {
+                  // Eigene Sortierreihenfolge für Kategorien
+                  const order = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
+                  const indexA = order.indexOf(a);
+                  const indexB = order.indexOf(b);
+                  if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                  if (indexA !== -1) return -1;
+                  if (indexB !== -1) return 1;
+                  return a.localeCompare(b, 'de');
+                }).map(cat => (
                   <button key={cat} onClick={() => setActiveCategory(cat)}
-                    className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+                    className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
                     {cat}
                   </button>
                 ))}
