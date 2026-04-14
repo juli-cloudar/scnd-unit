@@ -21,6 +21,7 @@ const staggerContainer = {
 interface Product {
   id: number
   name: string
+  brand: string        // ⭐ NEU
   category: string
   price: string
   size: string
@@ -29,7 +30,6 @@ interface Product {
   vinted_url: string
   sold: boolean
 }
-
 interface ProductClientProps {
   initialProducts: Product[]
 }
@@ -206,6 +206,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [activeCategory, setActiveCategory] = useState("Alle")
+  const [activeBrand, setActiveBrand] = useState("Alle")
   const [isAdmin, setIsAdmin] = useState(false)
 
   // Prüfe ob Admin (einfache Lösung: über Environment Variable oder localStorage)
@@ -243,10 +244,14 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category))).sort()]
-  const filteredProducts = activeCategory === "Alle" 
-    ? products 
-    : products.filter(p => p.category === activeCategory)
+const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filter(Boolean)))].sort()
+const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category)))].sort()
+
+const filteredProducts = products.filter(p => {
+  if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
+  if (activeCategory !== "Alle" && p.category !== activeCategory) return false
+  return true
+})
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
@@ -327,44 +332,75 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           {/* Vinted Import Button (nur für Admins sichtbar) */}
           {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
           
-          <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-12 flex-wrap">
-            <Filter className="w-4 h-4 text-[#FF4400]" />
-            {allCategories.map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-2 text-xs uppercase tracking-widest border transition-all ${activeCategory === cat ? 'border-[#FF4400] text-[#FF4400] bg-[#FF4400]/10' : 'border-[#1A1A1A] text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
-                {cat}
-              </button>
-            ))}
-          </motion.div>
-          
+        
+          <div className="mb-8">
+  <div className="mb-6">
+    <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Marken</p>
+    <div className="flex flex-wrap gap-2">
+      <button onClick={() => setActiveBrand("Alle")}
+        className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeBrand === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+        Alle
+      </button>
+      {allBrands.filter(b => b !== "Alle").map(b => (
+        <button key={b} onClick={() => setActiveBrand(b)}
+          className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+          {b}
+        </button>
+      ))}
+    </div>
+  </div>
+  
+  <div>
+    <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Kategorien</p>
+    <div className="flex flex-wrap gap-2">
+      <button onClick={() => setActiveCategory("Alle")}
+        className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeCategory === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+        Alle
+      </button>
+      {allCategories.filter(c => c !== "Alle").map(cat => (
+        <button key={cat} onClick={() => setActiveCategory(cat)}
+          className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+          {cat}
+        </button>
+      ))}
+    </div>
+  </div>
+</div>
           {loading ? (
             <div className="text-center py-20 text-gray-500 uppercase tracking-widest">Lade...</div>
           ) : (
             <AnimatePresence mode="wait">
               <motion.div key={activeCategory} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProducts.map((product, index) => (
-                  <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
-                    className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
-                    <ImageSlider images={product.images} alt={product.name} condition={product.condition} />
-                    <div className="p-6">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="min-w-0 pr-2">
-                          <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">{product.category}</p>
-                          <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">{product.name}</h3>
-                        </div>
-                        <span className="text-xl font-bold text-[#FF4400] shrink-0">{product.price}</span>
-                      </div>
-                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
-                        <span className="text-sm text-gray-400 uppercase tracking-widest">{product.size !== "–" ? `Size ${product.size}` : ""}</span>
-                        <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">View <ExternalLink className="w-4 h-4" /></span>
-                      </div>
-                    </div>
-                  </motion.a>
-                ))}
-              </motion.div>
-            </AnimatePresence>
-          )}
+                 <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
+  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
+  className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
+  <ImageSlider images={product.images} alt={product.name} condition={product.condition} />
+  <div className="p-6">
+    <div className="flex justify-between items-start mb-2">
+      <div className="min-w-0 pr-2">
+        {/* ⭐ ZEIGE MARKE (oder Kategorie als Fallback) ⭐ */}
+        <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">
+          {product.brand || product.category}
+        </p>
+        <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">
+          {product.name}
+        </h3>
+      </div>
+      <span className="text-xl font-bold text-[#FF4400] shrink-0">{product.price}</span>
+    </div>
+    <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
+      <span className="text-sm text-gray-400 uppercase tracking-widest">
+        {product.size !== "–" ? `Size ${product.size}` : ""}
+        {/* ⭐ ZEIGE KATEGORIE (wenn vorhanden) ⭐ */}
+        {product.category && product.category !== "Sonstiges" && ` • ${product.category}`}
+      </span>
+      <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">
+        View <ExternalLink className="w-4 h-4" />
+      </span>
+    </div>
+  </div>
+</motion.a>
           
           <div className="mt-16 text-center">
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest">
