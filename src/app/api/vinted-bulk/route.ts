@@ -16,23 +16,21 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: Request) {
-  console.log('[API] Bulk POST received');
+  console.log('[Bulk API] POST received');
   
   try {
     const body = await request.json();
     const { profileUrl, quick = false } = body;
     
-    let identifier = profileUrl;
-    
     // Extrahiere Member-ID
     let memberId = '';
-    if (/^\d+$/.test(identifier)) {
-      memberId = identifier;
-    } else if (identifier.includes('/member/')) {
-      const match = identifier.match(/\/member\/(\d+)/);
+    if (/^\d+$/.test(profileUrl)) {
+      memberId = profileUrl;
+    } else if (profileUrl.includes('/member/')) {
+      const match = profileUrl.match(/\/member\/(\d+)/);
       if (match) memberId = match[1];
     } else {
-      const numMatch = identifier.match(/^(\d+)/);
+      const numMatch = profileUrl.match(/^(\d+)/);
       if (numMatch) memberId = numMatch[1];
     }
     
@@ -40,7 +38,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Keine gültige Member-ID gefunden' }, { status: 400, headers: CORS });
     }
     
-    console.log(`[API] Member ID: ${memberId}`);
+    console.log(`[Bulk API] Member ID: ${memberId}`);
     
     // Simuliere 50 Items für den Test
     const mockUrls = Array.from({ length: 50 }, (_, i) => 
@@ -61,7 +59,7 @@ export async function POST(request: Request) {
     }, { headers: CORS });
     
   } catch (error) {
-    console.error('[API] Error:', error);
+    console.error('[Bulk API] Error:', error);
     return NextResponse.json({ message: 'Fehler: ' + String(error) }, { status: 500, headers: CORS });
   }
 }
