@@ -1,7 +1,7 @@
 // src/app/admin/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Trash2, ExternalLink, RefreshCw, ShoppingBag, Plus,
   Wand2, ImageIcon, Users, Package, BarChart3, Eye, EyeOff,
