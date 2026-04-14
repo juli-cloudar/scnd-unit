@@ -1,7 +1,4 @@
-// src/app/api/vinted-bulk/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-
-const BROWSABLE_API_KEY = process.env.BROWSABLE_API_KEY;
 
 function extractMemberId(input: string): string | null {
   const clean = input.trim();
@@ -38,13 +35,6 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!BROWSABLE_API_KEY) {
-      return NextResponse.json(
-        { error: 'BROWSABLE_API_KEY nicht konfiguriert' },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     const { profileUrl, urls } = body;
 
@@ -73,50 +63,52 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // Browsable API mit richtigem Header
-        const apiUrl = `https://api.browsable.app/v1/vinted/member/items?member_url=${encodeURIComponent(cleanUrl)}&pages=1&per_page=48`;
+        // AllOrigins Proxy - 100% kostenlos
+        const targetUrl = `https://www.${domain}/api/v2/users/${memberId}/items?page=1&per_page=48`;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
 
-        console.log(`[Browsable] Request: ${apiUrl}`);
+        console.log(`[AllOrigins] Fetching: ${targetUrl}`);
 
-        const response = await fetch(apiUrl, {
+        const response = await fetch(proxyUrl, {
           method: 'GET',
-          headers: {
-            'x-api-key': BROWSABLE_API_KEY,  // ✅ Richtiger Header!
+          headers: { 
             'Accept': 'application/json',
           },
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Browsable API Fehler ${response.status}: ${errorText}`);
+          throw new Error(`HTTP ${response.status}`);
         }
 
         const data = await response.json();
-        console.log(`[Browsable] Response:`, data);
-
-        // Browsable gibt items in data.items zurück
-        const items = data.items || data.data?.items || [];
+        
+        // Extrahiere Items aus der Response
+        const items = data.items || [];
+        
+        console.log(`[AllOrigins] Gefunden: ${items.length} Items`);
 
         results[cleanUrl] = {
           success: true,
           items: items.map((item: any) => ({
-            id: item.id || item.item_id,
-            title: item.title || 'Unbekannt',
-            price: item.price ? `${item.price} ${item.currency || 'EUR'}` : 'Preis unbekannt',
-            url: item.url || `https://www.${domain}/items/${item.id}`,
-            thumbnail: item.photo?.url || item.thumbnail || item.image,
-            brand: item.brand,
-            size: item.size,
+            id: item.id,
+            title: item.title || 'Unbekannter Artikel',
+            price: item.price ? `${item.price.amount} ${item.price.currency}` : 'Preis unbekannt',
+            url: `https://www.${domain}/items/${item.id}`,
+            thumbnail: item.photos?.[0]?.url || item.photos?.[0]?.thumbnails?.[0]?.url,
+            brand: item.brand?.title,
+            size: item.size?.title,
+            status: item.status,
           })),
           count: items.length,
-          source: 'browsable',
+          userId: memberId,
+          source: 'allorigins',
         };
 
       } catch (error: any) {
-        console.error(`[Browsable] Fehler für ${cleanUrl}:`, error);
+        console.error(`[AllOrigins] Fehler für ${cleanUrl}:`, error);
         results[cleanUrl] = {
           success: false,
-          error: error.message,
+          error: error.message || 'Unbekannter Fehler',
         };
       }
     }
@@ -138,9 +130,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    status: 'Vinted Bulk Scraper (Browsable API)',
-    version: '4.3',
-    apiKeyConfigured: !!BROWSABLE_API_KEY,
+    status: 'Vinted Bulk Scraper (AllOrigins - kostenlos)',
+    version: '4.4',
     endpoints: {
       POST: '/api/vinted-bulk - Body: { profileUrl: string }',
     },
