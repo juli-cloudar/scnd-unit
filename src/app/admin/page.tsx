@@ -1,4 +1,4 @@
-// src/app/admin/page.tsx
+// src/app/admin/page.tsx 
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -591,10 +591,12 @@ function VintedToolsTab({ user, toast, confirm }: {
   );
 }
 // =================== INVENTORY TAB ===================
+// =================== INVENTORY TAB ===================
 function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('Alle');
+  const [activeBrand, setActiveBrand] = useState('Alle');
+  const [activeCategory, setActiveCategory] = useState('Alle');
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
@@ -607,8 +609,20 @@ function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: 
 
   useEffect(() => { loadProducts(); const channel = supabase.channel('products-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => loadProducts()).subscribe(); return () => { supabase.removeChannel(channel); }; }, [loadProducts]);
 
-  const categories = ['Alle', ...Array.from(new Set(products.map(p => p.category))).sort()];
-  const filtered = products.filter(p => (filter === 'Alle' || p.category === filter) && (p.name.toLowerCase().includes(search.toLowerCase()) || p.price.includes(search)));
+  // Marken aus Datenbank (alphabetisch sortiert)
+  const allBrands = ["Alle", ...Array.from(new Set(products.map(p => p.brand).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'de'));
+  
+  // Feste Kategorien
+  const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
+  const allCategories = ["Alle", ...fixedCategories];
+
+  // Gefilterte Produkte
+  const filtered = products.filter(p => {
+    if (activeBrand !== "Alle" && p.brand !== activeBrand) return false;
+    if (activeCategory !== "Alle" && p.category !== activeCategory) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.price.includes(search)) return false;
+    return true;
+  });
 
   if (editingProduct) return (
     <div className="max-w-2xl mx-auto bg-[#111] border border-[#FF4400]/30 p-6">
@@ -623,7 +637,111 @@ function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: 
     </div>
   );
 
-  return (<div><div className="flex flex-wrap items-center justify-between gap-4 mb-6"><div className="flex items-center gap-2 flex-wrap">{categories.map(cat => (<button key={cat} onClick={() => setFilter(cat)} className={`px-3 py-1.5 text-xs uppercase font-bold transition-colors ${filter === cat ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>{cat}</button>))}</div><div className="flex items-center gap-2"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/><input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm"/></div><button onClick={loadProducts} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10"><RefreshCw className="w-4 h-4"/></button></div></div>{loading ? <div className="text-center py-20 text-gray-500">Lade...</div> : (<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">{filtered.map(p => (<div key={p.id} className={`relative border transition-all ${p.sold ? 'border-red-500/50 opacity-50' : 'border-[#FF4400]/20 hover:border-[#FF4400]/50'}`}>{p.sold && (<div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"><span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rotate-[-15deg] uppercase tracking-widest">Verkauft</span></div>)}<div className="aspect-[3/4] bg-[#1A1A1A] overflow-hidden relative"><img src={p.images?.[0] ? (p.images[0].startsWith('/api/') ? p.images[0] : `/api/image-proxy?url=${encodeURIComponent(p.images[0])}`) : ''} alt={p.name} className="w-full h-full object-cover"/>{p.images?.length > 1 && (<div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 text-xs font-bold flex items-center gap-1"><ImageIcon className="w-3 h-3"/> {p.images.length}</div>)}</div><div className="p-2 bg-[#0A0A0A]"><p className="text-xs font-bold truncate">{p.name}</p><p className="text-xs text-[#FF4400] mt-0.5">€{p.price?.replace(/^€/, '')} · {p.size}</p><div className="flex gap-1 mt-2">{user?.permissions.canEditProducts && (<button onClick={() => setEditingProduct(p)} className="px-2 py-1 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10"><Edit3 className="w-3 h-3"/></button>)}{user?.permissions.canEditProducts && (<button onClick={() => { if (user?.permissions.canEditProducts) { supabase.from('products').update({ sold: !p.sold }).eq('id', p.id).then(() => { toast(p.sold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info'); loadProducts(); }); } else { toast('Keine Berechtigung!', 'error'); } }} className={`flex-1 py-1 text-xs font-bold uppercase flex items-center justify-center gap-1 ${p.sold ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}><ShoppingBag className="w-3 h-3"/>{p.sold ? 'Reaktiv.' : 'Verkauft'}</button>)}<a href={p.vinted_url} target="_blank" className="px-2 py-1 border border-[#FF4400]/30 text-[#FF4400]"><ExternalLink className="w-3 h-3"/></a>{user?.permissions.canDeleteProducts && (<button onClick={() => { if (user?.permissions.canDeleteProducts) { confirm('Produkt wirklich löschen?', () => { supabase.from('products').delete().eq('id', p.id).then(() => { toast('Produkt gelöscht', 'info'); loadProducts(); }); }); } else { toast('Keine Berechtigung!', 'error'); } }} className="px-2 py-1 border border-red-500/30 text-red-400"><Trash2 className="w-3 h-3"/></button>)}</div></div></div>))}</div>)}</div>);
+  return (
+    <div>
+      {/* Verbesserte Filter mit getrennten Marken und Kategorien */}
+      <div className="mb-6 space-y-4">
+        {/* Marken Filter */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-1 h-3 bg-[#FF4400]"></div>
+            <p className="text-xs text-gray-500 uppercase tracking-widest">Marken</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {allBrands.map(b => (
+              <button key={b} onClick={() => setActiveBrand(b)}
+                className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+                {b}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Kategorien Filter */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-1 h-3 bg-[#FF4400]"></div>
+            <p className="text-xs text-gray-500 uppercase tracking-widest">Kategorien</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {allCategories.map(c => (
+              <button key={c} onClick={() => setActiveCategory(c)}
+                className={`px-3 py-1.5 text-xs uppercase tracking-widest transition-all ${activeCategory === c ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Suchleiste und Refresh Button */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
+            <input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64"/>
+          </div>
+          <button onClick={loadProducts} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10">
+            <RefreshCw className="w-4 h-4"/>
+          </button>
+        </div>
+        <div className="text-xs text-gray-500">
+          {filtered.length} von {products.length} Artikeln
+        </div>
+      </div>
+      
+      {/* Produkt Grid */}
+      {loading ? (
+        <div className="text-center py-20 text-gray-500">Lade...</div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {filtered.map(p => (
+            <div key={p.id} className={`relative border transition-all ${p.sold ? 'border-red-500/50 opacity-50' : 'border-[#FF4400]/20 hover:border-[#FF4400]/50'}`}>
+              {p.sold && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                  <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rotate-[-15deg] uppercase tracking-widest">Verkauft</span>
+                </div>
+              )}
+              <div className="aspect-[3/4] bg-[#1A1A1A] overflow-hidden relative">
+                <img src={p.images?.[0] ? (p.images[0].startsWith('/api/') ? p.images[0] : `/api/image-proxy?url=${encodeURIComponent(p.images[0])}`) : ''} alt={p.name} className="w-full h-full object-cover"/>
+                {p.images?.length > 1 && (
+                  <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 text-xs font-bold flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3"/> {p.images.length}
+                  </div>
+                )}
+              </div>
+              <div className="p-2 bg-[#0A0A0A]">
+                <p className="text-xs font-bold truncate">{p.name}</p>
+                <p className="text-xs text-[#FF4400] mt-0.5">{p.price} · {p.size}</p>
+                <div className="flex gap-1 mt-2">
+                  {user?.permissions.canEditProducts && (
+                    <button onClick={() => setEditingProduct(p)} className="px-2 py-1 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10">
+                      <Edit3 className="w-3 h-3"/>
+                    </button>
+                  )}
+                  {user?.permissions.canEditProducts && (
+                    <button onClick={() => { if (user?.permissions.canEditProducts) { supabase.from('products').update({ sold: !p.sold }).eq('id', p.id).then(() => { toast(p.sold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info'); loadProducts(); }); } else { toast('Keine Berechtigung!', 'error'); } }} 
+                      className={`flex-1 py-1 text-xs font-bold uppercase flex items-center justify-center gap-1 ${p.sold ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}>
+                      <ShoppingBag className="w-3 h-3"/>{p.sold ? 'Reaktiv.' : 'Verkauft'}
+                    </button>
+                  )}
+                  <a href={p.vinted_url} target="_blank" className="px-2 py-1 border border-[#FF4400]/30 text-[#FF4400]">
+                    <ExternalLink className="w-3 h-3"/>
+                  </a>
+                  {user?.permissions.canDeleteProducts && (
+                    <button onClick={() => { if (user?.permissions.canDeleteProducts) { confirm('Produkt wirklich löschen?', () => { supabase.from('products').delete().eq('id', p.id).then(() => { toast('Produkt gelöscht', 'info'); loadProducts(); }); }); } else { toast('Keine Berechtigung!', 'error'); } }} 
+                      className="px-2 py-1 border border-red-500/30 text-red-400">
+                      <Trash2 className="w-3 h-3"/>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // =================== ADD TAB ===================
