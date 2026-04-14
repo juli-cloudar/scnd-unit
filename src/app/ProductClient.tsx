@@ -205,16 +205,14 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [scrolled, setScrolled] = useState(false)
   const [activeCategory, setActiveCategory] = useState("Alle")
   const [activeBrand, setActiveBrand] = useState("Alle")
-  const [isAdmin, setIsAdmin] = useState(false)
-
-   const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)  // ⭐ NUR EINMAL!
 
   useEffect(() => {
     const adminMode = localStorage.getItem('admin_mode') === 'true'
     setIsAdmin(adminMode)
   }, [])
 
-  // ⭐ refreshProducts Funktion (MUSS VOR DEM FILTER SEIN!)
+  // ⭐ refreshProducts Funktion
   const refreshProducts = async () => {
     setLoading(true)
     try {
@@ -247,7 +245,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false
     return true
-  })   
+  })
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
