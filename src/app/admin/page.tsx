@@ -234,7 +234,6 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   setUploadedFile(file);
   setImportResult(null);
 };
-  
   const processImport = async () => {
   if (!uploadedFile) {
     toast('Bitte zuerst eine JSON-Datei auswählen', 'error');
@@ -267,21 +266,30 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       
-      const title = item.title || item.name || item.ItemTitle;
-      const priceRaw = item.price || item.ItemPrice || item.amount;
-      const price = typeof priceRaw === 'number' ? `${priceRaw} €` : String(priceRaw).replace(/^€/, '').trim() + ' €';
-      const brand = item.brand || item.ItemBrand || '';
-      const size = item.size || item.ItemSize || '–';
-      const condition = item.condition || item.ItemStatus || 'Gut';
-      const url = item.url || item.ItemURL || item.link || '';
-      const photos = item.photos || item.AllPhotos || item.images || [];
-      const photoUrl = Array.isArray(photos) ? photos[0] : (typeof photos === 'string' ? photos.split('||')[0] : '');
+      // ⭐ ANPASSUNG: Extrahiere Felder aus deinem JSON-Format ⭐
+      const id = item.id;
+      const title = item['Item Title'] || item.title || item.name;
+      const priceRaw = item['Item Price'] || item.price || item.amount;
+      const price = typeof priceRaw === 'number' ? `${priceRaw} €` : String(priceRaw).replace(/€/g, '').trim() + ' €';
+      const brand = item['Item Brand'] || item.brand || '';
+      const size = item['Item Size'] || item.size || '–';
+      const condition = item['Item Status'] || item.condition || 'Gut';
+      const url = item['Item URL'] || item.url || item.link || '';
+      
+      // Sammle alle Fotos
+      const photoUrls = [];
+      for (let p = 1; p <= 10; p++) {
+        const photo = item[`Item Photo ${p}`];
+        if (photo) photoUrls.push(photo);
+      }
+      const photoUrl = photoUrls[0] || '';
 
       if (!title || !url) {
         failed++;
         continue;
       }
 
+      // Prüfe ob bereits vorhanden
       const { data: existing } = await supabase
         .from('products')
         .select('id')
@@ -293,13 +301,14 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         continue;
       }
 
+      // Neues Produkt erstellen
       const newProduct = {
         name: title.substring(0, 100),
         category: brand || 'Vintage',
         price: price,
         size: size || '–',
         condition: condition,
-        images: [photoUrl],
+        images: photoUrls.length > 0 ? photoUrls : [],
         vinted_url: url,
         sold: false,
       };
@@ -321,7 +330,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         skipped
       }));
       
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 50));
     }
 
     const finalResult = {
@@ -350,7 +359,8 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   } finally {
     setImportLoading(false);
   }
-};      
+};
+ 
 
   // ⭐⭐⭐ SINGLE ITEM CHECK ⭐⭐⭐
   const checkSingleItem = async () => {
