@@ -321,55 +321,91 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
           
-                {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
+                    {isAdmin && <VintedImportButton onImportComplete={refreshProducts} />}
           
-          {/* Filter mit horizontalem Scroll und Sortierung */}
+          {/* Verbesserte Filter mit Custom Scrollbar */}
           <div className="mb-8 space-y-6">
-            {/* Marken - alphabetisch sortiert mit horizontalem Scroll */}
+            {/* Marken - alphabetisch sortiert */}
             <div>
-              <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Marken</p>
-              <div className="flex overflow-x-auto gap-2 pb-3 scrollbar-thin">
-                <button onClick={() => setActiveBrand("Alle")}
-                  className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeBrand === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
-                  Alle
-                </button>
-                {allBrands.filter(b => b !== "Alle").sort((a, b) => a.localeCompare(b, 'de')).map(b => (
-                  <button key={b} onClick={() => setActiveBrand(b)}
-                    className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
-                    {b}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-[#FF4400]"></div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest">Nach Marke filtern</p>
+              </div>
+              <div className="relative">
+                <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
+                  <button onClick={() => setActiveBrand("Alle")}
+                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                      activeBrand === "Alle" 
+                        ? 'bg-[#FF4400] text-white' 
+                        : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                    }`}>
+                    Alle
                   </button>
-                ))}
+                  {allBrands
+                    .filter(b => b !== "Alle")
+                    .sort((a, b) => a.localeCompare(b, 'de'))
+                    .map(b => (
+                      <button key={b} onClick={() => setActiveBrand(b)}
+                        className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                          activeBrand === b 
+                            ? 'bg-[#FF4400] text-white' 
+                            : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                        }`}>
+                        {b}
+                      </button>
+                    ))}
+                </div>
+                {/* Gradient für Scroll-Indikator (links/rechts) */}
+                <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
+                <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
               </div>
             </div>
             
-            {/* Kategorien - mit definierter Reihenfolge und horizontalem Scroll */}
+            {/* Kategorien - mit definierter Reihenfolge */}
             <div>
-              <p className="text-xs text-gray-500 mb-3 uppercase tracking-widest">Kategorien</p>
-              <div className="flex overflow-x-auto gap-2 pb-3 scrollbar-thin">
-                <button onClick={() => setActiveCategory("Alle")}
-                  className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeCategory === "Alle" ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
-                  Alle
-                </button>
-                {allCategories.filter(c => c !== "Alle").sort((a, b) => {
-                  // Eigene Sortierreihenfolge für Kategorien
-                  const order = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
-                  const indexA = order.indexOf(a);
-                  const indexB = order.indexOf(b);
-                  if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                  if (indexA !== -1) return -1;
-                  if (indexB !== -1) return 1;
-                  return a.localeCompare(b, 'de');
-                }).map(cat => (
-                  <button key={cat} onClick={() => setActiveCategory(cat)}
-                    className={`px-3 py-1.5 text-xs whitespace-nowrap uppercase tracking-widest transition-all ${activeCategory === cat ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
-                    {cat}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-1 h-4 bg-[#FF4400]"></div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest">Nach Kategorie filtern</p>
+              </div>
+              <div className="relative">
+                <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
+                  <button onClick={() => setActiveCategory("Alle")}
+                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                      activeCategory === "Alle" 
+                        ? 'bg-[#FF4400] text-white' 
+                        : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                    }`}>
+                    Alle
                   </button>
-                ))}
+                  {allCategories
+                    .filter(c => c !== "Alle")
+                    .sort((a, b) => {
+                      const order = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
+                      const indexA = order.indexOf(a);
+                      const indexB = order.indexOf(b);
+                      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                      if (indexA !== -1) return -1;
+                      if (indexB !== -1) return 1;
+                      return a.localeCompare(b, 'de');
+                    })
+                    .map(cat => (
+                      <button key={cat} onClick={() => setActiveCategory(cat)}
+                        className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                          activeCategory === cat 
+                            ? 'bg-[#FF4400] text-white' 
+                            : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
+                        }`}>
+                        {cat}
+                      </button>
+                    ))}
+                </div>
+                <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
+                <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
               </div>
             </div>
           </div>
           
-          {loading ? (
+          {loading ? (    
             <div className="text-center py-20 text-gray-500 uppercase tracking-widest">Lade...</div>
           ) : (
             <AnimatePresence mode="wait">
