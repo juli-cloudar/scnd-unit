@@ -25,7 +25,6 @@ function extractDomain(input: string): string {
   return 'vinted.de';
 }
 
-// ✅ OPTIONS für CORS Preflight
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
@@ -40,68 +39,63 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     console.log('[API] Request received');
-    console.log('[API] Headers:', Object.fromEntries(request.headers.entries()));
 
-    // ✅ Content-Type prüfen
     const contentType = request.headers.get('content-type');
-    console.log('[API] Content-Type:', contentType);
-
     if (!contentType?.includes('application/json')) {
       return NextResponse.json(
-        { error: `Invalid Content-Type: ${contentType}. Must be application/json` },
+        { error: `Invalid Content-Type: ${contentType}` },
         { status: 400 }
       );
     }
 
-    // ✅ API Key prüfen
     if (!SCRAPINGANT_API_KEY) {
-      console.error('[API] SCRAPINGANT_API_KEY not set');
       return NextResponse.json(
-        { error: 'Server config error: API key missing' },
+        { error: 'API key not configured' },
         { status: 500 }
       );
     }
 
-    // ✅ Body parsen mit Fehlerbehandlung
+    // ✅ Body parsen (unterstützt BEIDE Formate)
     let body;
     try {
       body = await request.json();
       console.log('[API] Body:', body);
     } catch (parseError) {
-      console.error('[API] JSON parse error:', parseError);
       return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
+        { error: 'Invalid JSON' },
         { status: 400 }
       );
     }
 
-    const { urls } = body;
-
-    // ✅ URLs validieren
-    if (!urls) {
+    // ✅ BEIDE Formate unterstützen:
+    // Format 1: { urls: ['...'] }  (neu)
+    // Format 2: { profileUrl: '...', quick: true }  (alt/Frontend)
+    
+    let urls: string[] = [];
+    
+    if (body.urls && Array.isArray(body.urls)) {
+      // Neues Format
+      urls = body.urls;
+    } else if (body.profileUrl && typeof body.profileUrl === 'string') {
+      // Altes Format (Frontend sendet das!)
+      urls = [body.profileUrl];
+    } else {
       return NextResponse.json(
-        { error: 'Missing "urls" field in body' },
-        { status: 400 }
-      );
-    }
-
-    if (!Array.isArray(urls)) {
-      return NextResponse.json(
-        { error: `"urls" must be an array, got ${typeof urls}` },
+        { error: 'Expected { urls: string[] } or { profileUrl: string }' },
         { status: 400 }
       );
     }
 
     if (urls.length === 0) {
       return NextResponse.json(
-        { error: '"urls" array is empty' },
+        { error: 'No URLs provided' },
         { status: 400 }
       );
     }
 
     if (urls.length > 3) {
       return NextResponse.json(
-        { error: `Too many URLs: ${urls.length}. Max: 3` },
+        { error: 'Max 3 URLs allowed' },
         { status: 400 }
       );
     }
@@ -109,7 +103,6 @@ export async function POST(request: NextRequest) {
     const results: Record<string, any> = {};
 
     for (const urlInput of urls) {
-      // ✅ URL muss String sein
       if (typeof urlInput !== 'string') {
         results[String(urlInput)] = { 
           success: false, 
@@ -191,11 +184,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: 'Vinted Bulk Scraper (ScrapingAnt)',
-    version: '3.0-debug',
+    version: '3.1',
     apiKeyConfigured: !!SCRAPINGANT_API_KEY,
-    endpoints: { 
-      POST: '/api/vinted-bulk - Body: { urls: string[] }',
-      GET: 'Status check'
-    },
+    formats: ['{ urls: string[] }', '{ profileUrl: string }'],
   });
 }
