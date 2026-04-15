@@ -25,7 +25,7 @@ interface Product {
   price: string
   size: string
   condition: string
-  images: string[]
+  images: string[] | null
   vinted_url: string
   sold: boolean
 }
@@ -40,7 +40,7 @@ const proxyImg = (url: string) => {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`
 }
 
-const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string, condition: string }) => {
+const ImageSlider = ({ images, alt, condition }: { images: string[] | null, alt: string, condition: string }) => {
   const [current, setCurrent] = useState(0)
   const [dragStart, setDragStart] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -60,8 +60,8 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
     if (Math.abs(diff) > 40) {
       e.preventDefault()
       diff > 0 
-        ? setCurrent(c => (c + 1) % images.length) 
-        : setCurrent(c => (c - 1 + images.length) % images.length)
+        ? setCurrent(c => (c + 1) % (images ?? []).length) 
+        : setCurrent(c => (c - 1 + (images ?? []).length) % (images ?? []).length)
     }
     setDragStart(null)
   }
@@ -80,7 +80,7 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
     >
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
       <img 
-        src={proxyImg(images[current])} 
+        src={proxyImg((images ?? [])[current])} 
         alt={alt} 
         draggable={false} 
         className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" 
@@ -90,9 +90,9 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
           {condition}
         </div>
       )}
-      {images.length > 1 && (
+      {(images ?? []).length > 1 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 items-center">
-          {images.map((_, i) => (
+          {(images ?? []).map((_, i) => (
             <button 
               key={i} 
               onClick={(e) => { e.preventDefault(); setCurrent(i) }}
@@ -216,7 +216,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                   <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
                     className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
-                    <ImageSlider images={product.images} alt={product.name} condition={product.condition} />
+                    <ImageSlider images={product.images ?? []} alt={product.name} condition={product.condition} />
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-2">
                         <div className="min-w-0 pr-2">

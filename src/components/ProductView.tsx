@@ -68,7 +68,7 @@ export function ProductView({ products, viewMode, onEdit, onToggleSold, onDelete
         {products.map((product) => (
           <div key={product.id} className="flex gap-4 bg-[#1A1A1A] p-4 hover:ring-1 hover:ring-[#FF4400] transition-all">
             <div className="w-24 h-24 shrink-0 bg-[#0A0A0A] overflow-hidden">
-              <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
+              <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || product.category}</p>
@@ -93,7 +93,7 @@ export function ProductView({ products, viewMode, onEdit, onToggleSold, onDelete
       {products.map((product) => (
         <div key={product.id} className="bg-[#1A1A1A] p-2 hover:ring-1 hover:ring-[#FF4400] transition-all text-center">
           <div className="aspect-square bg-[#0A0A0A] overflow-hidden mb-1">
-            <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
+            <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
           </div>
           <p className="text-xs font-bold truncate">{product.name}</p>
           <p className="text-xs text-[#FF4400]">{product.price}€</p>

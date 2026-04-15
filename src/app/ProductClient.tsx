@@ -27,7 +27,7 @@ interface Product {
   price: string
   size: string
   condition: string
-  images: string[]
+  images: string[] | null
   vinted_url: string
   sold: boolean
 }
@@ -42,7 +42,7 @@ const proxyImg = (url: string) => {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`
 }
 
-const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string, condition: string }) => {
+const ImageSlider = ({ images, alt, condition }: { images: string[] | null, alt: string, condition: string }) => {
   const [current, setCurrent] = useState(0)
   const [dragStart, setDragStart] = useState<number | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -62,8 +62,8 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
     if (Math.abs(diff) > 40) {
       e.preventDefault()
       diff > 0 
-        ? setCurrent(c => (c + 1) % images.length) 
-        : setCurrent(c => (c - 1 + images.length) % images.length)
+        ? setCurrent(c => (c + 1) % (images ?? []).length) 
+        : setCurrent(c => (c - 1 + (images ?? []).length) % (images ?? []).length)
     }
     setDragStart(null)
   }
@@ -82,7 +82,7 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
     >
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
       <img 
-        src={proxyImg(images[current])} 
+        src={proxyImg((images ?? [])[current])} 
         alt={alt} 
         draggable={false} 
         className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" 
@@ -92,9 +92,9 @@ const ImageSlider = ({ images, alt, condition }: { images: string[], alt: string
           {condition}
         </div>
       )}
-      {images.length > 1 && (
+      {(images ?? []).length > 1 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 items-center">
-          {images.map((_, i) => (
+          {(images ?? []).map((_, i) => (
             <button 
               key={i} 
               onClick={(e) => { e.preventDefault(); setCurrent(i) }}
@@ -437,28 +437,38 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <AnimatePresence mode="wait">
               <motion.div key={viewMode + activeCategory + activeBrand} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
                 
+
+
                 {/* Grid Ansicht */}
                 {viewMode === 'grid' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredProducts.map((product, index) => (
-                      <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
-                        className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
-                        <ImageSlider images={product.images} alt={product.name} condition={product.condition} />
-                        <div className="p-6">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="min-w-0 pr-2">
-                              <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">{product.brand || product.category}</p>
-                              <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">{product.name}</h3>
+                      <div
+                        key={product.id}
+                        onClick={() => window.location.href = `/products/${product.id}`}
+                        className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all cursor-pointer flex flex-col h-full"
+                      >
+                        <ImageSlider images={product.images ?? []} alt={product.name} condition={product.condition} />
+                        <div className="p-5 flex flex-col flex-1">
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="min-w-0 pr-2">
+                                <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">{product.brand || product.category}</p>
+                                <h3 className="text-base font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight line-clamp-2">{product.name}</h3>
+                              </div>
+                              <span className="text-xl font-bold text-[#FF4400] shrink-0">{product.price}</span>
                             </div>
-                            <span className="text-xl font-bold text-[#FF4400] shrink-0">{product.price}</span>
+                            <div className="mt-2">
+                              <span className="text-sm text-gray-400 uppercase tracking-widest">{product.size !== "–" ? `Size ${product.size}` : ""}</span>
+                            </div>
                           </div>
-                          <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
-                            <span className="text-sm text-gray-400 uppercase tracking-widest">{product.size !== "–" ? `Size ${product.size}` : ""}</span>
-                            <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">View <ExternalLink className="w-4 h-4" /></span>
+                          <div className="mt-4 pt-4 border-t border-[#0A0A0A]">
+                            <span className="inline-flex items-center gap-2 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-3 transition-all">
+                              Details <ArrowRight className="w-4 h-4" />
+                            </span>
                           </div>
                         </div>
-                      </motion.a>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -467,10 +477,13 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                 {viewMode === 'list' && (
                   <div className="space-y-3">
                     {filteredProducts.map((product) => (
-                      <a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
-                        className="flex gap-4 bg-[#1A1A1A] p-4 hover:ring-1 hover:ring-[#FF4400] transition-all group">
+                      <div
+                        key={product.id}
+                        onClick={() => window.location.href = `/products/${product.id}`}
+                        className="flex gap-4 bg-[#1A1A1A] p-4 hover:ring-1 hover:ring-[#FF4400] transition-all group cursor-pointer"
+                      >
                         <div className="w-24 h-24 shrink-0 bg-[#0A0A0A] overflow-hidden">
-                          <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
+                          <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || product.category}</p>
@@ -481,29 +494,33 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                           </div>
                         </div>
                         <div className="shrink-0 p-2 border border-[#FF4400]/30 text-[#FF4400] group-hover:bg-[#FF4400]/10 transition-all">
-                          <ExternalLink className="w-4 h-4" />
+                          <ArrowRight className="w-4 h-4" />
                         </div>
-                      </a>
+                      </div>
                     ))}
                   </div>
                 )}
+
+
 
                 {/* Kompakt Ansicht */}
                 {viewMode === 'compact' && (
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
                     {filteredProducts.map((product) => (
-                      <a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
-                        className="bg-[#1A1A1A] p-2 hover:ring-1 hover:ring-[#FF4400] transition-all text-center group">
+                      <div
+                        key={product.id}
+                        onClick={() => window.location.href = `/products/${product.id}`}
+                        className="bg-[#1A1A1A] p-2 hover:ring-1 hover:ring-[#FF4400] transition-all text-center group cursor-pointer"
+                      >
                         <div className="aspect-square bg-[#0A0A0A] overflow-hidden mb-1">
-                          <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
+                          <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
                         </div>
                         <p className="text-xs font-bold truncate group-hover:text-[#FF4400] transition-colors">{product.name}</p>
                         <p className="text-xs text-[#FF4400]">{product.price}</p>
-                      </a>
+                      </div>
                     ))}
                   </div>
                 )}
-
               </motion.div>
             </AnimatePresence>
           )}

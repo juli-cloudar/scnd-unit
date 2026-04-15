@@ -8,7 +8,7 @@ const proxyImg = (url: string) => {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 
-export function ImageSlider({ images, alt, condition }: { images: string[], alt: string, condition: string }) {
+export function ImageSlider({ images, alt, condition }: { images: string[] | null, alt: string, condition: string }) {
   const [current, setCurrent] = useState(0);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -28,8 +28,8 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
     if (Math.abs(diff) > 40) {
       e.preventDefault();
       diff > 0 
-        ? setCurrent(c => (c + 1) % images.length) 
-        : setCurrent(c => (c - 1 + images.length) % images.length);
+        ? setCurrent(c => (c + 1) % (images ?? []).length) 
+        : setCurrent(c => (c - 1 + (images ?? []).length) % (images ?? []).length);
     }
     setDragStart(null);
   };
@@ -48,7 +48,7 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
     >
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
       <img 
-        src={proxyImg(images[current])} 
+        src={proxyImg((images ?? [])[current])} 
         alt={alt} 
         draggable={false} 
         className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" 
@@ -58,9 +58,9 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
           {condition}
         </div>
       )}
-      {images.length > 1 && (
+      {(images ?? []).length > 1 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 items-center">
-          {images.map((_, i) => (
+          {(images ?? []).map((_, i) => (
             <button 
               key={i} 
               onClick={(e) => { e.preventDefault(); setCurrent(i); }}
