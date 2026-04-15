@@ -69,7 +69,7 @@ function ToastContainer({ toasts, onRemove }: { toasts: ToastItem[], onRemove: (
 function useToast() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const addToast = (message: string, type: ToastType = 'success') => {
-    const id = Date.now();
+    const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
