@@ -5,6 +5,7 @@ import { logActivity } from "../utils/helpers";
 import { ToastType } from "../hooks/useToast";
 
 interface Employee {
+  password?: string;
   id: number; username: string; password: string; role: string;
   login_count: number; online: boolean; last_login?: string;
   permissions: { canAddProducts: boolean; canEditProducts: boolean; canDeleteProducts: boolean; canViewStats: boolean; canManageEmployees: boolean; };

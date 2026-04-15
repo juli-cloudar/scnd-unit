@@ -28,6 +28,7 @@ interface Employee {
   id: number;
   username: string;
   role: 'Mitarbeiter' | 'Manager' | 'Admin';
+  password?: string;
   login_count: number;
   total_work_hours: number;
   online: boolean;
@@ -47,6 +48,7 @@ function createEmployeeFromUser(user: any): Employee {
     id: user.id || 0,
     username: user.username || 'Mastercontrol',
     role: user.role || 'Admin',
+    password: user.password || '',
     login_count: user.login_count || 0,
     total_work_hours: user.total_work_hours || 0,
     online: user.online || true,
@@ -80,6 +82,7 @@ export default function ManagementPanel() {
         id: 0,
         username: 'Mastercontrol',
         role: 'Admin',
+        password: '',
         login_count: 0,
         total_work_hours: 0,
         online: true,
@@ -125,6 +128,7 @@ export default function ManagementPanel() {
           id: 0,
           username: 'Mastercontrol',
           role: 'Admin',
+          password: '',
           login_count: 0,
           total_work_hours: 0,
           online: true,
