@@ -5,10 +5,20 @@ import { logActivity } from "../utils/helpers";
 import { ToastType } from "../hooks/useToast";
 
 interface Employee {
-  password?: string;
-  id: number; username: string; password: string; role: string;
-  login_count: number; online: boolean; last_login?: string;
-  permissions: { canAddProducts: boolean; canEditProducts: boolean; canDeleteProducts: boolean; canViewStats: boolean; canManageEmployees: boolean; };
+  id: number;
+  username: string;
+  password: string;
+  role: string;
+  login_count: number;
+  online: boolean;
+  last_login?: string;
+  permissions: {
+    canAddProducts: boolean;
+    canEditProducts: boolean;
+    canDeleteProducts: boolean;
+    canViewStats: boolean;
+    canManageEmployees: boolean;
+  };
 }
 
 export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Employee, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
@@ -45,7 +55,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         </div>
       )}
       <div className="bg-[#111] border border-[#FF4400]/20 overflow-hidden">
-        <div className="max-h-[calc(100vh-350px)] overflow-y-auto scrollbar-thin">
+        <div className="max-h-[400px] overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="bg-[#FF4400] text-white sticky top-0">
               <tr><th className="px-4 py-3 text-left">Username</th><th className="px-4 py-3 text-left">Rolle</th><th className="px-4 py-3 text-left">Logins</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-left">Letzter Login</th><th className="px-4 py-3 text-left">Aktionen</th></tr>
