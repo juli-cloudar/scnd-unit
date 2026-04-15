@@ -34,3 +34,27 @@
 .scroll-gradient-right {
   background: linear-gradient(to left, #0A0A0A, transparent);
 }
+
+/* Custom Scrollbar für horizontale Filter */
+.scrollbar-custom {
+  scrollbar-width: thin;
+  scrollbar-color: #FF4400 #1A1A1A;
+}
+
+.scrollbar-custom::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+  background: #1A1A1A;
+  border-radius: 2px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  background: #FF4400;
+  border-radius: 2px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #FF6600;
+}
