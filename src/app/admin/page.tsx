@@ -370,11 +370,12 @@ const fileInputRef = useRef<HTMLInputElement>(null);
           else if (titleLower.includes('sweatshirt') || titleLower.includes('crewneck') || titleLower.includes('hoodie')) category = 'Sweatshirts';
           else if (titleLower.includes('top') || titleLower.includes('shirt') || titleLower.includes('polo')) category = 'Tops';
 
+
           // Fotos sammeln
-          let photoUrls = [];
+          let photoUrls: string[] = [];
           const allPhotos = item['All Photos'] || '';
-          if (allPhotos && allPhotos.includes(' || ')) {
-            photoUrls = allPhotos.split(' || ').filter(p => p.startsWith('http'));
+          if (allPhotos && typeof allPhotos === 'string' && allPhotos.includes(' || ')) {
+            photoUrls = allPhotos.split(' || ').filter((p: string) => p.startsWith('http'));
           } else if (item.photos && Array.isArray(item.photos)) {
             photoUrls = item.photos;
           }
