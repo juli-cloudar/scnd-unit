@@ -28,7 +28,7 @@ interface Employee {
   id: number;
   username: string;
   role: 'Mitarbeiter' | 'Manager' | 'Admin';
-  password?: string;
+  password: string;
   login_count: number;
   total_work_hours: number;
   online: boolean;
