@@ -123,7 +123,6 @@ async function logActivity(employeeId: number, username: string, action: string,
 }
 
 // =================== KONSTANTEN ===================
-const ADMIN_PASSWORD = 'mastercontrol01010';
 
 // =================== RESULT DISPLAY KOMPONENTE ===================
 function ResultDisplay({ result }: { result: any }) {
@@ -131,30 +130,37 @@ function ResultDisplay({ result }: { result: any }) {
     <div className="border border-[#FF4400]/20 bg-[#0A0A0A] p-4 space-y-4 mt-2 rounded">
       {result.message && <p className="text-sm text-gray-300 font-medium">{result.message}</p>}
       {result.summary && (
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {[
-            { label: 'Gesamt', value: result.summary.total, color: 'text-blue-400', border: 'border-blue-500/30' },
-            { label: 'Neu', value: result.summary.available, color: 'text-green-400', border: 'border-green-500/30' },
-            { label: 'Verkauft', value: result.summary.sold, color: 'text-red-400', border: 'border-red-500/30' },
-            { label: 'Reserviert', value: result.summary.reserved ?? 0, color: 'text-yellow-400', border: 'border-yellow-500/30' },
-            { label: 'Duplikate', value: result.summary.dupes ?? 0, color: 'text-gray-400', border: 'border-gray-600/30' },
-            { label: 'Fehler', value: result.summary.errors ?? 0, color: 'text-orange-400', border: 'border-orange-600/30' },
-          ].map(s => (
-            <div key={s.label} className={`border ${s.border} p-2 text-center`}>
-              <div className={`text-xl font-bold ${s.color}`}>{s.value ?? 0}</div>
-              <div className="text-xs text-gray-500 uppercase">{s.label}</div>
-            </div>
-          ))}
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          <div className="border border-gray-700 p-2 text-center">
+            <div className="text-xl font-bold text-blue-400">{result.summary.total || 0}</div>
+            <div className="text-xs text-gray-500 uppercase">Geprüft</div>
+          </div>
+          <div className="border border-green-500/30 p-2 text-center">
+            <div className="text-xl font-bold text-green-400">{result.summary.imported || 0}</div>
+            <div className="text-xs text-gray-500 uppercase">Importiert</div>
+          </div>
+          <div className="border border-yellow-500/30 p-2 text-center">
+            <div className="text-xl font-bold text-yellow-400">{result.summary.duplicates || 0}</div>
+            <div className="text-xs text-gray-500 uppercase">Duplikate</div>
+          </div>
+          <div className="border border-orange-500/30 p-2 text-center">
+            <div className="text-xl font-bold text-orange-400">{result.summary.invalid || 0}</div>
+            <div className="text-xs text-gray-500 uppercase">Ungültig</div>
+          </div>
+          <div className="border border-red-500/30 p-2 text-center">
+            <div className="text-xl font-bold text-red-400">{result.summary.failed || 0}</div>
+            <div className="text-xs text-gray-500 uppercase">Fehler</div>
+          </div>
         </div>
       )}
       {result.soldItems?.length > 0 && (
         <div>
-          <h4 className="text-xs uppercase font-bold text-red-400 mb-2">🚨 Verkaufte Items ({result.soldItems.length})</h4>
+          <h4 className="text-xs uppercase font-bold text-red-400 mb-2">Verkaufte Items ({result.soldItems.length})</h4>
           <div className="bg-red-950/20 border border-red-500/20 p-3 max-h-48 overflow-y-auto space-y-2">
             {result.soldItems.map((item: any, i: number) => (
-              <div key={i} className="text-xs border-b border-red-500/10 pb-1 last:border-0">
+              <div key={i} className="text-xs border-b border-red-500/10 pb-1">
                 <p className="text-gray-300 font-medium">{item.name || 'Unbekannt'}</p>
-                <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#FF4400] truncate block">{item.url}</a>
+                <a href={item.url} target="_blank" className="text-gray-600 hover:text-[#FF4400] truncate block">{item.url}</a>
               </div>
             ))}
           </div>
@@ -167,7 +173,6 @@ function ResultDisplay({ result }: { result: any }) {
     </div>
   );
 }
-
 // =================== LOGIN SCREEN ===================
 function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: Employee | null) => void }) {
   const [input, setInput] = useState('');
@@ -178,16 +183,35 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
   const tryLogin = async () => {
     if (!input) return;
     setLoading(true); setError('');
-    if (input === ADMIN_PASSWORD) { onLogin('admin', null); setLoading(false); return; }
-    const { data, error } = await supabase.from('employees').select('*').eq('password', input).single();
-    if (data && !error) {
-      await supabase.from('employees').update({ online: true, last_login: new Date().toISOString(), login_count: (data.login_count || 0) + 1 }).eq('id', data.id);
-      await logActivity(data.id, data.username, 'Eingeloggt', `Rolle: ${data.role}`);
-      onLogin('employee', data);
-    } else {
-      setError('Ungültiges Passwort');
+    
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: input })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        if (data.mode === 'admin') {
+          sessionStorage.setItem('scnd_auth', 'admin');
+          onLogin('admin', null);
+        } else if (data.mode === 'employee' && data.user) {
+          sessionStorage.setItem('scnd_auth', 'employee');
+          sessionStorage.setItem('scnd_user', JSON.stringify(data.user));
+          onLogin('employee', data.user);
+        }
+      } else {
+        setError('Ungültiges Passwort');
+        setInput('');
+        setTimeout(() => setError(''), 2000);
+      }
+    } catch {
+      setError('Netzwerkfehler');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -199,15 +223,28 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
         </div>
         <div className="space-y-4">
           <div className="relative">
-            <input type={showPassword ? 'text' : 'password'} value={input} onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && tryLogin()} placeholder="Passwort eingeben"
-              className="w-full p-4 bg-[#1A1A1A] border border-[#FF4400]/30 text-[#F5F5F5] pr-12" autoFocus />
-            <button onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#FF4400]">
+            <input 
+              type={showPassword ? 'text' : 'password'} 
+              value={input} 
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && tryLogin()} 
+              placeholder="Passwort eingeben"
+              className="w-full p-4 bg-[#1A1A1A] border border-[#FF4400]/30 text-[#F5F5F5] pr-12" 
+              autoFocus 
+            />
+            <button 
+              onClick={() => setShowPassword(!showPassword)} 
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#FF4400]"
+            >
               {showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
             </button>
           </div>
           {error && <div className="bg-red-500/10 border border-red-500/30 p-3 text-red-400 text-sm text-center">{error}</div>}
-          <button onClick={tryLogin} disabled={loading} className="w-full py-4 bg-[#FF4400] text-white font-bold uppercase tracking-widest hover:bg-[#FF4400]/80 disabled:opacity-50">
+          <button 
+            onClick={tryLogin} 
+            disabled={loading} 
+            className="w-full py-4 bg-[#FF4400] text-white font-bold uppercase tracking-widest hover:bg-[#FF4400]/80 disabled:opacity-50"
+          >
             {loading ? '...' : 'Einloggen'}
           </button>
         </div>
@@ -215,7 +252,6 @@ function LoginScreen({ onLogin }: { onLogin: (mode: 'admin' | 'employee', user: 
     </div>
   );
 }
-
 
 // =================== VINTED TOOLS TAB ===================
 function VintedToolsTab({ user, toast, confirm }: {
@@ -244,7 +280,6 @@ const fileInputRef = useRef<HTMLInputElement>(null);
   };
 
   // ⭐⭐⭐ JSON IMPORT (ersetzt den Bulk Import) ⭐⭐⭐
-
   const processImport = async () => {
     if (!uploadedFile) { toast('Bitte Datei auswählen', 'error'); return; }
     setImportLoading(true);
@@ -258,7 +293,40 @@ const fileInputRef = useRef<HTMLInputElement>(null);
         else { throw new Error('Ungültiges JSON-Format'); }
       }
 
-      toast(`${items.length} Artikel in JSON gefunden`, 'info');
+      // 🔍 Filtere ungültige Einträge heraus
+      // 🔍 Filtere ungültige Einträge heraus
+      const validItems = items.filter(item => {
+        // Prüfe ob die ID gültig ist
+        const id = item?.id ? String(item.id) : '';
+        
+        // Überspringe den "Get Unlimited" Eintrag
+        if (id === 'Get Unlimited to see more than 10 rows.') return false;
+        
+        // Prüfe ob die ID #-Zeichen enthält (nur wenn id ein String ist)
+        if (id && typeof id === 'string' && id.includes('#')) return false;
+        
+        // Prüfe ob der Titel gültig ist
+        const title = item['Item Title'] || item.title || '';
+        if (!title || typeof title !== 'string') return false;
+        if (title.includes('#') || title.length < 5) return false;
+        
+        // Prüfe ob die URL gültig ist
+        const url = item['Item URL'] || item.url || '';
+        if (!url || typeof url !== 'string') return false;
+        if (!url.includes('vinted.de/items/')) return false;
+        
+        // Prüfe ob der Preis gültig ist
+        const price = item['Item Price'] || item.price || '';
+        if (!price || price === '####') return false;
+        
+        return true;
+      });
+      const invalidCount = items.length - validItems.length;
+      if (invalidCount > 0) {
+        toast(`${invalidCount} ungültige Einträge wurden übersprungen`, 'info');
+      }
+
+      toast(`${validItems.length} gültige Artikel in JSON gefunden`, 'info');
 
       // 🔍 Hole alle existierenden URLs aus der Datenbank
       const { data: existingProducts } = await supabase
@@ -271,12 +339,12 @@ const fileInputRef = useRef<HTMLInputElement>(null);
       let failed = 0;
       let duplicates = 0;
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
+      for (let i = 0; i < validItems.length; i++) {
+        const item = validItems[i];
         const title = item['Item Title'] || item.title || item.name;
         const url = item['Item URL'] || item.url || item.link || '';
         
-        // Extrahiere Marke aus Titel (z.B. "Nike", "Adidas", "Champion")
+        // Extrahiere Marke aus Titel
         let brand = item['Item Brand'] || '';
         if (!brand && title) {
           const brandMatch = title.match(/^(Nike|Adidas|Puma|Champion|Tommy Hilfiger|Lacoste|Helly Hansen|The North Face|Columbia|Lee|Wrangler|Fila|Napapijri|Starter|New Balance|Timberland|Reebok|Bernd Berger|La Martina|Bexleys|U\.S\. Polo Assn)/i);
@@ -289,8 +357,6 @@ const fileInputRef = useRef<HTMLInputElement>(null);
 
         if (existingUrls.has(url)) {
           duplicates++;
-        } else if (!title || !url) {
-          failed++;
         } else {
           const priceRaw = item['Item Price'] || item.price || item.amount;
           let priceNumber = String(priceRaw).replace(/[^0-9,.-]/g, '').replace(',', '.');
@@ -308,15 +374,13 @@ const fileInputRef = useRef<HTMLInputElement>(null);
           else if (titleLower.includes('sweatshirt') || titleLower.includes('crewneck') || titleLower.includes('hoodie')) category = 'Sweatshirts';
           else if (titleLower.includes('top') || titleLower.includes('shirt') || titleLower.includes('polo')) category = 'Tops';
 
-          const photoUrls = [];
-          for (let p = 1; p <= 10; p++) {
-            const photo = item[`Item Photo ${p}`];
-            if (photo && photo.startsWith('http')) photoUrls.push(photo);
-          }
-
-          // Wenn keine Fotos gefunden, versuche alternative Felder
-          if (photoUrls.length === 0 && item.photos) {
-            if (Array.isArray(item.photos)) photoUrls.push(...item.photos);
+          // Fotos sammeln
+          let photoUrls = [];
+          const allPhotos = item['All Photos'] || '';
+          if (allPhotos && allPhotos.includes(' || ')) {
+            photoUrls = allPhotos.split(' || ').filter(p => p.startsWith('http'));
+          } else if (item.photos && Array.isArray(item.photos)) {
+            photoUrls = item.photos;
           }
 
           const newProduct = {
@@ -344,7 +408,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
         setImportResult((prev: any) => ({
           ...prev,
           current: i + 1,
-          total: items.length,
+          total: validItems.length,
           success,
           failed,
           duplicates
@@ -355,12 +419,13 @@ const fileInputRef = useRef<HTMLInputElement>(null);
 
       const finalResult = {
         summary: {
-          total: items.length,
+          total: validItems.length,
           imported: success,
           duplicates: duplicates,
-          failed: failed
+          failed: failed,
+          invalid: invalidCount
         },
-        message: `✅ Fertig: ${success} importiert, ${duplicates} Duplikate, ${failed} Fehler`
+        message: `✅ Fertig: ${success} importiert, ${duplicates} Duplikate, ${invalidCount} ungültige übersprungen, ${failed} Fehler`
       };
       setImportResult(finalResult);
       toast(finalResult.message, 'success');
@@ -375,12 +440,13 @@ const fileInputRef = useRef<HTMLInputElement>(null);
       toast('Fehler: ' + error.message, 'error');
       setImportResult({
         message: 'Fehler: ' + error.message,
-        summary: { total: 0, imported: 0, duplicates: 0, failed: 1 }
+        summary: { total: 0, imported: 0, duplicates: 0, failed: 1, invalid: 0 }
       });
     } finally {
       setImportLoading(false);
     }
   };
+
   // ⭐⭐⭐ SINGLE ITEM CHECK ⭐⭐⭐
   const checkSingleItem = async () => {
     if (!singleUrl) { toast('Bitte URL eingeben', 'error'); return; }
