@@ -294,15 +294,10 @@ const fileInputRef = useRef<HTMLInputElement>(null);
       }
 
       // 🔍 Filtere ungültige Einträge heraus
-      // 🔍 Filtere ungültige Einträge heraus
-      const validItems = items.filter(item => {
+      const validItems = items.filter((item: any) => {
         // Prüfe ob die ID gültig ist
         const id = item?.id ? String(item.id) : '';
-        
-        // Überspringe den "Get Unlimited" Eintrag
         if (id === 'Get Unlimited to see more than 10 rows.') return false;
-        
-        // Prüfe ob die ID #-Zeichen enthält (nur wenn id ein String ist)
         if (id && typeof id === 'string' && id.includes('#')) return false;
         
         // Prüfe ob der Titel gültig ist
@@ -321,7 +316,8 @@ const fileInputRef = useRef<HTMLInputElement>(null);
         
         return true;
       });
-      const invalidCount = items.length - validItems.length;
+
+    const invalidCount = items.length - validItems.length;
       if (invalidCount > 0) {
         toast(`${invalidCount} ungültige Einträge wurden übersprungen`, 'info');
       }
