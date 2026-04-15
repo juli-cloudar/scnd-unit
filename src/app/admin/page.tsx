@@ -829,8 +829,16 @@ function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: 
 function AddTab({ user, toast, onProductAdded }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, onProductAdded: () => void }) {
   const [url, setUrl] = useState('');
   const [isScraping, setIsScraping] = useState(false);
-  const [formData, setFormData] = useState({ name: '', category: 'Jacken', price: '', size: '', condition: 'Gut', vinted_url: '', images: [] as string[] });
-
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    brand: '', 
+    category: 'Jacken', 
+    price: '', 
+    size: '', 
+    condition: 'Gut', 
+    vinted_url: '', 
+    images: [] as string[] 
+  });
   const scrapeVinted = async () => {
     if (!url.includes('vinted')) { toast('Bitte gültige Vinted URL', 'error'); return; }
     setIsScraping(true);
