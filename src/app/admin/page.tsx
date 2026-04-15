@@ -28,7 +28,6 @@ interface Employee {
   id: number;
   username: string;
   role: 'Mitarbeiter' | 'Manager' | 'Admin';
-  password?: string;
   login_count: number;
   total_work_hours: number;
   online: boolean;
@@ -39,6 +38,26 @@ interface Employee {
     canDeleteProducts: boolean;
     canViewStats: boolean;
     canManageEmployees: boolean;
+  };
+}
+
+// Helper um Employee zu erstellen
+function createEmployeeFromUser(user: any): Employee {
+  return {
+    id: user.id || 0,
+    username: user.username || 'Mastercontrol',
+    role: user.role || 'Admin',
+    login_count: user.login_count || 0,
+    total_work_hours: user.total_work_hours || 0,
+    online: user.online || true,
+    last_login: user.last_login,
+    permissions: user.permissions || {
+      canAddProducts: true,
+      canEditProducts: true,
+      canDeleteProducts: true,
+      canViewStats: true,
+      canManageEmployees: true
+    }
   };
 }
 
@@ -61,7 +80,6 @@ export default function ManagementPanel() {
         id: 0,
         username: 'Mastercontrol',
         role: 'Admin',
-        password: '',
         login_count: 0,
         total_work_hours: 0,
         online: true,
@@ -74,9 +92,14 @@ export default function ManagementPanel() {
         }
       });
     } else if (savedAuth === 'employee' && savedUser) {
-      setAuthed(true);
-      setAuthMode('employee');
-      setCurrentUser(JSON.parse(savedUser));
+      try {
+        const user = JSON.parse(savedUser);
+        setAuthed(true);
+        setAuthMode('employee');
+        setCurrentUser(createEmployeeFromUser(user));
+      } catch (e) {
+        console.error('Fehler beim Parsen des Benutzers:', e);
+      }
     }
     setChecking(false);
   }, []);
@@ -97,7 +120,25 @@ export default function ManagementPanel() {
     return <LoginScreen onLogin={(mode, user) => {
       setAuthed(true);
       setAuthMode(mode);
-      setCurrentUser(user);
+      if (mode === 'admin') {
+        setCurrentUser({
+          id: 0,
+          username: 'Mastercontrol',
+          role: 'Admin',
+          login_count: 0,
+          total_work_hours: 0,
+          online: true,
+          permissions: {
+            canAddProducts: true,
+            canEditProducts: true,
+            canDeleteProducts: true,
+            canViewStats: true,
+            canManageEmployees: true
+          }
+        });
+      } else if (user) {
+        setCurrentUser(createEmployeeFromUser(user));
+      }
       sessionStorage.setItem('scnd_auth', mode);
       if (user) sessionStorage.setItem('scnd_user', JSON.stringify(user));
     }} />;
