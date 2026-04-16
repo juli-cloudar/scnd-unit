@@ -1,3 +1,4 @@
+// src/app/api/products/[id]/route.ts
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -12,7 +13,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const productId = parseInt(id)
+    const productId = parseInt(id, 10)
     
     if (isNaN(productId)) {
       return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
@@ -22,14 +23,20 @@ export async function GET(
       .from('products')
       .select('*')
       .eq('id', productId)
-      .single()
+      .maybeSingle()  // ← Wichtig: maybeSingle() statt single()
     
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 })
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    
+    if (!data) {
+      return NextResponse.json({ error: 'Produkt nicht gefunden' }, { status: 404 })
     }
     
     return NextResponse.json(data)
+    
   } catch (error) {
+    console.error('API Error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
