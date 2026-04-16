@@ -145,7 +145,7 @@ const ImageSlider = ({ images, alt, condition }: { images: string[] | null | und
     >
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
       <img 
-        src={proxyImg((images ?? [])[current])} 
+src={images?.[current] ? `/api/image-proxy?url=${encodeURIComponent(images[current])}` : ''}
         alt={alt} 
         draggable={false} 
         className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" 
@@ -546,7 +546,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                         className="flex gap-4 bg-[#1A1A1A] p-4 hover:ring-1 hover:ring-[#FF4400] transition-all group cursor-pointer"
                       >
                         <div className="w-24 h-24 shrink-0 bg-[#0A0A0A] overflow-hidden">
-                          <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
+
+<img src={product.images?.[0] ? `/api/image-proxy?url=${encodeURIComponent(product.images[0])}` : ''} alt={product.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || product.category}</p>
@@ -576,7 +577,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                         className="bg-[#1A1A1A] p-2 hover:ring-1 hover:ring-[#FF4400] transition-all text-center group cursor-pointer"
                       >
                         <div className="aspect-square bg-[#0A0A0A] overflow-hidden mb-1">
-                          <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
+
+<img src={product.images?.[0] ? `/api/image-proxy?url=${encodeURIComponent(product.images[0])}` : ''} alt={product.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                         </div>
                         <p className="text-xs font-bold truncate group-hover:text-[#FF4400] transition-colors">{product.name}</p>
                         <p className="text-xs text-[#FF4400]">{product.price}</p>
