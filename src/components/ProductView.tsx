@@ -1,3 +1,4 @@
+// src/components/ProductView.tsx
 'use client';
 
 import { ExternalLink } from 'lucide-react';
@@ -28,7 +29,7 @@ export function ProductView({ products, viewMode }: ProductViewProps) {
     return numericPrice;
   };
 
-  // Grid Ansicht - OPTIMIERT FÜR PC
+  // Grid Ansicht
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
@@ -39,16 +40,24 @@ export function ProductView({ products, viewMode }: ProductViewProps) {
             className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all cursor-pointer"
           >
             <ImageSlider images={product.images} alt={product.name} condition={product.condition} />
-            <div className="p-3 md:p-4 lg:p-6">
+            <div className="p-3 md:p-4 lg:p-5">
               <div className="flex justify-between items-start mb-2">
                 <div className="min-w-0 pr-2">
-                  <p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-widest mb-1 line-clamp-1">{product.brand || product.category}</p>
-                  <h3 className="text-xs md:text-sm lg:text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight line-clamp-2">{product.name}</h3>
+                  <p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-widest mb-1 line-clamp-1">
+                    {product.brand || product.category}
+                  </p>
+                  <h3 className="text-xs md:text-sm lg:text-base font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight line-clamp-2">
+                    {product.name}
+                  </h3>
                 </div>
-                <span className="text-sm md:text-base lg:text-xl font-bold text-[#FF4400] shrink-0">{formatPrice(product.price)}€</span>
+                <span className="text-sm md:text-base lg:text-xl font-bold text-[#FF4400] shrink-0">
+                  {formatPrice(product.price)}€
+                </span>
               </div>
               <div className="flex justify-between items-center mt-2 md:mt-3 lg:mt-4 pt-2 md:pt-3 lg:pt-4 border-t border-[#0A0A0A]">
-                <span className="text-[10px] md:text-xs lg:text-sm text-gray-400 uppercase tracking-widest">{product.size !== "–" ? `Size ${product.size}` : ""}</span>
+                <span className="text-[10px] md:text-xs lg:text-sm text-gray-400 uppercase tracking-widest">
+                  {product.size !== "–" ? `Size ${product.size}` : ""}
+                </span>
                 <span className="inline-flex items-center gap-1 text-[10px] md:text-xs lg:text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">
                   Details <ExternalLink className="w-2 h-2 md:w-3 md:h-3 lg:w-4 lg:h-4" />
                 </span>
