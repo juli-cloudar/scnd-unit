@@ -104,7 +104,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
+       <div className="w-full px-4 md:px-6 lg:px-8">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             <motion.p variants={fadeIn} className="text-[#FF4400] text-sm uppercase tracking-[0.3em] mb-4">Bad Kreuznach, DE</motion.p>
             <motion.h1 variants={fadeIn} className="text-6xl md:text-9xl font-bold tracking-tighter mb-6">
