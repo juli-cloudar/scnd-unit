@@ -1,6 +1,7 @@
+// src/components/ImageSlider.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const proxyImg = (url: string) => {
@@ -13,39 +14,92 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
   const [current, setCurrent] = useState(0);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  
+  // Lade-Status für jedes Bild
   const [loaded, setLoaded] = useState<boolean[]>(() => new Array(images.length).fill(false));
-
-  // ========== VORLADEN der nächsten Bilder (Client-seitig) ==========
+  
+  // Referenzen für Image-Objekte
+  const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
+  
+  // ========== PRIORISIERTES LADEN ==========
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Nächstes Bild vorladen
+    // Lade-Queue mit Prioritäten
+    const loadQueue: { index: number; priority: number }[] = [];
+    
+    // 1. PRIORITÄT 1: Aktuelles Bild (sofort laden)
+    if (!loaded[current]) {
+      loadQueue.push({ index: current, priority: 1 });
+    }
+    
+    // 2. PRIORITÄT 2: Nächstes Bild (preload)
     const nextIndex = (current + 1) % images.length;
     if (!loaded[nextIndex]) {
+      loadQueue.push({ index: nextIndex, priority: 2 });
+    }
+    
+    // 3. PRIORITÄT 3: Vorheriges Bild (preload)
+    const prevIndex = (current - 1 + images.length) % images.length;
+    if (!loaded[prevIndex]) {
+      loadQueue.push({ index: prevIndex, priority: 2 });
+    }
+    
+    // 4. PRIORITÄT 4: Übernächstes Bild
+    const nextNextIndex = (current + 2) % images.length;
+    if (!loaded[nextNextIndex]) {
+      loadQueue.push({ index: nextNextIndex, priority: 3 });
+    }
+    
+    // 5. PRIORITÄT 5: Alle anderen Bilder (low priority)
+    for (let i = 0; i < images.length; i++) {
+      if (!loaded[i] && !loadQueue.some(item => item.index === i)) {
+        loadQueue.push({ index: i, priority: 4 });
+      }
+    }
+    
+    // Nach Priorität sortieren
+    loadQueue.sort((a, b) => a.priority - b.priority);
+    
+    // Bilder nacheinander laden (mit Verzögerung zwischen niedrigeren Prioritäten)
+    let timeoutId: NodeJS.Timeout;
+    
+    const loadNext = (index: number) => {
+      if (loaded[index]) return;
+      
       const img = new window.Image();
-      img.src = proxyImg(images[nextIndex]);
+      img.src = proxyImg(images[index]);
       img.onload = () => {
         setLoaded(prev => {
           const newLoaded = [...prev];
-          newLoaded[nextIndex] = true;
+          newLoaded[index] = true;
           return newLoaded;
         });
       };
+    };
+    
+    // Hochpriorität sofort laden
+    for (const item of loadQueue) {
+      if (item.priority === 1 || item.priority === 2) {
+        loadNext(item.index);
+      }
     }
     
-    // Übernächstes Bild vorladen
-    const nextNextIndex = (current + 2) % images.length;
-    if (!loaded[nextNextIndex]) {
-      const img2 = new window.Image();
-      img2.src = proxyImg(images[nextNextIndex]);
-      img2.onload = () => {
-        setLoaded(prev => {
-          const newLoaded = [...prev];
-          newLoaded[nextNextIndex] = true;
-          return newLoaded;
-        });
-      };
+    // Niedrigere Priorität mit Verzögerung
+    let delay = 500; // Start nach 500ms
+    for (const item of loadQueue) {
+      if (item.priority === 3) {
+        timeoutId = setTimeout(() => loadNext(item.index), delay);
+        delay += 300;
+      } else if (item.priority === 4) {
+        timeoutId = setTimeout(() => loadNext(item.index), delay);
+        delay += 500;
+      }
     }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [current, images, loaded]);
 
   // ========== MOBILE: Touch-Swipe ==========
@@ -109,15 +163,16 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
       onPointerUp={onPointerUp} 
       onClick={onClick}
     >
-      {/* Loading Spinner - nur wenn Bild noch nicht geladen */}
+      {/* Loading Spinner - nur wenn aktuelles Bild noch nicht geladen */}
       {!isCurrentLoaded && (
         <div className="absolute inset-0 flex items-center justify-center z-10">
           <div className="w-8 h-8 border-2 border-[#FF4400] border-t-transparent rounded-full animate-spin" />
         </div>
       )}
       
-      {/* Bild */}
+      {/* Aktuelles Bild */}
       <img 
+        ref={el => { imageRefs.current[current] = el; }}
         src={currentImageUrl}
         alt={alt} 
         draggable={false} 
@@ -143,7 +198,7 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
         </div>
       )}
       
-      {/* ========== PC: Hover-Buttons (nur auf Desktop sichtbar) ========== */}
+      {/* PC: Hover-Buttons */}
       {images.length > 1 && (
         <>
           <button
@@ -164,7 +219,7 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
         </>
       )}
       
-      {/* ========== MOBILE: Dots (immer sichtbar) ========== */}
+      {/* Mobile: Dots */}
       {images.length > 1 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 items-center">
           {images.map((_, i) => (
@@ -174,7 +229,14 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
                 e.preventDefault(); 
                 setCurrent(i);
               }}
-              className={`rounded-full transition-all duration-200 ${i === current ? 'bg-[#FF4400] w-5 h-2.5' : 'bg-white/40 hover:bg-white/70 w-2.5 h-2.5'}`} 
+              className={`rounded-full transition-all duration-200 ${
+                i === current 
+                  ? 'bg-[#FF4400] w-5 h-2.5' 
+                  : loaded[i] 
+                    ? 'bg-white/60 w-2.5 h-2.5' 
+                    : 'bg-white/20 w-2.5 h-2.5'
+              }`}
+              aria-label={`Bild ${i + 1}`}
             />
           ))}
         </div>
