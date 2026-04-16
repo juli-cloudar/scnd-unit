@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { ViewToggle, type ViewMode } from '@/components/ViewToggle'
 import { ProductView } from '@/components/ProductView'
+import { cleanMultipleProducts } from '@/lib/productCleaner'
 
 interface Product {
   id: number
@@ -38,7 +39,12 @@ const staggerContainer = {
 }
 
 export function ProductClient({ initialProducts }: ProductClientProps) {
-  const [products] = useState<Product[]>(initialProducts)
+  // Bereinige alle Produkte beim Laden
+  const [products, setProducts] = useState<Product[]>(() => {
+    const cleaned = cleanMultipleProducts(initialProducts);
+    return cleaned as Product[];
+  })
+  
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [activeCategory, setActiveCategory] = useState("Alle")
@@ -60,7 +66,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const filteredProducts = products.filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.brand.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
@@ -136,7 +142,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Filter Section mit horizontalem Scroll */}
+      {/* Filter Section */}
       <section className="py-8 px-6">
         <div className="max-w-7xl mx-auto">
           {/* Marken Filter */}
