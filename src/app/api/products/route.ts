@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       .from('products')
       .insert([body])
       .select()
-      .single()
+     .maybeSingle();
     
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
