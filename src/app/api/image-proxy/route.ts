@@ -1,6 +1,5 @@
 // src/app/api/image-proxy/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,7 +8,7 @@ export const dynamic = 'force-dynamic';
 const CACHE_MAX_AGE = 31536000; // 1 Jahr in Sekunden
 
 // Cache für wiederholte Anfragen (In-Memory)
-const imageCache = new Map<string, { buffer: Buffer, timestamp: number, contentType: string }>();
+const imageCache = new Map<string, { buffer: ArrayBuffer, timestamp: number, contentType: string }>();
 const CACHE_DURATION = 3600000; // 1 Stunde in Millisekunden
 
 // Aufräumen des Caches alle 30 Minuten
@@ -69,61 +68,25 @@ export async function GET(request: NextRequest) {
     }
     
     const contentType = response.headers.get('content-type') || 'image/jpeg';
-    let buffer = Buffer.from(await response.arrayBuffer());
+    const buffer = await response.arrayBuffer();
     
-    // Bild optimieren (falls sharp installiert ist)
-    try {
-      buffer = await sharp(buffer)
-        .resize(800, null, { 
-          withoutEnlargement: true,  // Nicht vergrößern wenn kleiner
-          fit: 'inside'
-        })
-        .webp({ quality: 80 })  // In WebP umwandeln (kleiner)
-        .toBuffer();
-      
-      // Content-Type auf WebP setzen
-      const webpContentType = 'image/webp';
-      
-      // Im Cache speichern
-      imageCache.set(cacheKey, {
-        buffer,
-        timestamp: Date.now(),
-        contentType: webpContentType,
-      });
-      
-      return new NextResponse(buffer, {
-        headers: {
-          'Content-Type': webpContentType,
-          'Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
-          'CDN-Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
-          'Vercel-CDN-Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
-          'Access-Control-Allow-Origin': '*',
-          'X-Cache': 'MISS',
-          'X-Optimized': 'true',
-        },
-      });
-    } catch (sharpError) {
-      // Wenn sharp nicht installiert ist oder Fehler auftritt, Originalbild zurückgeben
-      console.warn('Sharp optimization failed, using original image:', sharpError);
-      
-      // Originalbild im Cache speichern
-      imageCache.set(cacheKey, {
-        buffer,
-        timestamp: Date.now(),
-        contentType,
-      });
-      
-      return new NextResponse(buffer, {
-        headers: {
-          'Content-Type': contentType,
-          'Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
-          'CDN-Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
-          'Vercel-CDN-Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
-          'Access-Control-Allow-Origin': '*',
-          'X-Cache': 'MISS',
-        },
-      });
-    }
+    // Im Cache speichern (als ArrayBuffer, nicht Buffer)
+    imageCache.set(cacheKey, {
+      buffer,
+      timestamp: Date.now(),
+      contentType,
+    });
+    
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
+        'CDN-Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
+        'Vercel-CDN-Cache-Control': `public, max-age=${CACHE_MAX_AGE}, immutable`,
+        'Access-Control-Allow-Origin': '*',
+        'X-Cache': 'MISS',
+      },
+    });
     
   } catch (error) {
     console.error('Image proxy error:', error);
