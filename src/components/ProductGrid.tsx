@@ -4,26 +4,12 @@
 import { ProductView } from '@/components/ProductView';
 import type { ViewMode } from '@/components/ViewToggle';
 
-interface Product {
-  id: number;
-  name: string;
-  brand: string;
-  category: string;
-  price: string;
-  size: string;
-  condition: string;
-  images: string[] | null;
-  vinted_url: string;
-  sold: boolean;
-}
-
 interface ProductGridProps {
-  products: Product[];
+  products: any[];
   viewMode: ViewMode;
 }
 
 export function ProductGrid({ products, viewMode }: ProductGridProps) {
-  // Grid Klassen basierend auf ViewMode
   const getGridClasses = () => {
     switch (viewMode) {
       case 'grid':
