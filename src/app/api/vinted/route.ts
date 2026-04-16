@@ -101,7 +101,7 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   // NAME
   const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
   const titleMatch = html.match(/<title>\s*([^|<]+)/i);
-  const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
+  let name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
 // MARKEN EXTRAHIEREN & DOPPELTE MARKE ENTFERNEN
 const knownBrands = [
