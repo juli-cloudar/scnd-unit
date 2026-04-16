@@ -2,7 +2,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { cleanMultipleProducts, getUniqueBrands, getUniqueCategories, type CleanedProduct } from '@/lib/productCleaner';
+import { 
+  cleanMultipleProducts, 
+  getUniqueBrands, 
+  getUniqueCategories,
+  type CleanedProduct 
+} from '@/lib/productCleaner';
 
 export function useProductCleaner(products: any[]) {
   const [cleanedProducts, setCleanedProducts] = useState<CleanedProduct[]>([]);
@@ -23,7 +28,7 @@ export function useProductCleaner(products: any[]) {
     const cleaned = cleanMultipleProducts(products);
     setCleanedProducts(cleaned);
     
-    // Eindeutige Werte extrahieren
+    // Eindeutige Werte extrahieren (KEINE DUPLIKATE!)
     setUniqueBrands(getUniqueBrands(cleaned));
     setUniqueCategories(getUniqueCategories(cleaned));
     setLoading(false);
