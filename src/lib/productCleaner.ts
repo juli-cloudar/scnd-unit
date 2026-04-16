@@ -1,6 +1,5 @@
 // src/lib/productCleaner.ts
 // Diese Datei hat KEIN 'use client' und KEINE React Hooks!
-// Sie kann überall verwendet werden (API Routes + Client Components)
 
 // Bekannte Marken
 const KNOWN_BRANDS = [
@@ -30,6 +29,7 @@ const TYPO_FIXES: { [key: string]: string } = {
 const REMOVE_WORDS = ['Pullover', 'Sweatshirt', 'Jacket', 'Vintage', 'Streetwear', 'Crewneck', 'Nike Fit'];
 
 export interface CleanedProduct {
+  id: number;  // ← HINZUGEFÜGT! Das war der Fehler!
   name: string;
   brand: string;
   category: string;
@@ -107,6 +107,7 @@ export function cleanProduct(rawData: any): CleanedProduct {
   cleanedName = cleanedName.replace(/\s+/g, ' ').trim();
   
   return {
+    id: rawData.id,  // ← WICHTIG: ID muss erhalten bleiben!
     name: cleanedName || originalName,
     brand: brand,
     category: category,
@@ -128,7 +129,6 @@ export function cleanMultipleProducts(products: any[]): CleanedProduct[] {
 
 /**
  * Extrahiert eindeutige Marken aus Produkten (für Filter)
- * Das ist eine reine Funktion, KEIN React Hook!
  */
 export function getUniqueBrands(products: CleanedProduct[]): string[] {
   return [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
