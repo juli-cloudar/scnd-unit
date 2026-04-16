@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import Image from 'next/image';
 
 const proxyImg = (url: string) => {
   if (!url) return '';
@@ -15,17 +14,17 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const [loaded, setLoaded] = useState<boolean[]>(() => new Array(images.length).fill(false));
-  const [preloaded, setPreloaded] = useState<Set<number>>(new Set([0]));
 
-  // ========== VORLADEN der nächsten Bilder ==========
+  // ========== VORLADEN der nächsten Bilder (Client-seitig) ==========
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     // Nächstes Bild vorladen
     const nextIndex = (current + 1) % images.length;
-    if (!preloaded.has(nextIndex)) {
-      const img = new Image();
+    if (!loaded[nextIndex]) {
+      const img = new window.Image();
       img.src = proxyImg(images[nextIndex]);
       img.onload = () => {
-        setPreloaded(prev => new Set(prev).add(nextIndex));
         setLoaded(prev => {
           const newLoaded = [...prev];
           newLoaded[nextIndex] = true;
@@ -36,11 +35,10 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
     
     // Übernächstes Bild vorladen
     const nextNextIndex = (current + 2) % images.length;
-    if (!preloaded.has(nextNextIndex)) {
-      const img2 = new Image();
+    if (!loaded[nextNextIndex]) {
+      const img2 = new window.Image();
       img2.src = proxyImg(images[nextNextIndex]);
       img2.onload = () => {
-        setPreloaded(prev => new Set(prev).add(nextNextIndex));
         setLoaded(prev => {
           const newLoaded = [...prev];
           newLoaded[nextNextIndex] = true;
@@ -48,7 +46,7 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
         });
       };
     }
-  }, [current, images, preloaded]);
+  }, [current, images, loaded]);
 
   // ========== MOBILE: Touch-Swipe ==========
   const onPointerDown = (e: React.PointerEvent) => { 
@@ -100,7 +98,7 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
     );
   }
 
-  const isCurrentLoaded = loaded[current] || preloaded.has(current);
+  const isCurrentLoaded = loaded[current];
   const currentImageUrl = proxyImg(images[current]);
 
   return (
@@ -118,26 +116,22 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
         </div>
       )}
       
-      {/* Bild mit Next.js Image für optimiertes Laden */}
-      <div className="relative w-full h-full">
-        <img 
-          src={currentImageUrl}
-          alt={alt} 
-          draggable={false} 
-          className={`w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${
-            isCurrentLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          onLoad={() => {
-            setLoaded(prev => {
-              const newLoaded = [...prev];
-              newLoaded[current] = true;
-              return newLoaded;
-            });
-            setPreloaded(prev => new Set(prev).add(current));
-          }}
-          fetchPriority={current === 0 ? "high" : "auto"}
-        />
-      </div>
+      {/* Bild */}
+      <img 
+        src={currentImageUrl}
+        alt={alt} 
+        draggable={false} 
+        className={`w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${
+          isCurrentLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+        onLoad={() => {
+          setLoaded(prev => {
+            const newLoaded = [...prev];
+            newLoaded[current] = true;
+            return newLoaded;
+          });
+        }}
+      />
       
       {/* Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
