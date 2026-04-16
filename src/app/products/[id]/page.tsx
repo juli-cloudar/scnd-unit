@@ -37,22 +37,14 @@ export default function ProductPage() {
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
-
-  console.log('=== PRODUCT PAGE DEBUG ===');
-  console.log('1. params:', params);
-  console.log('2. params.id:', params.id);
-    
     async function fetchProduct() {
       try {
-        // RICHTIG: params.id auslesen (kann Promise sein)
         let idParam = params.id;
         
-        // Falls es ein Promise ist, auflösen
         if (idParam && typeof idParam === 'object' && 'then' in idParam) {
           idParam = await idParam;
         }
         
-        // ID als String oder Array behandeln
         let idStr: string = '';
         if (typeof idParam === 'string') {
           idStr = idParam;
@@ -70,13 +62,14 @@ export default function ProductPage() {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('id', id)
-          .maybeSingle();
+        // Rufe die API auf (nicht direkt Supabase!)
+        const response = await fetch(`/api/products/${id}`);
         
-        if (error) throw error;
+        if (!response.ok) {
+          throw new Error('Produkt nicht gefunden');
+        }
+        
+        const data = await response.json();
         setProduct(data);
         setCurrentImage(0);
         setImageError(false);
@@ -132,7 +125,6 @@ export default function ProductPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
-      {/* Header */}
       <div className="border-b border-[#1A1A1A] sticky top-0 bg-[#0A0A0A]/95 backdrop-blur z-50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
           <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#FF4400] transition-colors group">
@@ -142,11 +134,9 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-12">
         <div className="grid md:grid-cols-2 gap-6 md:gap-12">
           
-          {/* Bildergalerie */}
           <div>
             <div className="sticky top-0 md:top-24">
               <div className="relative aspect-[3/4] bg-[#1A1A1A] overflow-hidden rounded-sm group">
@@ -164,16 +154,10 @@ export default function ProductPage() {
                 )}
                 {hasMultipleImages && (
                   <>
-                    <button 
-                      onClick={prevImage} 
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-[#FF4400] transition-opacity"
-                    >
+                    <button onClick={prevImage} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-[#FF4400] transition-opacity">
                       <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <button 
-                      onClick={nextImage} 
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-[#FF4400] transition-opacity"
-                    >
+                    <button onClick={nextImage} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-[#FF4400] transition-opacity">
                       <ChevronRight className="w-5 h-5" />
                     </button>
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 px-3 py-1 rounded-full text-xs">
@@ -182,7 +166,6 @@ export default function ProductPage() {
                   </>
                 )}
               </div>
-              {/* Thumbnails */}
               {hasMultipleImages && (
                 <div className="flex gap-2 mt-3 md:mt-4 overflow-x-auto pb-2">
                   {images.map((img, idx) => (
@@ -211,34 +194,28 @@ export default function ProductPage() {
             </div>
           </div>
 
-          {/* Infos */}
           <div className="flex flex-col h-full px-0 md:px-0">
             
-            {/* Sold Badge */}
             {product.sold && (
               <div className="inline-block px-3 py-1 bg-red-500 text-white text-xs uppercase tracking-widest mb-4 w-fit">
                 Verkauft
               </div>
             )}
             
-            {/* Brand & Category */}
             <div className="flex flex-wrap items-center gap-2 mb-3 md:mb-4">
               <span className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || 'Keine Marke'}</span>
               <span className="text-gray-600">•</span>
               <span className="text-xs text-gray-500 uppercase tracking-widest">{product.category || 'Sonstiges'}</span>
             </div>
             
-            {/* Title */}
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-3 md:mb-4">
               {product.name}
             </h1>
             
-            {/* Price */}
             <div className="text-3xl md:text-4xl font-bold text-[#FF4400] mb-4 md:mb-6">
               €{product.price}
             </div>
             
-            {/* Size & Condition */}
             <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#1A1A1A] rounded-sm">
               <div>
                 <p className="text-xs text-gray-500 uppercase mb-1">Größe</p>
@@ -250,11 +227,8 @@ export default function ProductPage() {
               </div>
             </div>
 
-            {/* Platform Links */}
             <div className="space-y-3 mb-6 md:mb-8">
               <p className="text-xs text-gray-500 uppercase tracking-widest">Verfügbar auf</p>
-              
-              {/* Vinted Link */}
               <a 
                 href={product.vinted_url} 
                 target="_blank" 
@@ -274,7 +248,6 @@ export default function ProductPage() {
               </a>
             </div>
 
-            {/* Share Button */}
             <button 
               onClick={() => { 
                 navigator.clipboard.writeText(window.location.href); 
