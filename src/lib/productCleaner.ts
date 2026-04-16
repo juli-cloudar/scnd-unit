@@ -1,35 +1,8 @@
 // src/lib/productCleaner.ts
-// Diese Datei hat KEIN 'use client' und KEINE React Hooks!
-
-// Bekannte Marken
-const KNOWN_BRANDS = [
-  'Tommy Hilfiger', 'Helly Hansen', 'The North Face', 'New Balance',
-  'Adidas', 'Nike', 'Puma', 'Champion', 'Columbia', 'FILA', 
-  'Napapijri', 'Lee Sport', 'Lee', 'L.L.Bean', 'Timberland',
-  'Reebok', 'Lacoste', 'Wrangler', 'Bexleys', 'U.S. Polo Assn',
-  'Starter', 'NBA', 'NFL', 'Carhartt', 'Dickies', 'Vans', 'Converse'
-];
-
-// Häufige Rechtschreibfehler
-const TYPO_FIXES: { [key: string]: string } = {
-  'chwarz': 'Schwarz',
-  'woosh': 'Swoosh',
-  'weater': 'Sweater',
-  'weatshirt': 'Sweatshirt',
-  'weather': 'Sweater',
-  'port': 'Sport',
-  'adidas': 'Adidas',
-  'nike': 'Nike',
-  'puma': 'Puma',
-  'tommy': 'Tommy',
-  'hilfiger': 'Hilfiger'
-};
-
-// Überflüssige Wörter
-const REMOVE_WORDS = ['Pullover', 'Sweatshirt', 'Jacket', 'Vintage', 'Streetwear', 'Crewneck', 'Nike Fit'];
+// KEIN 'use client' - reine Logik für API und Frontend
 
 export interface CleanedProduct {
-  id: number;  // ← HINZUGEFÜGT! Das war der Fehler!
+  id: number;
   name: string;
   brand: string;
   category: string;
@@ -41,54 +14,72 @@ export interface CleanedProduct {
   sold: boolean;
 }
 
-/**
- * Bereinigt ein einzelnes Produkt
- */
+const KNOWN_BRANDS = [
+  'Tommy Hilfiger', 'Helly Hansen', 'The North Face', 'New Balance',
+  'Adidas', 'Nike', 'Puma', 'Champion', 'Columbia', 'FILA', 
+  'Napapijri', 'Lee Sport', 'Lee', 'L.L.Bean', 'Timberland',
+  'Reebok', 'Lacoste', 'Wrangler', 'Bexleys', 'U.S. Polo Assn',
+  'Starter', 'NBA', 'NFL', 'Carhartt', 'Dickies', 'Vans', 'Converse',
+  'Olympique Marseille'
+];
+
+const TYPO_FIXES: Record<string, string> = {
+  'chwarz': 'Schwarz', 'woosh': 'Swoosh', 'weater': 'Sweater',
+  'weatshirt': 'Sweatshirt', 'weather': 'Sweater', 'port': 'Sport',
+  'adidas': 'Adidas', 'nike': 'Nike', 'puma': 'Puma', 'tommy': 'Tommy',
+  'hilfiger': 'Hilfiger', 'treewear': 'Streetwear', 'ogro': 'Logo',
+  'tripe': 'Stripe'
+};
+
+const REMOVE_WORDS = ['Vintage', 'Streetwear', 'Clean', 'Oversize', 'Essential', 'Basic', 'Pullover', 'Sweatshirt', 'Jacket'];
+
 export function cleanProduct(rawData: any): CleanedProduct {
-  let originalName = rawData.name || rawData.title || '';
+  const originalId = rawData.id;
+  let name = rawData.name || rawData.title || '';
   
-  // 1. Rechtschreibfehler korrigieren
-  let cleanedName = originalName;
+  // 1. Rechtschreibung korrigieren
   for (const [wrong, correct] of Object.entries(TYPO_FIXES)) {
-    cleanedName = cleanedName.replace(new RegExp(wrong, 'gi'), correct);
+    name = name.replace(new RegExp(wrong, 'gi'), correct);
   }
   
-  // 2. Marke erkennen und entfernen
+  // 2. Marke erkennen
   let brand = rawData.brand || '';
   if (!brand) {
     for (const knownBrand of KNOWN_BRANDS) {
-      if (cleanedName.match(new RegExp(`^${knownBrand}\\s|\\s${knownBrand}\\s|\\s${knownBrand}$`, 'i'))) {
+      if (name.match(new RegExp(`^${knownBrand}\\s|\\s${knownBrand}\\s`, 'i'))) {
         brand = knownBrand;
-        cleanedName = cleanedName.replace(new RegExp(`^${knownBrand}\\s+|\\s${knownBrand}\\s+|\\s${knownBrand}$`, 'gi'), ' ');
+        name = name.replace(new RegExp(`^${knownBrand}\\s+|\\s${knownBrand}\\s+`, 'gi'), ' ');
         break;
       }
     }
   }
+  if (!brand) {
+    brand = name.split(' ')[0];
+    name = name.replace(new RegExp(`^${brand}\\s+`, 'i'), '');
+  }
   
   // 3. Größe extrahieren
   let size = rawData.size || '';
-  const sizePattern = /\b(XXL|XL|L|M|S|XS|XXXL|34\/6|36\/8|38\/10|40\/12)\b/i;
-  const sizeMatch = cleanedName.match(sizePattern);
+  const sizeMatch = name.match(/\b(XXL|XL|L|M|S|XS)\b/i);
   if (sizeMatch && !size) {
     size = sizeMatch[1].toUpperCase();
-    cleanedName = cleanedName.replace(sizePattern, '');
+    name = name.replace(new RegExp(`\\b${size}\\b`, 'i'), '');
   }
   
   // 4. Kategorie bestimmen
   let category = rawData.category || '';
   if (!category) {
-    const lowerName = cleanedName.toLowerCase();
+    const lowerName = name.toLowerCase();
     if (lowerName.includes('sweatshirt') || lowerName.includes('crewneck')) category = 'Sweatshirts';
-    else if (lowerName.includes('jacke') || lowerName.includes('jacket') || lowerName.includes('fleece')) category = 'Jacken';
+    else if (lowerName.includes('jacke') || lowerName.includes('jacket') || lowerName.includes('fleece') || lowerName.includes('track')) category = 'Jacken';
     else if (lowerName.includes('polo')) category = 'Polos';
-    else if (lowerName.includes('weste')) category = 'Westen';
     else if (lowerName.includes('top') || lowerName.includes('cropped')) category = 'Tops';
     else category = 'Pullover';
   }
   
   // 5. Überflüssige Wörter entfernen
   for (const word of REMOVE_WORDS) {
-    cleanedName = cleanedName.replace(new RegExp(`\\s*${word}\\s*`, 'gi'), ' ');
+    name = name.replace(new RegExp(`\\s*${word}\\s*`, 'gi'), ' ');
   }
   
   // 6. Preis bereinigen
@@ -97,46 +88,38 @@ export function cleanProduct(rawData: any): CleanedProduct {
   
   // 7. Condition bereinigen
   let condition = rawData.condition || 'Gut';
-  const conditionMap: { [key: string]: string } = {
+  const conditionMap: Record<string, string> = {
     'neu': 'Neu', 'new': 'Neu', 'sehr gut': 'Sehr gut', 'very good': 'Sehr gut',
     'gut': 'Gut', 'good': 'Gut', 'zufriedenstellend': 'Zufriedenstellend'
   };
   condition = conditionMap[condition.toLowerCase()] || condition;
   
-  // 8. Name final bereinigen
-  cleanedName = cleanedName.replace(/\s+/g, ' ').trim();
+  // 8. Finale Bereinigung
+  name = name.replace(/\s+/g, ' ').trim();
+  if (!name) name = 'Unbenanntes Produkt';
   
   return {
-    id: rawData.id,  // ← WICHTIG: ID muss erhalten bleiben!
-    name: cleanedName || originalName,
-    brand: brand,
-    category: category,
-    price: price,
-    size: size,
-    condition: condition,
+    id: originalId,
+    name,
+    brand,
+    category,
+    price,
+    size,
+    condition,
     vinted_url: rawData.vinted_url || '',
     images: rawData.images || null,
     sold: rawData.sold || false
   };
 }
 
-/**
- * Bereinigt mehrere Produkte
- */
 export function cleanMultipleProducts(products: any[]): CleanedProduct[] {
   return products.map(p => cleanProduct(p));
 }
 
-/**
- * Extrahiert eindeutige Marken aus Produkten (für Filter)
- */
 export function getUniqueBrands(products: CleanedProduct[]): string[] {
   return [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
 }
 
-/**
- * Extrahiert eindeutige Kategorien aus Produkten
- */
 export function getUniqueCategories(products: CleanedProduct[]): string[] {
   return [...new Set(products.map(p => p.category).filter(Boolean))].sort();
 }
