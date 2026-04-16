@@ -1,3 +1,4 @@
+// src/app/products/[id]/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +7,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeft, ExternalLink, ShoppingBag, Share2, 
-  Facebook, ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface Product {
@@ -17,7 +18,7 @@ interface Product {
   price: string;
   size: string;
   condition: string;
-  images: string[] | null;  // ← ÄNDERUNG: Kann null sein
+  images: string[] | null;
   vinted_url: string;
   sold: boolean;
 }
@@ -33,24 +34,35 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentImage, setCurrentImage] = useState(0);
-  const [imageError, setImageError] = useState(false); // ← NEU: Bildfehler
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     async function fetchProduct() {
       try {
-        // ← ÄNDERUNG: Korrekte Behandlung von params.id
-        const idParam = params.id;
+        // WICHTIG: Richtig auslesen von params.id in Next.js 15+
         let productId: number | null = null;
         
-        if (typeof idParam === 'string') {
-          productId = parseInt(idParam, 10);
-        } else if (Array.isArray(idParam) && idParam.length > 0) {
-          productId = parseInt(idParam[0], 10);
+        console.log('Raw params:', params); // Debug: Zeigt was wirklich da ist
+        
+        // Lösung 1: Wenn params.id ein Promise ist
+        let resolvedId = params.id;
+        if (resolvedId && typeof resolvedId === 'object' && 'then' in resolvedId) {
+          resolvedId = await resolvedId;
         }
         
-        // ← NEU: Validierung
+        // Lösung 2: Verschiedene Formate abfangen
+        if (typeof resolvedId === 'string') {
+          productId = parseInt(resolvedId, 10);
+        } else if (Array.isArray(resolvedId) && resolvedId.length > 0) {
+          productId = parseInt(resolvedId[0], 10);
+        } else if (typeof resolvedId === 'number') {
+          productId = resolvedId;
+        }
+        
+        console.log('Extracted productId:', productId); // Debug
+        
         if (!productId || isNaN(productId) || productId <= 0) {
-          console.error('Ungültige Produkt-ID:', idParam);
+          console.error('Ungültige Produkt-ID:', resolvedId);
           setProduct(null);
           setLoading(false);
           return;
@@ -85,12 +97,9 @@ export default function ProductPage() {
       }
     }
     
-    if (params.id) {
-      fetchProduct();
-    }
+    fetchProduct();
   }, [params.id]);
 
-  // ← NEU: Bildwechsel mit Reset des Error States
   const nextImage = () => {
     if (!product?.images) return;
     setCurrentImage((prev) => (prev + 1) % product.images!.length);
@@ -129,14 +138,12 @@ export default function ProductPage() {
     );
   }
 
-  // ← ÄNDERUNG: Sichere Behandlung von images
   const images = product.images && Array.isArray(product.images) ? product.images : [];
   const hasMultipleImages = images.length > 1;
   const currentImageUrl = images[currentImage];
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
-      {/* Header */}
       <div className="border-b border-[#1A1A1A] sticky top-0 bg-[#0A0A0A]/95 backdrop-blur z-50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
           <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#FF4400] transition-colors group">
@@ -146,7 +153,6 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-12">
         <div className="grid md:grid-cols-2 gap-6 md:gap-12">
           
@@ -188,7 +194,6 @@ export default function ProductPage() {
                 )}
               </div>
               
-              {/* Thumbnails */}
               {hasMultipleImages && (
                 <div className="flex gap-2 mt-3 md:mt-4 overflow-x-auto pb-2">
                   {images.map((img, idx) => (
@@ -220,31 +225,26 @@ export default function ProductPage() {
           {/* Infos */}
           <div className="flex flex-col h-full px-0 md:px-0">
             
-            {/* Sold Badge */}
             {product.sold && (
               <div className="inline-block px-3 py-1 bg-red-500 text-white text-xs uppercase tracking-widest mb-4 w-fit">
                 Verkauft
               </div>
             )}
             
-            {/* Brand & Category */}
             <div className="flex flex-wrap items-center gap-2 mb-3 md:mb-4">
               <span className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || 'Keine Marke'}</span>
               <span className="text-gray-600">•</span>
               <span className="text-xs text-gray-500 uppercase tracking-widest">{product.category || 'Sonstiges'}</span>
             </div>
             
-            {/* Title */}
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-3 md:mb-4">
               {product.name}
             </h1>
             
-            {/* Price */}
             <div className="text-3xl md:text-4xl font-bold text-[#FF4400] mb-4 md:mb-6">
               €{product.price}
             </div>
             
-            {/* Size & Condition */}
             <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#1A1A1A] rounded-sm">
               <div>
                 <p className="text-xs text-gray-500 uppercase mb-1">Größe</p>
@@ -258,11 +258,9 @@ export default function ProductPage() {
               </div>
             </div>
 
-            {/* Platform Links */}
             <div className="space-y-3 mb-6 md:mb-8">
               <p className="text-xs text-gray-500 uppercase tracking-widest">Verfügbar auf</p>
               
-              {/* Vinted Link */}
               <a 
                 href={product.vinted_url} 
                 target="_blank" 
@@ -282,7 +280,6 @@ export default function ProductPage() {
               </a>
             </div>
 
-            {/* Share Button */}
             <button 
               onClick={() => { 
                 navigator.clipboard.writeText(window.location.href); 
