@@ -2,15 +2,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
-  Clock, Shield, ExternalLink, Menu, X, Search,
+  Clock, Shield, ExternalLink, Search,
   LayoutGrid, List, Minimize2
 } from 'lucide-react';
-import { ViewToggle, type ViewMode } from '@/components/ViewToggle';
+import { type ViewMode } from '@/components/ViewToggle';
 import { ProductView } from '@/components/ProductView';
 import { useProductCleaner } from '@/hooks/useProductCleaner';
+import { Navigation } from '@/components/Navigation';
 
 interface Product {
   id: number;
@@ -42,30 +43,23 @@ const staggerContainer = {
 export function ProductClient({ initialProducts }: ProductClientProps) {
   const { cleanedProducts, uniqueBrands, uniqueCategories, loading: cleaning } = useProductCleaner(initialProducts);
   
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Alle");
   const [activeBrand, setActiveBrand] = useState("Alle");
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [search, setSearch] = useState("");
   
-  // ========== PRIORISIERTES LADEN DER PRODUKTE ==========
   const [visibleProducts, setVisibleProducts] = useState<Product[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     if (cleanedProducts.length === 0) return;
-    
-    // Nur die ersten 12 Produkte sofort anzeigen
     setVisibleProducts(cleanedProducts.slice(0, 12));
     setIsLoadingMore(true);
-    
-    // Restliche Produkte nach und nach laden
     const timer = setTimeout(() => {
       setVisibleProducts(cleanedProducts);
       setIsLoadingMore(false);
     }, 800);
-    
     return () => clearTimeout(timer);
   }, [cleanedProducts]);
 
@@ -76,14 +70,9 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   }, []);
 
   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
-  
-  const allCategories = uniqueCategories.length > 0 
-    ? ["Alle", ...uniqueCategories] 
-    : ["Alle", ...fixedCategories];
-  
+  const allCategories = uniqueCategories.length > 0 ? ["Alle", ...uniqueCategories] : ["Alle", ...fixedCategories];
   const allBrands = ["Alle", ...uniqueBrands];
   
-  // Gefilterte Produkte (verwende visibleProducts für priorisiertes Laden)
   const filteredProducts = (visibleProducts.length > 0 ? visibleProducts : cleanedProducts).filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false;
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false;
@@ -93,10 +82,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
   const viewButtonClass = (mode: ViewMode) => `
     p-2 transition-all duration-200 rounded-sm
-    ${viewMode === mode 
-      ? 'bg-[#FF4400] text-white' 
-      : 'bg-[#1A1A1A] border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'
-    }
+    ${viewMode === mode ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}
   `;
 
   if (cleaning) {
@@ -112,40 +98,9 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans">
-      {/* Header Navigation */}
-
-
-      {/* Header Navigation */}
-      <nav className={`fixed w-full z-40 transition-all duration-300 ${scrolled ? 'bg-[#0A0A0A]/90 backdrop-blur-md py-4' : 'bg-transparent py-6'}`}>
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-bold tracking-tighter">
-            <span className="text-[#FF4400]">SCND</span>_UNIT
-          </motion.div>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#products" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">Inventory</a>
-            <a href="#about" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">About</a>
-            <a href="#contact" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">Contact</a>
-            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="px-6 py-2 bg-[#FF4400] text-white text-sm uppercase tracking-widest hover:bg-[#FF4400]/80 transition-colors">
-              Shop Vinted
-            </a>
-          </div>
-          <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X /> : <Menu />}
-          </button>
-        </div>
-        <AnimatePresence>
-          {isMenuOpen && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-[#0A0A0A] border-t border-[#1A1A1A]">
-              <div className="flex flex-col p-6 gap-4">
-                <a href="#products" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">Inventory</a>
-                <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">About</a>
-                <a href="#contact" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">Contact</a>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </nav>
-
+      
+      {/* Navigation */}
+      <Navigation scrolled={scrolled} />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -193,15 +148,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <div className="relative">
               <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
                 {allBrands.map(b => (
-                  <button 
-                    key={b} 
-                    onClick={() => setActiveBrand(b)}
-                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
-                      activeBrand === b 
-                        ? 'bg-[#FF4400] text-white' 
-                        : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                    }`}
-                  >
+                  <button key={b} onClick={() => setActiveBrand(b)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
                     {b}
                   </button>
                 ))}
@@ -219,15 +166,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <div className="relative">
               <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
                 {allCategories.map(c => (
-                  <button 
-                    key={c} 
-                    onClick={() => setActiveCategory(c)}
-                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
-                      activeCategory === c 
-                        ? 'bg-[#FF4400] text-white' 
-                        : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                    }`}
-                  >
+                  <button key={c} onClick={() => setActiveCategory(c)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${activeCategory === c ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
                     {c}
                   </button>
                 ))}
@@ -245,29 +184,15 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-              <input 
-                type="text" 
-                placeholder="Suchen..." 
-                value={search} 
-                onChange={e => setSearch(e.target.value)} 
-                className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64 rounded-sm"
-              />
+              <input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64 rounded-sm"/>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex gap-1">
-                <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')}>
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button onClick={() => setViewMode('list')} className={viewButtonClass('list')}>
-                  <List className="w-4 h-4" />
-                </button>
-                <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')}>
-                  <Minimize2 className="w-4 h-4" />
-                </button>
+                <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')}><LayoutGrid className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('list')} className={viewButtonClass('list')}><List className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')}><Minimize2 className="w-4 h-4" /></button>
               </div>
-              <div className="text-xs text-gray-500">
-                {filteredProducts.length} von {cleanedProducts.length} Artikeln
-              </div>
+              <div className="text-xs text-gray-500">{filteredProducts.length} von {cleanedProducts.length} Artikeln</div>
             </div>
           </div>
           
@@ -280,11 +205,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           )}
           
           <div className="mt-16 text-center">
-            <a 
-              href="https://www.vinted.de/member/3138250645-scndunit" 
-              target="_blank" 
-              className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest"
-            >
+            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest">
               Alle Artikel auf Vinted <ExternalLink className="w-4 h-4" />
             </a>
           </div>
