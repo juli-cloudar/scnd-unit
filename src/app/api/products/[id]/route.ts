@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,19 +7,21 @@ const supabase = createClient(
 )
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
-    if (isNaN(id)) {
+    const { id } = await params
+    const productId = parseInt(id)
+    
+    if (isNaN(productId)) {
       return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
     }
     
     const { data, error } = await supabase
       .from('products')
       .select('*')
-      .eq('id', id)
+      .eq('id', productId)
       .single()
     
     if (error) {
