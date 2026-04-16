@@ -1,17 +1,18 @@
-// src/app/ProductClient.tsx
+// src/app/ProductClient.tsx (vereinfacht)
 'use client';
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
-  Clock, Shield, ExternalLink, Search,
-  LayoutGrid, List, Minimize2
+  Clock, Shield, ExternalLink
 } from 'lucide-react';
-import { type ViewMode } from '@/components/ViewToggle';
-import { ProductView } from '@/components/ProductView';
 import { useProductCleaner } from '@/hooks/useProductCleaner';
 import { Navigation } from '@/components/Navigation';
+import { FilterBar } from '@/components/FilterBar';
+import { SearchAndControls } from '@/components/SearchAndControls';
+import { ProductGrid } from '@/components/ProductGrid';
+import type { ViewMode } from '@/components/ViewToggle';
 
 interface Product {
   id: number;
@@ -70,8 +71,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   }, []);
 
   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
-  const allCategories = uniqueCategories.length > 0 ? ["Alle", ...uniqueCategories] : ["Alle", ...fixedCategories];
-  const allBrands = ["Alle", ...uniqueBrands];
+  const allCategories = uniqueCategories.length > 0 ? uniqueCategories : fixedCategories;
+  const allBrands = uniqueBrands;
   
   const filteredProducts = (visibleProducts.length > 0 ? visibleProducts : cleanedProducts).filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false;
@@ -79,11 +80,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.brand.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
-
-  const viewButtonClass = (mode: ViewMode) => `
-    p-2 transition-all duration-200 rounded-sm
-    ${viewMode === mode ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}
-  `;
 
   if (cleaning) {
     return (
@@ -99,7 +95,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans">
       
-      {/* Navigation */}
       <Navigation scrolled={scrolled} />
 
       {/* Hero Section */}
@@ -128,7 +123,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
       {/* Info Bar */}
       <section className="border-y border-[#1A1A1A] bg-[#0A0A0A]">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="w-full px-4 md:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Clock className="w-5 h-5 text-[#FF4400]" />Versand innerhalb 48h</div>
             <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Shield className="w-5 h-5 text-[#FF4400]" />Ehrliche Beschreibungen</div>
@@ -137,66 +132,32 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Filter Section */}
-      <section className="py-8 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-4 bg-[#FF4400]"></div>
-              <p className="text-xs text-gray-400 uppercase tracking-widest">Marken</p>
-            </div>
-            <div className="relative">
-              <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
-                {allBrands.map(b => (
-                  <button key={b} onClick={() => setActiveBrand(b)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
-                    {b}
-                  </button>
-                ))}
-              </div>
-              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
-              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-4 bg-[#FF4400]"></div>
-              <p className="text-xs text-gray-400 uppercase tracking-widest">Kategorien</p>
-            </div>
-            <div className="relative">
-              <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
-                {allCategories.map(c => (
-                  <button key={c} onClick={() => setActiveCategory(c)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${activeCategory === c ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
-              <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Filter Bar Component */}
+      <FilterBar
+        brands={allBrands}
+        categories={allCategories}
+        activeBrand={activeBrand}
+        activeCategory={activeCategory}
+        onBrandChange={setActiveBrand}
+        onCategoryChange={setActiveCategory}
+      />
 
       {/* Products Section */}
-      <section id="products" className="py-12 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-              <input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64 rounded-sm"/>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex gap-1">
-                <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')}><LayoutGrid className="w-4 h-4" /></button>
-                <button onClick={() => setViewMode('list')} className={viewButtonClass('list')}><List className="w-4 h-4" /></button>
-                <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')}><Minimize2 className="w-4 h-4" /></button>
-              </div>
-              <div className="text-xs text-gray-500">{filteredProducts.length} von {cleanedProducts.length} Artikeln</div>
-            </div>
-          </div>
+      <section id="products" className="py-12 px-4 md:px-6 lg:px-8">
+        <div className="w-full">
           
-          <ProductView products={filteredProducts as any} viewMode={viewMode} />
+          {/* Search and Controls Component */}
+          <SearchAndControls
+            search={search}
+            onSearchChange={setSearch}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            filteredCount={filteredProducts.length}
+            totalCount={cleanedProducts.length}
+          />
+          
+          {/* Product Grid Component */}
+          <ProductGrid products={filteredProducts} viewMode={viewMode} />
           
           {isLoadingMore && visibleProducts.length < cleanedProducts.length && (
             <div className="flex justify-center py-8">
@@ -214,9 +175,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
       {/* ABOUT SECTION */}
       <section id="about" className="py-24 bg-[#1A1A1A] relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_49%,rgba(255,68,0,0.03)_50%,transparent_51%)] bg-[length:20px_20px]" />
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
+        <div className="w-full px-4 md:px-6 lg:px-8 relative z-10">
+          <div className="grid md:grid-cols-2 gap-16 items-center max-w-7xl mx-auto">
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
               <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">ABOUT_<span className="text-[#FF4400]">UNIT</span></h2>
               <div className="space-y-4 text-gray-300 leading-relaxed">
@@ -243,7 +203,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       </section>
 
       {/* CONTACT SECTION */}
-      <section id="contact" className="py-24 px-6">
+      <section id="contact" className="py-24 px-4 md:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">GET_IN_<span className="text-[#FF4400]">TOUCH</span></h2>
@@ -264,7 +224,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[#1A1A1A] py-12 px-6">
+      <footer className="border-t border-[#1A1A1A] py-12 px-4 md:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-2xl font-bold tracking-tighter">
             <span className="text-[#FF4400]">SCND</span>_UNIT
