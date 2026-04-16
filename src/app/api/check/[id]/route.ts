@@ -1,11 +1,11 @@
 // app/api/vinted/check/[id]/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const itemId = params.id;
+  const { id: itemId } = await params;
   
   try {
     // Vinted API-Endpunkt für Item-Details
@@ -16,7 +16,6 @@ export async function GET(
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Accept': 'application/json',
         },
-        next: { revalidate: 0 } // Kein Caching
       }
     );
     
