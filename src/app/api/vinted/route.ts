@@ -1,5 +1,6 @@
 // src/app/api/vinted/route.ts
 import { NextResponse } from 'next/server';
+import { cleanProduct } from '@/lib/productCleaner';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -94,84 +95,16 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     const base = fullUrl.split('?')[0];
     if (!seen.has(base)) {
       seen.add(base);
-      // SPEICHERE ORIGINAL URL - NICHT DEN PROXY!
       images.push(fullUrl);
     }
   }
 
-  // NAME
+  // NAME - Hole den rohen Namen
   const h1Match = html.match(/<h1[^>]*>\s*([^<]+)\s*<\/h1>/i);
   const titleMatch = html.match(/<title>\s*([^|<]+)/i);
-  let name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
+  const rawName = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
-  // MARKEN EXTRAHIEREN & DOPPELTE MARKE ENTFERNEN
-  const knownBrands = [
-    'Adidas', 'Nike', 'Puma', 'Tommy Hilfiger', 'Tommy', 
-    'Lacoste', 'Champion', 'Vintage', 'The North Face',
-    'Carhartt', 'Patagonia', 'Columbia', 'Jack Wolfskin'
-  ];
-
-  let brand = '';
-
-  // Prüfe auf bekannte Marken im Namen
-  for (const knownBrand of knownBrands) {
-    const regex = new RegExp(`\\b${knownBrand}\\b`, 'i');
-    if (regex.test(name)) {
-      brand = knownBrand;
-      break;
-    }
-  }
-
-  // DOPPELTE MARKE ENTFERNEN (z.B. "Adidas Adidas" -> "Adidas")
-  if (brand) {
-    const doubleBrandRegex = new RegExp(`^${brand}\\s+${brand}`, 'i');
-    name = name.replace(doubleBrandRegex, brand);
-    
-    // Entferne Marke vom Anfang wenn sie doppelt vorkommt
-    if (name.toLowerCase().startsWith(brand.toLowerCase() + ' ')) {
-      const firstWord = name.split(' ')[0];
-      const rest = name.substring(firstWord.length).trim();
-      if (rest.toLowerCase().startsWith(brand.toLowerCase())) {
-        name = brand + ' ' + rest.substring(brand.length).trim();
-      }
-    }
-  }
-
-  // GRÖSSE
-  let size = '';
-  const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) ||
-                       html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) ||
-                       html.match(/"size_title"[:\s]*"([^"]{1,20})"/i);
-  if (sizeJsonMatch) size = sizeJsonMatch[1].trim();
-
-  if (!size) {
-    const sizePatterns = [
-      /data-testid="item-details-size"[^>]*>([^<]{1,20})/i,
-      /class="[^"]*item-details[^"]*"[^>]*>[^<]*Größe[^<]*<[^>]*>([^<]{1,20})/i,
-      /Größe\s*<\/[^>]+>\s*<[^>]+>\s*([^<]{1,20})/i,
-      /Größe[^<]{0,30}<[^>]+>([^<]{1,20})/i,
-      /"Größe"[^:]*:[^"]*"([^"]{1,20})"/i,
-    ];
-    for (const pattern of sizePatterns) {
-      const match = html.match(pattern);
-      if (match?.[1]) {
-        size = match[1].trim().replace(/[·\/\-]/g, '').trim();
-        if (size.length > 0 && size.length < 20) break;
-      }
-    }
-  }
-
-  if (!size) {
-    const broadMatch = html.match(/(?:Größe|Grösse|Size)[^\w]{0,10}(XXS|XS|S|M|L|XL|XXL|XXXL|4XL|5XL|One Size|Einheitsgröße|UNI|\d{2,3})/i);
-    if (broadMatch) size = broadMatch[1].trim();
-  }
-
-  if (!size) {
-    const numericMatch = html.match(/(?:Größe|Size)[^\d]{0,15}(\d{2,3})\b/i);
-    if (numericMatch) size = numericMatch[1];
-  }
-
-  // PREIS - VERBESSERTE VERSION
+  // PREIS
   let price = '';
 
   // 1. Versuche JSON-LD zuerst
@@ -220,6 +153,35 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     if (priceMatch) price = priceMatch[1];
   }
 
+  // GRÖSSE
+  let size = '';
+  const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) ||
+                       html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) ||
+                       html.match(/"size_title"[:\s]*"([^"]{1,20})"/i);
+  if (sizeJsonMatch) size = sizeJsonMatch[1].trim();
+
+  if (!size) {
+    const sizePatterns = [
+      /data-testid="item-details-size"[^>]*>([^<]{1,20})/i,
+      /class="[^"]*item-details[^"]*"[^>]*>[^<]*Größe[^<]*<[^>]*>([^<]{1,20})/i,
+      /Größe\s*<\/[^>]+>\s*<[^>]+>\s*([^<]{1,20})/i,
+      /Größe[^<]{0,30}<[^>]+>([^<]{1,20})/i,
+      /"Größe"[^:]*:[^"]*"([^"]{1,20})"/i,
+    ];
+    for (const pattern of sizePatterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        size = match[1].trim().replace(/[·\/\-]/g, '').trim();
+        if (size.length > 0 && size.length < 20) break;
+      }
+    }
+  }
+
+  if (!size) {
+    const broadMatch = html.match(/(?:Größe|Grösse|Size)[^\w]{0,10}(XXS|XS|S|M|L|XL|XXL|XXXL|4XL|5XL|One Size|Einheitsgröße|UNI|\d{2,3})/i);
+    if (broadMatch) size = broadMatch[1].trim();
+  }
+
   // ZUSTAND
   const condMap: Record<string, string> = {
     'neu mit etikett': 'Neu mit Etikett',
@@ -263,27 +225,36 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // KATEGORIE
-  const catMap: Record<string, string> = {
-    'jacke': 'Jacken', 'jacket': 'Jacken', 'mantel': 'Jacken', 'coat': 'Jacken',
-    'pullover': 'Pullover', 'hoodie': 'Pullover', 'strickjacke': 'Pullover', 'sweater': 'Pullover',
-    'sweatshirt': 'Sweatshirts', 'sweat': 'Sweatshirts', 'crewneck': 'Sweatshirts',
-    'top': 'Tops', 'shirt': 'Tops', 't-shirt': 'Tops', 'tshirt': 'Tops', 'crop': 'Tops',
-    'kleid': 'Kleider', 'dress': 'Kleider',
-    'rock': 'Röcke', 'skirt': 'Röcke',
-    'hose': 'Hosen', 'pants': 'Hosen', 'jeans': 'Hosen',
-    'schuhe': 'Schuhe', 'shoes': 'Schuhe', 'sneaker': 'Schuhe',
-    'tasche': 'Taschen', 'bag': 'Taschen',
-  };
-  
-  let category = 'Sonstiges';
-  const nameLower = name.toLowerCase();
-  const urlLower = url.toLowerCase();
-  
-  for (const [key, val] of Object.entries(catMap)) {
-    if (nameLower.includes(key) || urlLower.includes(key)) {
-      category = val;
-      break;
+  // JETZT: Verwende cleanProduct für Name, Brand, Category
+  const cleaned = cleanProduct({
+    name: rawName,
+    price: price,
+    size: size,
+    condition: condition,
+    vinted_url: url,
+    images: images
+  });
+
+  // KATEGORIE (falls cleanProduct keine gesetzt hat)
+  let category = cleaned.category;
+  if (!category || category === 'Pullover') {
+    const nameLower = rawName.toLowerCase();
+    const urlLower = url.toLowerCase();
+    const catMap: Record<string, string> = {
+      'jacke': 'Jacken', 'jacket': 'Jacken', 'fleece': 'Jacken',
+      'sweatshirt': 'Sweatshirts', 'crewneck': 'Sweatshirts',
+      'top': 'Tops', 'cropped': 'Tops',
+      'polo': 'Polos',
+      'weste': 'Westen',
+    };
+    for (const [key, val] of Object.entries(catMap)) {
+      if (nameLower.includes(key) || urlLower.includes(key)) {
+        category = val;
+        break;
+      }
+    }
+    if (category === 'Pullover' && (nameLower.includes('jacke') || nameLower.includes('fleece'))) {
+      category = 'Jacken';
     }
   }
 
@@ -295,12 +266,12 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     itemId,
     url,
     status: itemStatus,
-    name,
-    brand,        // ← BRAND HINZUGEFÜGT
-    price,
-    size,
-    condition,
-    category,
+    name: cleaned.name,
+    brand: cleaned.brand,
+    price: cleaned.price,
+    size: cleaned.size || size,
+    condition: cleaned.condition,
+    category: category,
     images: images.slice(0, 5),
     lastChecked: new Date().toISOString(),
   };
@@ -324,7 +295,7 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
         url, 
         status: 'sold', 
         name: '',
-        brand: '',    // ← BRAND HINZUGEFÜGT
+        brand: '',
         price: '',
         size: '',
         condition: '',
@@ -342,48 +313,31 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   return extractItemFromHTML(html, url);
 }
 
-// VERBESSERTE getAllUserItems - unterstützt verschiedene Eingabeformate
 async function getAllUserItems(memberInput: string): Promise<string[]> {
   const urls: string[] = [];
   
-  // Extrahiere die numerische Member-ID aus verschiedenen Formaten
   let memberId = '';
-  
-  // Entferne Leerzeichen
   memberInput = memberInput.trim();
   
-  // Fall 1: Nur eine Zahl (z.B. "3138250645")
   if (/^\d+$/.test(memberInput)) {
     memberId = memberInput;
   }
-  // Fall 2: URL mit /member/Zahl-Name (z.B. "https://www.vinted.de/member/3138250645-scndunit")
   else if (memberInput.includes('/member/')) {
     const match = memberInput.match(/\/member\/(\d+)/);
-    if (match) {
-      memberId = match[1];
-    }
+    if (match) memberId = match[1];
   }
-  // Fall 3: Nur die Zahl mit eventuellem Text dahinter (z.B. "3138250645-scndunit")
   else {
     const numMatch = memberInput.match(/^(\d+)/);
-    if (numMatch) {
-      memberId = numMatch[1];
-    }
+    if (numMatch) memberId = numMatch[1];
   }
   
-  if (!memberId) {
-    console.error('[Vinted] Could not extract member ID from:', memberInput);
-    return [];
-  }
-  
-  console.log(`[Vinted] Member ID: ${memberId}`);
+  if (!memberId) return [];
   
   let page = 1;
   const maxPages = 20;
   
   while (page <= maxPages) {
     const profileUrl = `https://www.vinted.de/member/${memberId}?page=${page}`;
-    console.log(`[Vinted] Fetching page ${page}: ${profileUrl}`);
     
     try {
       const response = await fetch(profileUrl, {
@@ -396,14 +350,9 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
         },
       });
       
-      if (!response.ok) {
-        console.log(`[Vinted] HTTP ${response.status} on page ${page}`);
-        break;
-      }
+      if (!response.ok) break;
       
       const html = await response.text();
-      
-      // Finde alle Item-Links
       const itemMatches = html.matchAll(/href="(\/items\/\d+[^"?#]*)"/g);
       let found = 0;
       for (const match of itemMatches) {
@@ -414,27 +363,19 @@ async function getAllUserItems(memberInput: string): Promise<string[]> {
         }
       }
       
-      console.log(`[Vinted] Page ${page}: found ${found} items (total: ${urls.length})`);
-      
-      // Prüfe auf nächste Seite
       const hasNext = html.includes(`page=${page + 1}`) || 
                       html.includes('rel="next"') ||
                       html.includes('>Weiter<');
       
-      if (!hasNext || found === 0) {
-        console.log(`[Vinted] No more pages`);
-        break;
-      }
+      if (!hasNext || found === 0) break;
       
       page++;
       await new Promise(r => setTimeout(r, 500));
     } catch (err) {
-      console.error(`[Vinted] Error fetching page ${page}:`, err);
       break;
     }
   }
   
-  console.log(`[Vinted] Total unique items found: ${urls.length}`);
   return urls;
 }
 
@@ -456,7 +397,6 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
           results.push(data);
           await new Promise(r => setTimeout(r, 500));
         } catch (e) {
-          console.error(`Fehler bei ${url}:`, e);
           results.push({ 
             itemId: null,
             url, 
@@ -489,83 +429,47 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
 
 // POST Route
 export async function POST(request: Request) {
-  console.log('[API] POST received');
-  
   try {
     const body = await request.json();
-    console.log('[API] Body:', JSON.stringify(body, null, 2));
-    
-    const { 
-      url,
-      username,
-      userId,
-      profileUrl,
-      mode = 'single',
-      autoRemove = false,
-      quick = false,
-    } = body;
+    const { url, username, userId, profileUrl, mode = 'single', autoRemove = false, quick = false } = body;
 
-    // SINGLE MODE (Item-URL)
+    // SINGLE MODE
     if (mode === 'single' && url) {
       if (!url.includes('vinted')) {
         return NextResponse.json({ message: 'Ungültige URL' }, { status: 400, headers: CORS });
       }
 
-      console.log('[API] Single mode for:', url);
       const data = await scrapeSingleItem(url);
 
       if (data.status === 'sold' && autoRemove) {
-        return NextResponse.json({
-          ...data,
-          action: 'removed',
-          message: '⚠️ Item ist VERKAUFT',
-        }, { headers: CORS });
+        return NextResponse.json({ ...data, action: 'removed', message: '⚠️ Item ist VERKAUFT' }, { headers: CORS });
       }
 
       if (data.status === 'sold') {
-        return NextResponse.json({
-          ...data,
-          warning: '⚠️ Item ist VERKAUFT',
-          action: 'suggest_remove',
-        }, { headers: CORS });
+        return NextResponse.json({ ...data, warning: '⚠️ Item ist VERKAUFT', action: 'suggest_remove' }, { headers: CORS });
       }
 
       return NextResponse.json(data, { headers: CORS });
     }
 
-    // BULK MODE (Member-URL oder Member-ID)
+    // BULK MODE
     if (mode === 'bulk') {
       let identifier = username || userId || profileUrl;
       
       if (!identifier) {
-        return NextResponse.json(
-          { message: 'profileUrl, username oder userId erforderlich' }, 
-          { status: 400, headers: CORS }
-        );
+        return NextResponse.json({ message: 'profileUrl, username oder userId erforderlich' }, { status: 400, headers: CORS });
       }
 
-      console.log(`[API] Bulk mode for: ${identifier}`);
       const allUrls = await getAllUserItems(identifier);
       
       if (allUrls.length === 0) {
-        return NextResponse.json(
-          { message: 'Keine Items gefunden für: ' + identifier }, 
-          { status: 404, headers: CORS }
-        );
+        return NextResponse.json({ message: 'Keine Items gefunden für: ' + identifier }, { status: 404, headers: CORS });
       }
 
-      // Quick Mode: Nur URLs zurückgeben
       if (quick === true) {
-        console.log(`[API] Quick mode: returning ${allUrls.length} URLs`);
-        return NextResponse.json({
-          totalItems: allUrls.length,
-          itemUrls: allUrls,
-          message: `${allUrls.length} Items gefunden.`,
-        }, { headers: CORS });
+        return NextResponse.json({ totalItems: allUrls.length, itemUrls: allUrls, message: `${allUrls.length} Items gefunden.` }, { headers: CORS });
       }
 
-      // Vollständiger Import mit Scraping
-      console.log(`[API] Full scrape mode: processing ${allUrls.length} items`);
       const results = await bulkScrapeItems(allUrls, 2);
       
       const successful = results.filter(r => !r.error && r.status === 'available');
@@ -575,40 +479,21 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         timestamp: new Date().toISOString(),
-        summary: {
-          total: results.length,
-          available: successful.length,
-          sold: sold.length,
-          reserved: reserved.length,
-          errors: errors.length,
-        },
-        items: {
-          added: successful,
-          skipped: sold,
-          reserved: reserved,
-          failed: errors,
-        },
+        summary: { total: results.length, available: successful.length, sold: sold.length, reserved: reserved.length, errors: errors.length },
+        items: { added: successful, skipped: sold, reserved: reserved, failed: errors },
         message: `✅ ${successful.length} verfügbare Items, ${sold.length} verkauft, ${reserved.length} reserviert`,
       }, { headers: CORS });
     }
 
-    return NextResponse.json(
-      { message: 'Ungültiger Modus. Verwende mode: "single" mit url ODER mode: "bulk" mit profileUrl' }, 
-      { status: 400, headers: CORS }
-    );
+    return NextResponse.json({ message: 'Ungültiger Modus. Verwende mode: "single" mit url ODER mode: "bulk" mit profileUrl' }, { status: 400, headers: CORS });
 
   } catch (e) {
     console.error('[API] Scraper Error:', e);
-    return NextResponse.json(
-      { message: 'Fehler: ' + String(e) }, 
-      { status: 500, headers: CORS }
-    );
+    return NextResponse.json({ message: 'Fehler: ' + String(e) }, { status: 500, headers: CORS });
   }
 }
 
 // GET Route
 export async function GET(request: Request) {
-  return NextResponse.json({ 
-    message: 'Verwende POST für API-Zugriff. Beispiele: { "mode": "single", "url": "..." } oder { "mode": "bulk", "profileUrl": "...", "quick": true }' 
-  }, { headers: CORS });
+  return NextResponse.json({ message: 'Verwende POST für API-Zugriff. Beispiele: { "mode": "single", "url": "..." } oder { "mode": "bulk", "profileUrl": "...", "quick": true }' }, { headers: CORS });
 }
