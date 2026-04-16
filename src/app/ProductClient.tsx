@@ -128,7 +128,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
       {/* Info Bar */}
       <section className="border-y border-[#1A1A1A] bg-[#0A0A0A]">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+<div className="relative z-10 text-center px-4 md:px-6 w-full max-w-full md:max-w-7xl lg:max-w-[90%] xl:max-w-[85%] mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Clock className="w-5 h-5 text-[#FF4400]" />Versand innerhalb 48h</div>
             <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Shield className="w-5 h-5 text-[#FF4400]" />Ehrliche Beschreibungen</div>
