@@ -1,6 +1,6 @@
 // src/app/api/vinted/route.ts
 import { NextResponse } from 'next/server';
-import { cleanProduct } from '@/lib/productCleaner';
+import { cleanProduct } from '@/lib/productCleanerCore';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
