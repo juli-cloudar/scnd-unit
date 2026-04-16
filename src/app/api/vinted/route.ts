@@ -82,7 +82,7 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // BILDER
+  // BILDER - SPEICHERE ORIGINAL URLs (NICHT PROXY)
   const imgMatches = [...html.matchAll(/https:\/\/images\d*\.vinted\.net\/[^"'\s<>]+/g)];
   const seen = new Set<string>();
   const images: string[] = [];
@@ -94,7 +94,8 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     const base = fullUrl.split('?')[0];
     if (!seen.has(base)) {
       seen.add(base);
-      images.push(`/api/image-proxy?url=${encodeURIComponent(fullUrl)}`);
+      // SPEICHERE ORIGINAL URL - NICHT DEN PROXY!
+      images.push(fullUrl);
     }
   }
 
@@ -103,40 +104,40 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   const titleMatch = html.match(/<title>\s*([^|<]+)/i);
   let name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
-// MARKEN EXTRAHIEREN & DOPPELTE MARKE ENTFERNEN
-const knownBrands = [
-  'Adidas', 'Nike', 'Puma', 'Tommy Hilfiger', 'Tommy', 
-  'Lacoste', 'Champion', 'Vintage', 'The North Face',
-  'Carhartt', 'Patagonia', 'Columbia', 'Jack Wolfskin'
-];
+  // MARKEN EXTRAHIEREN & DOPPELTE MARKE ENTFERNEN
+  const knownBrands = [
+    'Adidas', 'Nike', 'Puma', 'Tommy Hilfiger', 'Tommy', 
+    'Lacoste', 'Champion', 'Vintage', 'The North Face',
+    'Carhartt', 'Patagonia', 'Columbia', 'Jack Wolfskin'
+  ];
 
-let brand = '';
+  let brand = '';
 
-// Prüfe auf bekannte Marken im Namen
-for (const knownBrand of knownBrands) {
-  const regex = new RegExp(`\\b${knownBrand}\\b`, 'i');
-  if (regex.test(name)) {
-    brand = knownBrand;
-    break;
-  }
-}
-
-// DOPPELTE MARKE ENTFERNEN (z.B. "Adidas Adidas" -> "Adidas")
-if (brand) {
-  const doubleBrandRegex = new RegExp(`^${brand}\\s+${brand}`, 'i');
-  name = name.replace(doubleBrandRegex, brand);
-  
-  // Entferne Marke vom Anfang wenn sie doppelt vorkommt
-  if (name.toLowerCase().startsWith(brand.toLowerCase() + ' ')) {
-    const firstWord = name.split(' ')[0];
-    const rest = name.substring(firstWord.length).trim();
-    if (rest.toLowerCase().startsWith(brand.toLowerCase())) {
-      name = brand + ' ' + rest.substring(brand.length).trim();
+  // Prüfe auf bekannte Marken im Namen
+  for (const knownBrand of knownBrands) {
+    const regex = new RegExp(`\\b${knownBrand}\\b`, 'i');
+    if (regex.test(name)) {
+      brand = knownBrand;
+      break;
     }
   }
-}
 
- // GRÖSSE
+  // DOPPELTE MARKE ENTFERNEN (z.B. "Adidas Adidas" -> "Adidas")
+  if (brand) {
+    const doubleBrandRegex = new RegExp(`^${brand}\\s+${brand}`, 'i');
+    name = name.replace(doubleBrandRegex, brand);
+    
+    // Entferne Marke vom Anfang wenn sie doppelt vorkommt
+    if (name.toLowerCase().startsWith(brand.toLowerCase() + ' ')) {
+      const firstWord = name.split(' ')[0];
+      const rest = name.substring(firstWord.length).trim();
+      if (rest.toLowerCase().startsWith(brand.toLowerCase())) {
+        name = brand + ' ' + rest.substring(brand.length).trim();
+      }
+    }
+  }
+
+  // GRÖSSE
   let size = '';
   const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) ||
                        html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) ||
@@ -170,8 +171,10 @@ if (brand) {
     if (numericMatch) size = numericMatch[1];
   }
 
-  // PREIS
+  // PREIS - VERBESSERTE VERSION
   let price = '';
+
+  // 1. Versuche JSON-LD zuerst
   const jsonLdMatches = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
   for (const jsonMatch of jsonLdMatches) {
     try {
@@ -195,6 +198,22 @@ if (brand) {
     } catch (e) {}
   }
 
+  // 2. Suche nach Preis mit Währung
+  if (!price) {
+    const priceRegex = /(\d{1,3}(?:[.,]\d{2})?)\s*(?:€|EUR)/gi;
+    const matches = [...html.matchAll(priceRegex)];
+    if (matches.length > 0) {
+      price = matches[0][1].replace(',', '.');
+    }
+  }
+
+  // 3. Suche in Meta-Tags
+  if (!price) {
+    const metaMatch = html.match(/<meta[^>]*property="product:price:amount"[^>]*content="([^"]+)"/i);
+    if (metaMatch) price = metaMatch[1];
+  }
+
+  // 4. Letzter Versuch: HTML Text
   if (!price) {
     const priceSection = html.substring(0, html.indexOf('Käuferschutz') > 0 ? html.indexOf('Käuferschutz') : html.length);
     const priceMatch = priceSection.match(/(\d{1,3}(?:[.,]\d{2})?)\s*(€|EUR)/i);
@@ -277,6 +296,7 @@ if (brand) {
     url,
     status: itemStatus,
     name,
+    brand,        // ← BRAND HINZUGEFÜGT
     price,
     size,
     condition,
@@ -304,6 +324,7 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
         url, 
         status: 'sold', 
         name: '',
+        brand: '',    // ← BRAND HINZUGEFÜGT
         price: '',
         size: '',
         condition: '',
@@ -321,7 +342,7 @@ async function scrapeSingleItem(url: string): Promise<ScrapeResult> {
   return extractItemFromHTML(html, url);
 }
 
-// ⭐⭐⭐ VERBESSERTE getAllUserItems - unterstützt verschiedene Eingabeformate ⭐⭐⭐
+// VERBESSERTE getAllUserItems - unterstützt verschiedene Eingabeformate
 async function getAllUserItems(memberInput: string): Promise<string[]> {
   const urls: string[] = [];
   
@@ -466,7 +487,7 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
   });
 }
 
-// ⭐⭐⭐ POST MUSS VOR GET KOMMEN - WICHTIG FÜR VERCEL! ⭐⭐⭐
+// POST Route
 export async function POST(request: Request) {
   console.log('[API] POST received');
   
@@ -484,7 +505,7 @@ export async function POST(request: Request) {
       quick = false,
     } = body;
 
-    // ── SINGLE MODE (Item-URL) ──
+    // SINGLE MODE (Item-URL)
     if (mode === 'single' && url) {
       if (!url.includes('vinted')) {
         return NextResponse.json({ message: 'Ungültige URL' }, { status: 400, headers: CORS });
@@ -512,7 +533,7 @@ export async function POST(request: Request) {
       return NextResponse.json(data, { headers: CORS });
     }
 
-    // ── BULK MODE (Member-URL oder Member-ID) ──
+    // BULK MODE (Member-URL oder Member-ID)
     if (mode === 'bulk') {
       let identifier = username || userId || profileUrl;
       
@@ -585,7 +606,7 @@ export async function POST(request: Request) {
   }
 }
 
-// ⭐⭐⭐ GET DANACH - WICHTIG FÜR VERCEL! ⭐⭐⭐
+// GET Route
 export async function GET(request: Request) {
   return NextResponse.json({ 
     message: 'Verwende POST für API-Zugriff. Beispiele: { "mode": "single", "url": "..." } oder { "mode": "bulk", "profileUrl": "...", "quick": true }' 
