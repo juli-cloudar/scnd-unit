@@ -28,6 +28,7 @@ interface ScrapeResult {
   url: string;
   status: 'available' | 'sold' | 'reserved';
   name: string;
+  brand?: string;
   price: string;
   size: string;
   condition: string;
@@ -440,6 +441,7 @@ async function bulkScrapeItems(urls: string[], concurrency: number = 3): Promise
             url, 
             status: 'sold',
             name: '',
+            brand: '', 
             price: '',
             size: '',
             condition: '',
