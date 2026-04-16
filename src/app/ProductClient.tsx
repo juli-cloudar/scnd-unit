@@ -113,30 +113,18 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans">
       {/* Header Navigation */}
+
+
+      {/* Header Navigation */}
       <nav className={`fixed w-full z-40 transition-all duration-300 ${scrolled ? 'bg-[#0A0A0A]/90 backdrop-blur-md py-4' : 'bg-transparent py-6'}`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-bold tracking-tighter">
             <span className="text-[#FF4400]">SCND</span>_UNIT
           </motion.div>
           <div className="hidden md:flex items-center gap-8">
-            <button 
-              onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors cursor-pointer"
-            >
-              Inventory
-            </button>
-            <button 
-              onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors cursor-pointer"
-            >
-              About
-            </button>
-            <button 
-              onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors cursor-pointer"
-            >
-              Contact
-            </button>
+            <a href="#products" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">Inventory</a>
+            <a href="#about" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">About</a>
+            <a href="#contact" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">Contact</a>
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="px-6 py-2 bg-[#FF4400] text-white text-sm uppercase tracking-widest hover:bg-[#FF4400]/80 transition-colors">
               Shop Vinted
             </a>
@@ -149,14 +137,15 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           {isMenuOpen && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="md:hidden bg-[#0A0A0A] border-t border-[#1A1A1A]">
               <div className="flex flex-col p-6 gap-4">
-                <button onClick={() => { document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' }); setIsMenuOpen(false); }} className="text-lg uppercase tracking-widest text-left">Inventory</button>
-                <button onClick={() => { document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' }); setIsMenuOpen(false); }} className="text-lg uppercase tracking-widest text-left">About</button>
-                <button onClick={() => { document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); setIsMenuOpen(false); }} className="text-lg uppercase tracking-widest text-left">Contact</button>
+                <a href="#products" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">Inventory</a>
+                <a href="#about" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">About</a>
+                <a href="#contact" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest">Contact</a>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </nav>
+
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
