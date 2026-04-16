@@ -37,6 +37,11 @@ export default function ProductPage() {
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
+
+  console.log('=== PRODUCT PAGE DEBUG ===');
+  console.log('1. params:', params);
+  console.log('2. params.id:', params.id);
+    
     async function fetchProduct() {
       try {
         // RICHTIG: params.id auslesen (kann Promise sein)
