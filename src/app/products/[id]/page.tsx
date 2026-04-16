@@ -17,7 +17,7 @@ interface Product {
   price: string;
   size: string;
   condition: string;
-  images: string[];
+  images: string[] | null;  // ← ÄNDERUNG: Kann null sein
   vinted_url: string;
   sold: boolean;
 }
@@ -33,15 +33,24 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentImage, setCurrentImage] = useState(0);
+  const [imageError, setImageError] = useState(false); // ← NEU: Bildfehler
 
   useEffect(() => {
     async function fetchProduct() {
       try {
-        // Wichtig: params.id richtig auslesen
-        const id = typeof params.id === 'string' ? parseInt(params.id) : parseInt(params.id?.[0] || '0');
+        // ← ÄNDERUNG: Korrekte Behandlung von params.id
+        const idParam = params.id;
+        let productId: number | null = null;
         
-        if (isNaN(id) || id === 0) {
-          console.error('Ungültige ID:', params.id);
+        if (typeof idParam === 'string') {
+          productId = parseInt(idParam, 10);
+        } else if (Array.isArray(idParam) && idParam.length > 0) {
+          productId = parseInt(idParam[0], 10);
+        }
+        
+        // ← NEU: Validierung
+        if (!productId || isNaN(productId) || productId <= 0) {
+          console.error('Ungültige Produkt-ID:', idParam);
           setProduct(null);
           setLoading(false);
           return;
@@ -50,15 +59,24 @@ export default function ProductPage() {
         const { data, error } = await supabase
           .from('products')
           .select('*')
-          .eq('id', id)
+          .eq('id', productId)
           .single();
         
         if (error) {
-          console.error('Supabase error:', error);
+          console.error('Supabase Fehler:', error);
           throw error;
         }
         
+        if (!data) {
+          setProduct(null);
+          setLoading(false);
+          return;
+        }
+        
         setProduct(data);
+        setCurrentImage(0);
+        setImageError(false);
+        
       } catch (err) {
         console.error('Fehler beim Laden:', err);
         setProduct(null);
@@ -71,6 +89,19 @@ export default function ProductPage() {
       fetchProduct();
     }
   }, [params.id]);
+
+  // ← NEU: Bildwechsel mit Reset des Error States
+  const nextImage = () => {
+    if (!product?.images) return;
+    setCurrentImage((prev) => (prev + 1) % product.images!.length);
+    setImageError(false);
+  };
+  
+  const prevImage = () => {
+    if (!product?.images) return;
+    setCurrentImage((prev) => (prev - 1 + product.images!.length) % product.images!.length);
+    setImageError(false);
+  };
 
   if (loading) {
     return (
@@ -98,10 +129,10 @@ export default function ProductPage() {
     );
   }
 
-  const images = product.images || [];
+  // ← ÄNDERUNG: Sichere Behandlung von images
+  const images = product.images && Array.isArray(product.images) ? product.images : [];
   const hasMultipleImages = images.length > 1;
-  const nextImage = () => setCurrentImage((prev) => (prev + 1) % images.length);
-  const prevImage = () => setCurrentImage((prev) => (prev - 1 + images.length) % images.length);
+  const currentImageUrl = images[currentImage];
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
@@ -123,13 +154,19 @@ export default function ProductPage() {
           <div>
             <div className="sticky top-0 md:top-24">
               <div className="relative aspect-[3/4] bg-[#1A1A1A] overflow-hidden rounded-sm group">
-                {images[currentImage] && (
+                {currentImageUrl && !imageError ? (
                   <img 
-                    src={proxyImg(images[currentImage])} 
+                    src={proxyImg(currentImageUrl)} 
                     alt={product.name} 
-                    className="w-full h-full object-cover" 
+                    className="w-full h-full object-cover"
+                    onError={() => setImageError(true)}
                   />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-500">
+                    Kein Bild verfügbar
+                  </div>
                 )}
+                
                 {hasMultipleImages && (
                   <>
                     <button 
@@ -150,18 +187,29 @@ export default function ProductPage() {
                   </>
                 )}
               </div>
+              
               {/* Thumbnails */}
               {hasMultipleImages && (
                 <div className="flex gap-2 mt-3 md:mt-4 overflow-x-auto pb-2">
                   {images.map((img, idx) => (
                     <button 
                       key={idx} 
-                      onClick={() => setCurrentImage(idx)} 
+                      onClick={() => {
+                        setCurrentImage(idx);
+                        setImageError(false);
+                      }} 
                       className={`w-14 h-14 md:w-20 md:h-20 shrink-0 bg-[#1A1A1A] overflow-hidden rounded-sm transition-all ${
                         currentImage === idx ? 'ring-2 ring-[#FF4400]' : 'opacity-50 hover:opacity-100'
                       }`}
                     >
-                      <img src={proxyImg(img)} alt="" className="w-full h-full object-cover" />
+                      <img 
+                        src={proxyImg(img)} 
+                        alt="" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
                     </button>
                   ))}
                 </div>
@@ -200,11 +248,13 @@ export default function ProductPage() {
             <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#1A1A1A] rounded-sm">
               <div>
                 <p className="text-xs text-gray-500 uppercase mb-1">Größe</p>
-                <p className="font-medium text-sm md:text-base">{product.size !== "–" ? product.size : 'Einheitsgröße'}</p>
+                <p className="font-medium text-sm md:text-base">
+                  {product.size && product.size !== "–" ? product.size : 'Einheitsgröße'}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase mb-1">Zustand</p>
-                <p className="font-medium text-sm md:text-base">{product.condition}</p>
+                <p className="font-medium text-sm md:text-base">{product.condition || 'Gut'}</p>
               </div>
             </div>
 
