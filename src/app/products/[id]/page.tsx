@@ -74,7 +74,7 @@ export default function ProductPage() {
           .from('products')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
         
         if (error) throw error;
         setProduct(data);
