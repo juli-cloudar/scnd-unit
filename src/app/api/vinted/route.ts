@@ -102,7 +102,40 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
   const titleMatch = html.match(/<title>\s*([^|<]+)/i);
   const name = (h1Match?.[1] || titleMatch?.[1] || '').trim();
 
-  // GRÖSSE
+// MARKEN EXTRAHIEREN & DOPPELTE MARKE ENTFERNEN
+const knownBrands = [
+  'Adidas', 'Nike', 'Puma', 'Tommy Hilfiger', 'Tommy', 
+  'Lacoste', 'Champion', 'Vintage', 'The North Face',
+  'Carhartt', 'Patagonia', 'Columbia', 'Jack Wolfskin'
+];
+
+let brand = '';
+
+// Prüfe auf bekannte Marken im Namen
+for (const knownBrand of knownBrands) {
+  const regex = new RegExp(`\\b${knownBrand}\\b`, 'i');
+  if (regex.test(name)) {
+    brand = knownBrand;
+    break;
+  }
+}
+
+// DOPPELTE MARKE ENTFERNEN (z.B. "Adidas Adidas" -> "Adidas")
+if (brand) {
+  const doubleBrandRegex = new RegExp(`^${brand}\\s+${brand}`, 'i');
+  name = name.replace(doubleBrandRegex, brand);
+  
+  // Entferne Marke vom Anfang wenn sie doppelt vorkommt
+  if (name.toLowerCase().startsWith(brand.toLowerCase() + ' ')) {
+    const firstWord = name.split(' ')[0];
+    const rest = name.substring(firstWord.length).trim();
+    if (rest.toLowerCase().startsWith(brand.toLowerCase())) {
+      name = brand + ' ' + rest.substring(brand.length).trim();
+    }
+  }
+}
+
+ // GRÖSSE
   let size = '';
   const sizeJsonMatch = html.match(/"size"[:\s]*"([^"]{1,20})"/i) ||
                        html.match(/"size_name"[:\s]*"([^"]{1,20})"/i) ||
