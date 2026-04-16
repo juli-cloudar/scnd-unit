@@ -97,3 +97,29 @@
   background-color: #0A0A0A;
   z-index: 10;
 }
+/* Custom scrollbar for horizontal filters */
+.scrollbar-custom {
+  scrollbar-width: thin;
+  scrollbar-color: #FF4400 #1A1A1A;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scrollbar-custom::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+  background: #1A1A1A;
+  border-radius: 10px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  background: #FF4400;
+  border-radius: 10px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #ff6633;
+}
