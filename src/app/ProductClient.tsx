@@ -1,74 +1,79 @@
-"use client"
+// src/app/ProductClient.tsx
+'use client';
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
   Clock, Shield, ExternalLink, Menu, X, Search,
   LayoutGrid, List, Minimize2
-} from 'lucide-react'
-import { ViewToggle, type ViewMode } from '@/components/ViewToggle'
-import { ProductView } from '@/components/ProductView'
-import { cleanMultipleProducts } from '@/lib/productCleaner'
+} from 'lucide-react';
+import { ViewToggle, type ViewMode } from '@/components/ViewToggle';
+import { ProductView } from '@/components/ProductView';
+import { useProductCleaner } from '@/hooks/useProductCleaner'; // ← Separater Hook
 
 interface Product {
-  id: number
-  name: string
-  brand: string
-  category: string
-  price: string
-  size: string
-  condition: string
-  images: string[] | null
-  vinted_url: string
-  sold: boolean
+  id: number;
+  name: string;
+  brand: string;
+  category: string;
+  price: string;
+  size: string;
+  condition: string;
+  images: string[] | null;
+  vinted_url: string;
+  sold: boolean;
 }
 
 interface ProductClientProps {
-  initialProducts: Product[]
+  initialProducts: Product[];
 }
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
-}
+};
 
 const staggerContainer = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-}
+};
 
 export function ProductClient({ initialProducts }: ProductClientProps) {
-  // Bereinige alle Produkte beim Laden
-  const [products, setProducts] = useState<Product[]>(() => {
-    const cleaned = cleanMultipleProducts(initialProducts);
-    return cleaned as Product[];
-  })
+  // Verwende den separaten Hook für automatische Bereinigung
+  const { cleanedProducts, uniqueBrands, uniqueCategories, loading: cleaning } = useProductCleaner(initialProducts);
   
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-  const [activeCategory, setActiveCategory] = useState("Alle")
-  const [activeBrand, setActiveBrand] = useState("Alle")
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
-  const [search, setSearch] = useState("")
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("Alle");
+  const [activeBrand, setActiveBrand] = useState("Alle");
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50)
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-  const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges']
-  const allCategories = ["Alle", ...fixedCategories]
-  const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'))
-  const allBrands = ["Alle", ...brandList]
+  // Verwende die bereinigten Marken und Kategorien (KEINE DUPLIKATE!)
+  const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
   
-  const filteredProducts = products.filter(p => {
-    if (activeBrand !== "Alle" && p.brand !== activeBrand) return false
-    if (activeCategory !== "Alle" && p.category !== activeCategory) return false
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.brand.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
+  // Entweder die eindeutigen Kategorien aus dem Hook oder die festen
+  const allCategories = uniqueCategories.length > 0 
+    ? ["Alle", ...uniqueCategories] 
+    : ["Alle", ...fixedCategories];
+  
+  // Eindeutige Marken aus dem Hook (bereits sortiert und ohne Duplikate)
+  const allBrands = ["Alle", ...uniqueBrands];
+  
+  // Gefilterte Produkte (verwende cleanedProducts)
+  const filteredProducts = cleanedProducts.filter(p => {
+    if (activeBrand !== "Alle" && p.brand !== activeBrand) return false;
+    if (activeCategory !== "Alle" && p.category !== activeCategory) return false;
+    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.brand.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   const viewButtonClass = (mode: ViewMode) => `
     p-2 transition-all duration-200 rounded-sm
@@ -76,7 +81,19 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       ? 'bg-[#FF4400] text-white' 
       : 'bg-[#1A1A1A] border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'
     }
-  `
+  `;
+
+  // Ladezustand anzeigen
+  if (cleaning) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-[#FF4400] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500 text-sm uppercase tracking-widest">Produkte werden geladen...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans">
@@ -145,7 +162,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       {/* Filter Section */}
       <section className="py-8 px-6">
         <div className="max-w-7xl mx-auto">
-          {/* Marken Filter */}
+          {/* Marken Filter - OHNE DUPLIKATE! */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -154,12 +171,15 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <div className="relative">
               <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
                 {allBrands.map(b => (
-                  <button key={b} onClick={() => setActiveBrand(b)}
+                  <button 
+                    key={b} 
+                    onClick={() => setActiveBrand(b)}
                     className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
                       activeBrand === b 
                         ? 'bg-[#FF4400] text-white' 
                         : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                    }`}>
+                    }`}
+                  >
                     {b}
                   </button>
                 ))}
@@ -178,12 +198,15 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <div className="relative">
               <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
                 {allCategories.map(c => (
-                  <button key={c} onClick={() => setActiveCategory(c)}
+                  <button 
+                    key={c} 
+                    onClick={() => setActiveCategory(c)}
                     className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
                       activeCategory === c 
                         ? 'bg-[#FF4400] text-white' 
                         : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                    }`}>
+                    }`}
+                  >
                     {c}
                   </button>
                 ))}
@@ -202,22 +225,40 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-              <input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64 rounded-sm"/>
+              <input 
+                type="text" 
+                placeholder="Suchen..." 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+                className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64 rounded-sm"
+              />
             </div>
             <div className="flex items-center gap-4">
               <div className="flex gap-1">
-                <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')}><LayoutGrid className="w-4 h-4" /></button>
-                <button onClick={() => setViewMode('list')} className={viewButtonClass('list')}><List className="w-4 h-4" /></button>
-                <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')}><Minimize2 className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')}>
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button onClick={() => setViewMode('list')} className={viewButtonClass('list')}>
+                  <List className="w-4 h-4" />
+                </button>
+                <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')}>
+                  <Minimize2 className="w-4 h-4" />
+                </button>
               </div>
-              <div className="text-xs text-gray-500">{filteredProducts.length} von {products.length} Artikeln</div>
+              <div className="text-xs text-gray-500">
+                {filteredProducts.length} von {cleanedProducts.length} Artikeln
+              </div>
             </div>
           </div>
           
           <ProductView products={filteredProducts as any} viewMode={viewMode} />
           
           <div className="mt-16 text-center">
-            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest">
+            <a 
+              href="https://www.vinted.de/member/3138250645-scndunit" 
+              target="_blank" 
+              className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest"
+            >
               Alle Artikel auf Vinted <ExternalLink className="w-4 h-4" />
             </a>
           </div>
@@ -227,7 +268,9 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       {/* Footer */}
       <footer className="border-t border-[#1A1A1A] py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-2xl font-bold tracking-tighter"><span className="text-[#FF4400]">SCND</span>_UNIT</div>
+          <div className="text-2xl font-bold tracking-tighter">
+            <span className="text-[#FF4400]">SCND</span>_UNIT
+          </div>
           <div className="flex gap-6 text-sm uppercase tracking-widest text-gray-500">
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="hover:text-[#FF4400] transition-colors">Vinted</a>
             <a href="https://www.instagram.com/scnd.unit" target="_blank" className="hover:text-[#FF4400] transition-colors">Instagram</a>
@@ -236,7 +279,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </footer>
     </div>
-  )
+  );
 }
 
-export default ProductClient
+export default ProductClient;
