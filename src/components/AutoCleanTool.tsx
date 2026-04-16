@@ -50,31 +50,41 @@ export function AutoCleanTool({ toast, confirm }: { toast: (msg: string, type?: 
 
   useEffect(() => { loadProducts(); }, []);
 
-  const checkSingleItem = async (url: string): Promise<{ exists: boolean; isSold: boolean; error?: string }> => {
-    try {
-      const itemMatch = url.match(/\/items\/(\d+)/);
-      if (!itemMatch) return { exists: false, isSold: false, error: 'Ungültige URL' };
-      
-      const itemId = itemMatch[1];
-      const res = await fetch(`/api/vinted/check/${itemId}`);
-      
-      if (res.status === 404) {
-        return { exists: false, isSold: false };
-      }
-      
-      const data = await res.json();
-      
-      if (data.status === 'sold') {
-        return { exists: true, isSold: true };
-      }
-      
-      return { exists: true, isSold: false };
-    } catch (error) {
-      return { exists: true, isSold: false, error: 'Netzwerkfehler' };
-    }
-  };
 
-  const deleteProduct = async (id: number) => {
+// Ersetze sie mit der verbesserten Version:
+const checkSingleItem = async (url: string, retryCount = 0): Promise<{ exists: boolean; isSold: boolean; error?: string }> => {
+  try {
+    const itemMatch = url.match(/\/items\/(\d+)/);
+    if (!itemMatch) return { exists: false, isSold: false, error: 'Ungültige URL' };
+    
+    const itemId = itemMatch[1];
+    const res = await fetch(`/api/vinted/check/${itemId}`);
+    
+    // Rate limiting - warten und wiederholen
+    if (res.status === 429 && retryCount < 3) {
+      const waitTime = 2000 * (retryCount + 1);
+      console.log(`Rate Limited! Warte ${waitTime}ms und wiederhole...`);
+      await new Promise(r => setTimeout(r, waitTime));
+      return checkSingleItem(url, retryCount + 1);
+    }
+    
+    if (res.status === 404) {
+      return { exists: false, isSold: false };
+    }
+    
+    const data = await res.json();
+    
+    if (data.status === 'sold') {
+      return { exists: true, isSold: true };
+    }
+    
+    return { exists: true, isSold: false };
+  } catch (error) {
+    return { exists: true, isSold: false, error: 'Netzwerkfehler' };
+  }
+};
+
+    const deleteProduct = async (id: number) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
     return !error;
   };
