@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, ShoppingBag, Edit3, Trash2, ImageIcon } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { ImageSlider } from './ImageSlider';
 import type { ViewMode } from './ViewToggle';
 
@@ -20,10 +20,6 @@ interface Product {
 interface ProductViewProps {
   products: Product[];
   viewMode: ViewMode;
-  onEdit?: (product: Product) => void;
-  onToggleSold?: (product: Product) => void;
-  onDelete?: (product: Product) => void;
-  isAdmin?: boolean;
 }
 
 const proxyImg = (url: string) => {
@@ -32,8 +28,8 @@ const proxyImg = (url: string) => {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 
-export function ProductView({ products, viewMode, onEdit, onToggleSold, onDelete, isAdmin }: ProductViewProps) {
-  // Grid Ansicht (3 Spalten, normal)
+export function ProductView({ products, viewMode }: ProductViewProps) {
+  // Grid Ansicht
   if (viewMode === 'grid') {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -61,14 +57,14 @@ export function ProductView({ products, viewMode, onEdit, onToggleSold, onDelete
     );
   }
 
-  // Listen Ansicht (horizontal)
+  // Listen Ansicht
   if (viewMode === 'list') {
     return (
       <div className="space-y-3">
         {products.map((product) => (
           <div key={product.id} className="flex gap-4 bg-[#1A1A1A] p-4 hover:ring-1 hover:ring-[#FF4400] transition-all">
             <div className="w-24 h-24 shrink-0 bg-[#0A0A0A] overflow-hidden">
-              <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
+              <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || product.category}</p>
@@ -87,13 +83,13 @@ export function ProductView({ products, viewMode, onEdit, onToggleSold, onDelete
     );
   }
 
-  // Kompakt Ansicht (6 Spalten, sehr klein)
+  // Kompakt Ansicht
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
       {products.map((product) => (
         <div key={product.id} className="bg-[#1A1A1A] p-2 hover:ring-1 hover:ring-[#FF4400] transition-all text-center">
           <div className="aspect-square bg-[#0A0A0A] overflow-hidden mb-1">
-            <img src={proxyImg((product.images ?? [])[0])} alt={product.name} className="w-full h-full object-cover" />
+            <img src={proxyImg(product.images[0])} alt={product.name} className="w-full h-full object-cover" />
           </div>
           <p className="text-xs font-bold truncate">{product.name}</p>
           <p className="text-xs text-[#FF4400]">{product.price}€</p>

@@ -94,10 +94,37 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
           else if (titleLower.includes('top') || titleLower.includes('shirt') || titleLower.includes('polo')) category = 'Tops';
 
           let photoUrls: string[] = [];
-          const allPhotos = item['All Photos'] || '';
-          if (allPhotos && typeof allPhotos === 'string' && allPhotos.includes(' || ')) {
-            photoUrls = allPhotos.split(' || ').filter((p: string) => p.startsWith('http'));
+          
+          // 1. Versuche "All Photos"
+          const allPhotos = item['All Photos'] || item['all_photos'] || '';
+          if (allPhotos && typeof allPhotos === 'string') {
+            if (allPhotos.includes(' || ')) {
+              photoUrls = allPhotos.split(' || ').filter((p: string) => p.startsWith('http'));
+            } else if (allPhotos.startsWith('http')) {
+              photoUrls = [allPhotos];
+            }
           }
+          
+          // 2. Fallback: Item Photo 1-5
+          if (photoUrls.length === 0) {
+            for (let p = 1; p <= 10; p++) {
+              const photo = item[`Item Photo ${p}`];
+              if (photo && typeof photo === 'string' && photo.startsWith('http') && photo !== 'Not Available') {
+                photoUrls.push(photo);
+              }
+            }
+          }
+          
+          // ⭐⭐⭐ WICHTIG: Entferne Query-Parameter (?s=...) ⭐⭐⭐
+
+          
+          // Debug
+          if (photoUrls.length === 0) {
+            console.log(`⚠️ KEINE BILDER für: ${title.substring(0, 40)}`);
+          } else {
+            console.log(`📸 ${title.substring(0, 40)} → ${photoUrls.length} Bilder`);
+          }
+
 
           const newProduct = { name: title.substring(0, 100), brand, category, price, size, condition, images: photoUrls, vinted_url: url, sold: false };
           const { error } = await supabase.from('products').insert(newProduct);

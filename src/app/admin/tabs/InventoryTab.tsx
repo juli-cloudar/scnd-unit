@@ -137,7 +137,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
               <div key={p.id} className={`relative border transition-all ${p.sold ? 'border-red-500/50 opacity-50' : 'border-[#FF4400]/20 hover:border-[#FF4400]/50'}`}>
                 {p.sold && (<div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"><span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rotate-[-15deg] uppercase tracking-widest">Verkauft</span></div>)}
                 <div className="aspect-[3/4] bg-[#1A1A1A] overflow-hidden relative">
-                  <img src={p.images?.[0] ? proxyImg(p.images[0]) : ''} alt={p.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }} />
+                  <img src={p.images?.[0] ? `/api/image-proxy?url=${encodeURIComponent(p.images[0])}` : ''} alt={p.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }} />
                   {p.images?.length > 1 && (<div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 text-xs font-bold flex items-center gap-1"><ImageIcon className="w-3 h-3"/> {p.images.length}</div>)}
                 </div>
                 <div className="p-2 bg-[#0A0A0A]">
