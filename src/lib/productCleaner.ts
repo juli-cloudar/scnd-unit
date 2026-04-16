@@ -202,7 +202,7 @@ export function cleanProduct(rawData: any): CleanedProduct {
   }
   
   // Marke korrekt schreiben (ersten Buchstaben groß, rest klein)
-  brand = brand.split(' ').map(word => 
+    brand = brand.split(' ').map((word: string) => 
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   ).join(' ');
   
