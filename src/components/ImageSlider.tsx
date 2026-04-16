@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
 
 const proxyImg = (url: string) => {
   if (!url) return '';
@@ -13,6 +14,41 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
   const [current, setCurrent] = useState(0);
   const [dragStart, setDragStart] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [loaded, setLoaded] = useState<boolean[]>(() => new Array(images.length).fill(false));
+  const [preloaded, setPreloaded] = useState<Set<number>>(new Set([0]));
+
+  // ========== VORLADEN der nächsten Bilder ==========
+  useEffect(() => {
+    // Nächstes Bild vorladen
+    const nextIndex = (current + 1) % images.length;
+    if (!preloaded.has(nextIndex)) {
+      const img = new Image();
+      img.src = proxyImg(images[nextIndex]);
+      img.onload = () => {
+        setPreloaded(prev => new Set(prev).add(nextIndex));
+        setLoaded(prev => {
+          const newLoaded = [...prev];
+          newLoaded[nextIndex] = true;
+          return newLoaded;
+        });
+      };
+    }
+    
+    // Übernächstes Bild vorladen
+    const nextNextIndex = (current + 2) % images.length;
+    if (!preloaded.has(nextNextIndex)) {
+      const img2 = new Image();
+      img2.src = proxyImg(images[nextNextIndex]);
+      img2.onload = () => {
+        setPreloaded(prev => new Set(prev).add(nextNextIndex));
+        setLoaded(prev => {
+          const newLoaded = [...prev];
+          newLoaded[nextNextIndex] = true;
+          return newLoaded;
+        });
+      };
+    }
+  }, [current, images, preloaded]);
 
   // ========== MOBILE: Touch-Swipe ==========
   const onPointerDown = (e: React.PointerEvent) => { 
@@ -29,9 +65,10 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
     const diff = dragStart - e.clientX;
     if (Math.abs(diff) > 40) {
       e.preventDefault();
-      diff > 0 
-        ? setCurrent(c => (c + 1) % images.length) 
-        : setCurrent(c => (c - 1 + images.length) % images.length);
+      const newIndex = diff > 0 
+        ? (current + 1) % images.length 
+        : (current - 1 + images.length) % images.length;
+      setCurrent(newIndex);
     }
     setDragStart(null);
   };
@@ -44,36 +81,69 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
   const nextImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setCurrent((prev) => (prev + 1) % images.length);
+    const newIndex = (current + 1) % images.length;
+    setCurrent(newIndex);
   };
 
   const prevImage = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setCurrent((prev) => (prev - 1 + images.length) % images.length);
+    const newIndex = (current - 1 + images.length) % images.length;
+    setCurrent(newIndex);
   };
+
+  if (!images || images.length === 0) {
+    return (
+      <div className="aspect-[3/4] md:aspect-[4/5] bg-[#1A1A1A] flex items-center justify-center text-gray-500">
+        Kein Bild
+      </div>
+    );
+  }
+
+  const isCurrentLoaded = loaded[current] || preloaded.has(current);
+  const currentImageUrl = proxyImg(images[current]);
 
   return (
     <div 
-      className="aspect-[3/4] md:aspect-[4/5] relative overflow-hidden bg-[#0A0A0A] cursor-grab active:cursor-grabbing select-none touch-pan-y group"
+      className="aspect-[3/4] md:aspect-[4/5] relative overflow-hidden bg-[#1A1A1A] cursor-grab active:cursor-grabbing select-none touch-pan-y group"
       onPointerDown={onPointerDown} 
       onPointerMove={onPointerMove} 
       onPointerUp={onPointerUp} 
       onClick={onClick}
     >
+      {/* Loading Spinner - nur wenn Bild noch nicht geladen */}
+      {!isCurrentLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="w-8 h-8 border-2 border-[#FF4400] border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      
+      {/* Bild mit Next.js Image für optimiertes Laden */}
+      <div className="relative w-full h-full">
+        <img 
+          src={currentImageUrl}
+          alt={alt} 
+          draggable={false} 
+          className={`w-full h-full object-cover transition-opacity duration-300 pointer-events-none ${
+            isCurrentLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          onLoad={() => {
+            setLoaded(prev => {
+              const newLoaded = [...prev];
+              newLoaded[current] = true;
+              return newLoaded;
+            });
+            setPreloaded(prev => new Set(prev).add(current));
+          }}
+          fetchPriority={current === 0 ? "high" : "auto"}
+        />
+      </div>
+      
       {/* Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
       
-      {/* Bild */}
-      <img 
-        src={proxyImg(images[current])} 
-        alt={alt} 
-        draggable={false} 
-        className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" 
-      />
-      
       {/* Condition Badge */}
-      {condition !== "–" && (
+      {condition && condition !== "–" && (
         <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-[#0A0A0A]/80 backdrop-blur text-xs uppercase tracking-widest border border-[#FF4400] text-[#FF4400] pointer-events-none">
           {condition}
         </div>
@@ -82,7 +152,6 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
       {/* ========== PC: Hover-Buttons (nur auf Desktop sichtbar) ========== */}
       {images.length > 1 && (
         <>
-          {/* Linker Button */}
           <button
             onClick={prevImage}
             className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-[#FF4400] text-white p-2 rounded-full transition-all duration-200 z-30 cursor-pointer opacity-0 group-hover:opacity-100 md:flex hidden items-center justify-center"
@@ -91,7 +160,6 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
             <ChevronLeft className="w-5 h-5" />
           </button>
           
-          {/* Rechter Button */}
           <button
             onClick={nextImage}
             className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-[#FF4400] text-white p-2 rounded-full transition-all duration-200 z-30 cursor-pointer opacity-0 group-hover:opacity-100 md:flex hidden items-center justify-center"
@@ -108,7 +176,10 @@ export function ImageSlider({ images, alt, condition }: { images: string[], alt:
           {images.map((_, i) => (
             <button 
               key={i} 
-              onClick={(e) => { e.preventDefault(); setCurrent(i); }}
+              onClick={(e) => { 
+                e.preventDefault(); 
+                setCurrent(i);
+              }}
               className={`rounded-full transition-all duration-200 ${i === current ? 'bg-[#FF4400] w-5 h-2.5' : 'bg-white/40 hover:bg-white/70 w-2.5 h-2.5'}`} 
             />
           ))}
