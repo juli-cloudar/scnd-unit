@@ -39,30 +39,27 @@ export default function ProductPage() {
   useEffect(() => {
     async function fetchProduct() {
       try {
-        // WICHTIG: Richtig auslesen von params.id in Next.js 15+
-        let productId: number | null = null;
+        // RICHTIG: params.id auslesen (kann Promise sein)
+        let idParam = params.id;
         
-        console.log('Raw params:', params); // Debug: Zeigt was wirklich da ist
-        
-        // Lösung 1: Wenn params.id ein Promise ist
-        let resolvedId = params.id;
-        if (resolvedId && typeof resolvedId === 'object' && 'then' in resolvedId) {
-          resolvedId = await resolvedId;
+        // Falls es ein Promise ist, auflösen
+        if (idParam && typeof idParam === 'object' && 'then' in idParam) {
+          idParam = await idParam;
         }
         
-        // Lösung 2: Verschiedene Formate abfangen
-        if (typeof resolvedId === 'string') {
-          productId = parseInt(resolvedId, 10);
-        } else if (Array.isArray(resolvedId) && resolvedId.length > 0) {
-          productId = parseInt(resolvedId[0], 10);
-        } else if (typeof resolvedId === 'number') {
-          productId = resolvedId;
+        // ID als String oder Array behandeln
+        let idStr: string = '';
+        if (typeof idParam === 'string') {
+          idStr = idParam;
+        } else if (Array.isArray(idParam) && idParam.length > 0) {
+          idStr = idParam[0];
+        } else {
+          throw new Error('Ungültige ID');
         }
         
-        console.log('Extracted productId:', productId); // Debug
+        const id = parseInt(idStr, 10);
         
-        if (!productId || isNaN(productId) || productId <= 0) {
-          console.error('Ungültige Produkt-ID:', resolvedId);
+        if (isNaN(id) || id <= 0) {
           setProduct(null);
           setLoading(false);
           return;
@@ -71,46 +68,26 @@ export default function ProductPage() {
         const { data, error } = await supabase
           .from('products')
           .select('*')
-          .eq('id', productId)
+          .eq('id', id)
           .single();
         
-        if (error) {
-          console.error('Supabase Fehler:', error);
-          throw error;
-        }
-        
-        if (!data) {
-          setProduct(null);
-          setLoading(false);
-          return;
-        }
-        
+        if (error) throw error;
         setProduct(data);
         setCurrentImage(0);
         setImageError(false);
         
       } catch (err) {
-        console.error('Fehler beim Laden:', err);
+        console.error('Fehler:', err);
         setProduct(null);
       } finally {
         setLoading(false);
       }
     }
     
-    fetchProduct();
+    if (params.id) {
+      fetchProduct();
+    }
   }, [params.id]);
-
-  const nextImage = () => {
-    if (!product?.images) return;
-    setCurrentImage((prev) => (prev + 1) % product.images!.length);
-    setImageError(false);
-  };
-  
-  const prevImage = () => {
-    if (!product?.images) return;
-    setCurrentImage((prev) => (prev - 1 + product.images!.length) % product.images!.length);
-    setImageError(false);
-  };
 
   if (loading) {
     return (
@@ -128,11 +105,8 @@ export default function ProductPage() {
       <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <div className="text-8xl font-bold text-[#FF4400]/20 mb-4">404</div>
-          <h2 className="text-xl font-bold uppercase tracking-widest mb-4">Produkt nicht gefunden</h2>
-          <p className="text-gray-500 mb-6">Das Produkt existiert nicht oder wurde gelöscht.</p>
-          <Link href="/" className="inline-block px-6 py-3 bg-[#FF4400] text-white text-sm uppercase tracking-widest hover:bg-[#FF4400]/80 transition-colors">
-            Zurück zur Übersicht
-          </Link>
+          <h2 className="text-xl font-bold uppercase tracking-widest mb-4">Nicht gefunden</h2>
+          <Link href="/" className="inline-block px-6 py-3 bg-[#FF4400] text-white text-sm uppercase tracking-widest">Zurück</Link>
         </div>
       </div>
     );
@@ -140,10 +114,20 @@ export default function ProductPage() {
 
   const images = product.images && Array.isArray(product.images) ? product.images : [];
   const hasMultipleImages = images.length > 1;
-  const currentImageUrl = images[currentImage];
+  const nextImage = () => {
+    if (images.length === 0) return;
+    setCurrentImage((prev) => (prev + 1) % images.length);
+    setImageError(false);
+  };
+  const prevImage = () => {
+    if (images.length === 0) return;
+    setCurrentImage((prev) => (prev - 1 + images.length) % images.length);
+    setImageError(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+      {/* Header */}
       <div className="border-b border-[#1A1A1A] sticky top-0 bg-[#0A0A0A]/95 backdrop-blur z-50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
           <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#FF4400] transition-colors group">
@@ -153,6 +137,7 @@ export default function ProductPage() {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-12">
         <div className="grid md:grid-cols-2 gap-6 md:gap-12">
           
@@ -160,9 +145,9 @@ export default function ProductPage() {
           <div>
             <div className="sticky top-0 md:top-24">
               <div className="relative aspect-[3/4] bg-[#1A1A1A] overflow-hidden rounded-sm group">
-                {currentImageUrl && !imageError ? (
+                {images.length > 0 && !imageError ? (
                   <img 
-                    src={proxyImg(currentImageUrl)} 
+                    src={proxyImg(images[currentImage])} 
                     alt={product.name} 
                     className="w-full h-full object-cover"
                     onError={() => setImageError(true)}
@@ -172,7 +157,6 @@ export default function ProductPage() {
                     Kein Bild verfügbar
                   </div>
                 )}
-                
                 {hasMultipleImages && (
                   <>
                     <button 
@@ -193,7 +177,7 @@ export default function ProductPage() {
                   </>
                 )}
               </div>
-              
+              {/* Thumbnails */}
               {hasMultipleImages && (
                 <div className="flex gap-2 mt-3 md:mt-4 overflow-x-auto pb-2">
                   {images.map((img, idx) => (
@@ -225,32 +209,35 @@ export default function ProductPage() {
           {/* Infos */}
           <div className="flex flex-col h-full px-0 md:px-0">
             
+            {/* Sold Badge */}
             {product.sold && (
               <div className="inline-block px-3 py-1 bg-red-500 text-white text-xs uppercase tracking-widest mb-4 w-fit">
                 Verkauft
               </div>
             )}
             
+            {/* Brand & Category */}
             <div className="flex flex-wrap items-center gap-2 mb-3 md:mb-4">
               <span className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || 'Keine Marke'}</span>
               <span className="text-gray-600">•</span>
               <span className="text-xs text-gray-500 uppercase tracking-widest">{product.category || 'Sonstiges'}</span>
             </div>
             
+            {/* Title */}
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-3 md:mb-4">
               {product.name}
             </h1>
             
+            {/* Price */}
             <div className="text-3xl md:text-4xl font-bold text-[#FF4400] mb-4 md:mb-6">
               €{product.price}
             </div>
             
+            {/* Size & Condition */}
             <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#1A1A1A] rounded-sm">
               <div>
                 <p className="text-xs text-gray-500 uppercase mb-1">Größe</p>
-                <p className="font-medium text-sm md:text-base">
-                  {product.size && product.size !== "–" ? product.size : 'Einheitsgröße'}
-                </p>
+                <p className="font-medium text-sm md:text-base">{product.size !== "–" ? product.size : 'Einheitsgröße'}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase mb-1">Zustand</p>
@@ -258,9 +245,11 @@ export default function ProductPage() {
               </div>
             </div>
 
+            {/* Platform Links */}
             <div className="space-y-3 mb-6 md:mb-8">
               <p className="text-xs text-gray-500 uppercase tracking-widest">Verfügbar auf</p>
               
+              {/* Vinted Link */}
               <a 
                 href={product.vinted_url} 
                 target="_blank" 
@@ -280,6 +269,7 @@ export default function ProductPage() {
               </a>
             </div>
 
+            {/* Share Button */}
             <button 
               onClick={() => { 
                 navigator.clipboard.writeText(window.location.href); 
