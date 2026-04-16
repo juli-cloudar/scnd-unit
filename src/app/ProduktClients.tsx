@@ -8,6 +8,128 @@ import {
   Clock, Shield, ExternalLink, Menu, X, Filter
 } from 'lucide-react'
 
+// ========== NEU: ProductCleaner Component direkt integriert ==========
+// Bekannte Marken
+const KNOWN_BRANDS = [
+  'L.L.BEAN', 'ADIDAS', 'NIKE', 'TOMMY HILFIGER', 'CHAMPION',
+  'COLUMBIA', 'PUMA', 'FILA', 'NAPAPIJRI', 'HELLY HANSEN',
+  'THE NORTH FACE', 'NEW BALANCE', 'STARTER', 'LEE', 'TIMBERLAND',
+  'REEBOK', 'LACOSTE', 'WRANGLER', 'BEXLEYS', 'U.S. POLO ASSN',
+  'STARTER', 'NBA', 'NFL', 'LEE SPORT', 'COLUMBIA', 'ADIDA'
+];
+
+// Funktion zum Bereinigen von Produktnamen
+function cleanProductName(rawName: string): {
+  brand: string;
+  description: string;
+  size: string;
+  cleaned: string;
+} {
+  if (!rawName) {
+    return { brand: '', description: '', size: '', cleaned: '' };
+  }
+
+  const upperName = rawName.toUpperCase();
+  let brand = '';
+
+  // Marke erkennen
+  for (const knownBrand of KNOWN_BRANDS) {
+    if (upperName.startsWith(knownBrand)) {
+      brand = knownBrand;
+      break;
+    }
+  }
+
+  // Wenn keine Marke gefunden, nimm das erste Wort
+  if (!brand) {
+    const firstWord = rawName.split(' ')[0];
+    brand = firstWord;
+  }
+
+  // Rest nach der Marke
+  let rest = rawName.slice(brand.length).trim();
+
+  // Entferne doppelte Marke (z.B. "ADIDAS ADIDAS Fleece")
+  const brandRegex = new RegExp(`^${brand}\\s+`, 'i');
+  rest = rest.replace(brandRegex, '');
+
+  // Größen erkennen
+  const sizePatterns = [
+    /\b(XXL|XL|L|M|S|XS|XXXL)\b/i,
+    /\b(34\/6|36\/8|38\/10|40\/12|42\/14)\b/i,
+    /\b(\d+ JAHRE|\d+ \/ \d+)\b/i,
+    /\b(ONE SIZE|OSFM)\b/i
+  ];
+
+  let size = '';
+  for (const pattern of sizePatterns) {
+    const match = rest.match(pattern);
+    if (match) {
+      size = match[1].toUpperCase();
+      rest = rest.replace(pattern, '').trim();
+      break;
+    }
+  }
+
+  // Mehrfache Leerzeichen entfernen
+  const description = rest.replace(/\s+/g, ' ').trim();
+
+  return {
+    brand: brand,
+    description: description,
+    size: size,
+    cleaned: `${brand} ${description}${size ? ` (${size})` : ''}`.trim()
+  };
+}
+
+// Hook für Product Cleaning
+function useProductCleaner(products: Product[]) {
+  const [cleanedProducts, setCleanedProducts] = useState<any[]>([]);
+  const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!products || products.length === 0) {
+      setCleanedProducts([]);
+      setUniqueBrands([]);
+      return;
+    }
+
+    // Bereinige alle Produkte
+    const cleaned = products.map(product => {
+      const cleaned = cleanProductName(product.name);
+      return {
+        ...product,
+        cleaned_name: cleaned.cleaned,
+        extracted_brand: cleaned.brand,
+        extracted_description: cleaned.description,
+        extracted_size: cleaned.size
+      };
+    });
+
+    setCleanedProducts(cleaned);
+
+    // Extrahiere eindeutige Marken (ohne Duplikate)
+    const brands = new Map<string, string>();
+    
+    cleaned.forEach(product => {
+      const brandName = product.extracted_brand;
+      if (brandName) {
+        const key = brandName.toUpperCase();
+        if (!brands.has(key)) {
+          brands.set(key, brandName);
+        }
+      }
+    });
+
+    const sortedBrands = Array.from(brands.values()).sort();
+    setUniqueBrands(sortedBrands);
+    
+  }, [products]);
+
+  return { cleanedProducts, uniqueBrands };
+}
+// ========== ENDE ProductCleaner ==========
+
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
@@ -111,6 +233,11 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [activeCategory, setActiveCategory] = useState("Alle")
+  
+  // ========== NEU: ProductCleaner Hook verwenden ==========
+  const [activeBrand, setActiveBrand] = useState("Alle")
+  const { cleanedProducts, uniqueBrands } = useProductCleaner(products)
+  // ========== ENDE NEU ==========
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50)
@@ -118,10 +245,17 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  // ========== NEU: Gefilterte Produkte mit Marke + Kategorie ==========
+  const filteredProducts = (cleanedProducts.length > 0 ? cleanedProducts : products).filter(product => {
+    const matchesCategory = activeCategory === "Alle" || product.category === activeCategory
+    const matchesBrand = activeBrand === "Alle" || product.extracted_brand?.toUpperCase() === activeBrand.toUpperCase()
+    return matchesCategory && matchesBrand
+  })
+  // ========== ENDE NEU ==========
+
+  // ========== NEU: Alle Kategorien + Alle Marken ==========
   const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category))).sort()]
-  const filteredProducts = activeCategory === "Alle" 
-    ? products 
-    : products.filter(p => p.category === activeCategory)
+  // ========== ENDE NEU ==========
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
@@ -198,20 +332,46 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">CURRENT_<span className="text-[#FF4400]">INVENTORY</span></h2>
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
-          <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex items-center gap-3 mb-12 flex-wrap">
-            <Filter className="w-4 h-4 text-[#FF4400]" />
-            {allCategories.map(cat => (
-              <button key={cat} onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-2 text-xs uppercase tracking-widest border transition-all ${activeCategory === cat ? 'border-[#FF4400] text-[#FF4400] bg-[#FF4400]/10' : 'border-[#1A1A1A] text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
-                {cat}
-              </button>
-            ))}
+          
+          {/* ========== NEU: Doppelte Filter (Kategorie + Marke) ========== */}
+          <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-4 mb-12">
+            {/* Kategorie Filter */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <Filter className="w-4 h-4 text-[#FF4400]" />
+              <span className="text-xs uppercase tracking-widest text-gray-500 mr-2">Kategorie:</span>
+              {allCategories.map(cat => (
+                <button key={`cat-${cat}`} onClick={() => setActiveCategory(cat)}
+                  className={`px-4 py-2 text-xs uppercase tracking-widest border transition-all ${activeCategory === cat ? 'border-[#FF4400] text-[#FF4400] bg-[#FF4400]/10' : 'border-[#1A1A1A] text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            
+            {/* ========== NEU: Marken Filter (OHNE DUPLIKATE!) ========== */}
+            {uniqueBrands.length > 0 && (
+              <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-[#1A1A1A]">
+                <Filter className="w-4 h-4 text-[#FF4400]" />
+                <span className="text-xs uppercase tracking-widest text-gray-500 mr-2">Marke:</span>
+                <button onClick={() => setActiveBrand("Alle")}
+                  className={`px-4 py-2 text-xs uppercase tracking-widest border transition-all ${activeBrand === "Alle" ? 'border-[#FF4400] text-[#FF4400] bg-[#FF4400]/10' : 'border-[#1A1A1A] text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
+                  Alle
+                </button>
+                {uniqueBrands.map(brand => (
+                  <button key={`brand-${brand}`} onClick={() => setActiveBrand(brand)}
+                    className={`px-4 py-2 text-xs uppercase tracking-widest border transition-all ${activeBrand === brand ? 'border-[#FF4400] text-[#FF4400] bg-[#FF4400]/10' : 'border-[#1A1A1A] text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
+                    {brand}
+                  </button>
+                ))}
+              </div>
+            )}
           </motion.div>
+          {/* ========== ENDE NEU ========== */}
+          
           {loading ? (
             <div className="text-center py-20 text-gray-500 uppercase tracking-widest">Lade...</div>
           ) : (
             <AnimatePresence mode="wait">
-              <motion.div key={activeCategory} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <motion.div key={`${activeCategory}-${activeBrand}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProducts.map((product, index) => (
                   <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
@@ -220,13 +380,24 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-2">
                         <div className="min-w-0 pr-2">
-                          <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">{product.category}</p>
-                          <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">{product.name}</h3>
+                          <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">
+                            {product.category}
+                            {/* ========== NEU: Zeige extrahierte Marke an ========== */}
+                            {product.extracted_brand && (
+                              <span className="ml-2 text-[#FF4400]">• {product.extracted_brand}</span>
+                            )}
+                          </p>
+                          {/* ========== NEU: Verwende bereinigten Namen ========== */}
+                          <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">
+                            {product.cleaned_name || product.name}
+                          </h3>
                         </div>
                         <span className="text-xl font-bold text-[#FF4400] shrink-0">€{product.price}</span>
                       </div>
                       <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
-                        <span className="text-sm text-gray-400 uppercase tracking-widest">{product.size !== "–" ? `Size ${product.size}` : ""}</span>
+                        <span className="text-sm text-gray-400 uppercase tracking-widest">
+                          {product.extracted_size || (product.size !== "–" ? `Size ${product.size}` : "")}
+                        </span>
                         <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">View <ExternalLink className="w-4 h-4" /></span>
                       </div>
                     </div>
