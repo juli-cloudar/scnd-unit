@@ -143,22 +143,22 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Filter Section - Volle Breite */}
-      <section className="py-8 px-4 md:px-6 lg:px-8">
+      {/* Filter Section */}
+      <section className="py-4 md:py-6 lg:py-8 px-4 md:px-6 lg:px-8">
         <div className="w-full">
           {/* Marken Filter */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-4 bg-[#FF4400]"></div>
-              <p className="text-xs text-gray-400 uppercase tracking-widest">Marken</p>
+          <div className="mb-4 md:mb-6">
+            <div className="flex items-center gap-2 mb-2 md:mb-3">
+              <div className="w-1 h-3 md:h-4 bg-[#FF4400]"></div>
+              <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest">Marken</p>
             </div>
             <div className="w-full overflow-x-auto scrollbar-custom">
-              <div className="flex gap-2 min-w-max pb-2">
+              <div className="flex gap-1 md:gap-2 min-w-max pb-1 md:pb-2">
                 {allBrands.map(b => (
                   <button 
                     key={b} 
                     onClick={() => setActiveBrand(b)} 
-                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                    className={`px-2 md:px-4 py-1 md:py-2 text-[10px] md:text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
                       activeBrand === b 
                         ? 'bg-[#FF4400] text-white' 
                         : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
@@ -173,17 +173,17 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
           {/* Kategorien Filter */}
           <div className="mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-1 h-4 bg-[#FF4400]"></div>
-              <p className="text-xs text-gray-400 uppercase tracking-widest">Kategorien</p>
+            <div className="flex items-center gap-2 mb-2 md:mb-3">
+              <div className="w-1 h-3 md:h-4 bg-[#FF4400]"></div>
+              <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest">Kategorien</p>
             </div>
             <div className="w-full overflow-x-auto scrollbar-custom">
-              <div className="flex gap-2 min-w-max pb-2">
+              <div className="flex gap-1 md:gap-2 min-w-max pb-1 md:pb-2">
                 {allCategories.map(c => (
                   <button 
                     key={c} 
                     onClick={() => setActiveCategory(c)} 
-                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
+                    className={`px-2 md:px-4 py-1 md:py-2 text-[10px] md:text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
                       activeCategory === c 
                         ? 'bg-[#FF4400] text-white' 
                         : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
@@ -198,7 +198,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Products Section - Volle Breite */}
+      {/* Products Section */}
       <section id="products" className="py-12 px-4 md:px-6 lg:px-8">
         <div className="w-full">
           {/* Search und View Controls */}
@@ -234,20 +234,14 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           {/* Produkte Grid */}
           <ProductView products={filteredProducts as any} viewMode={viewMode} />
           
-          {/* Lade-Indikator */}
           {isLoadingMore && visibleProducts.length < cleanedProducts.length && (
             <div className="flex justify-center py-8">
               <div className="w-6 h-6 border-2 border-[#FF4400] border-t-transparent rounded-full animate-spin" />
             </div>
           )}
           
-          {/* Vinted Link */}
           <div className="mt-16 text-center">
-            <a 
-              href="https://www.vinted.de/member/3138250645-scndunit" 
-              target="_blank" 
-              className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest"
-            >
+            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest">
               Alle Artikel auf Vinted <ExternalLink className="w-4 h-4" />
             </a>
           </div>
@@ -272,22 +266,10 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                 <div className="text-center">
                   <div className="text-8xl font-bold text-[#FF4400]/20 mb-4">SCND</div>
                   <div className="grid grid-cols-2 gap-4 text-sm uppercase tracking-widest">
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">100%</span>
-                      <span className="text-gray-500">Authentic</span>
-                    </div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">48h</span>
-                      <span className="text-gray-500">Shipping</span>
-                    </div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">DE</span>
-                      <span className="text-gray-500">Based</span>
-                    </div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">{cleanedProducts.length}+</span>
-                      <span className="text-gray-500">Items</span>
-                    </div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">100%</span><span className="text-gray-500">Authentic</span></div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">48h</span><span className="text-gray-500">Shipping</span></div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">DE</span><span className="text-gray-500">Based</span></div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">{cleanedProducts.length}+</span><span className="text-gray-500">Items</span></div>
                   </div>
                 </div>
               </div>
