@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ViewToggle, type ViewMode } from '@/components/ViewToggle';
 import { ProductView } from '@/components/ProductView';
-import { useProductCleaner } from '@/hooks/useProductCleaner'; // ← Separater Hook
+import { useProductCleaner } from '@/hooks/useProductCleaner';
 
 interface Product {
   id: number;
@@ -40,7 +40,6 @@ const staggerContainer = {
 };
 
 export function ProductClient({ initialProducts }: ProductClientProps) {
-  // Verwende den separaten Hook für automatische Bereinigung
   const { cleanedProducts, uniqueBrands, uniqueCategories, loading: cleaning } = useProductCleaner(initialProducts);
   
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -49,6 +48,26 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [activeBrand, setActiveBrand] = useState("Alle");
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [search, setSearch] = useState("");
+  
+  // ========== PRIORISIERTES LADEN DER PRODUKTE ==========
+  const [visibleProducts, setVisibleProducts] = useState<Product[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  useEffect(() => {
+    if (cleanedProducts.length === 0) return;
+    
+    // Nur die ersten 12 Produkte sofort anzeigen
+    setVisibleProducts(cleanedProducts.slice(0, 12));
+    setIsLoadingMore(true);
+    
+    // Restliche Produkte nach und nach laden
+    const timer = setTimeout(() => {
+      setVisibleProducts(cleanedProducts);
+      setIsLoadingMore(false);
+    }, 800);
+    
+    return () => clearTimeout(timer);
+  }, [cleanedProducts]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -56,19 +75,16 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Verwende die bereinigten Marken und Kategorien (KEINE DUPLIKATE!)
   const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
   
-  // Entweder die eindeutigen Kategorien aus dem Hook oder die festen
   const allCategories = uniqueCategories.length > 0 
     ? ["Alle", ...uniqueCategories] 
     : ["Alle", ...fixedCategories];
   
-  // Eindeutige Marken aus dem Hook (bereits sortiert und ohne Duplikate)
   const allBrands = ["Alle", ...uniqueBrands];
   
-  // Gefilterte Produkte (verwende cleanedProducts)
-  const filteredProducts = cleanedProducts.filter(p => {
+  // Gefilterte Produkte (verwende visibleProducts für priorisiertes Laden)
+  const filteredProducts = (visibleProducts.length > 0 ? visibleProducts : cleanedProducts).filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false;
     if (activeCategory !== "Alle" && p.category !== activeCategory) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.brand.toLowerCase().includes(search.toLowerCase())) return false;
@@ -83,7 +99,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     }
   `;
 
-  // Ladezustand anzeigen
   if (cleaning) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex items-center justify-center">
@@ -97,7 +112,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans">
-      {/* Header */}
       <nav className={`fixed w-full z-40 transition-all duration-300 ${scrolled ? 'bg-[#0A0A0A]/90 backdrop-blur-md py-4' : 'bg-transparent py-6'}`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-bold tracking-tighter">
@@ -126,7 +140,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </AnimatePresence>
       </nav>
 
-      {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
@@ -148,7 +161,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Info Bar */}
       <section className="border-y border-[#1A1A1A] bg-[#0A0A0A]">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
@@ -159,10 +171,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Filter Section */}
       <section className="py-8 px-6">
         <div className="max-w-7xl mx-auto">
-          {/* Marken Filter - OHNE DUPLIKATE! */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -189,7 +199,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             </div>
           </div>
 
-          {/* Kategorien Filter */}
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -218,10 +227,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Products Section */}
       <section id="products" className="py-12 px-6">
         <div className="max-w-7xl mx-auto">
-          {/* Search and View Controls */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
@@ -253,6 +260,13 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           
           <ProductView products={filteredProducts as any} viewMode={viewMode} />
           
+          {/* Lade-Indikator für weitere Produkte */}
+          {isLoadingMore && visibleProducts.length < cleanedProducts.length && (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-[#FF4400] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          
           <div className="mt-16 text-center">
             <a 
               href="https://www.vinted.de/member/3138250645-scndunit" 
@@ -265,7 +279,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-[#1A1A1A] py-12 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-2xl font-bold tracking-tighter">
