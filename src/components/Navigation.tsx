@@ -41,13 +41,16 @@ export function Navigation({ scrolled }: NavigationProps) {
           </a>
         </div>
 
-        {/* Mobile Menu Button */}
-        <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-          {isMenuOpen ? <X /> : <Menu />}
-        </button>
+        {/* Mobile: GameButton NEBEN dem Hamburger-Menü */}
+        <div className="flex items-center gap-3 md:hidden">
+          <GameButton onClick={scrollToGame} />
+          <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            {isMenuOpen ? <X /> : <Menu />}
+          </button>
+        </div>
       </div>
 
-      {/* Mobile Navigation */}
+      {/* Mobile Navigation (Menü-Inhalt) */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
@@ -66,12 +69,6 @@ export function Navigation({ scrolled }: NavigationProps) {
               <a href="#contact" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest text-left hover:text-[#FF4400] transition-colors">
                 Contact
               </a>
-              <button
-                onClick={scrollToGame}
-                className="text-lg uppercase tracking-widest text-left hover:text-[#FF4400] transition-colors flex items-center gap-2"
-              >
-                <span>🎮</span> SCND DROP
-              </button>
               <div className="pt-2">
                 <ThemeToggle />
               </div>
