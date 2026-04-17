@@ -12,7 +12,7 @@ const getCellSize = () => {
   return 32;
 };
 
-// SCND UNIT Themed Tetrominos mit Branding
+// SCND UNIT Themed Tetrominos
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I', isBrand: true },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O', isBrand: false },
@@ -23,7 +23,6 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
 ];
 
-// Power-Up Typen
 const POWERUPS = [
   { name: 'SLOW', color: '#00FFFF', effect: 'slow' },
   { name: 'BOMB', color: '#FF4444', effect: 'bomb' },
@@ -35,31 +34,6 @@ interface Highscore {
   name: string;
   score: number;
 }
-
-// Sound-Funktionen (optional, aber deaktivierbar)
-const playSound = (type: 'drop' | 'clear' | 'gameover') => {
-  if (typeof window === 'undefined') return;
-  try {
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    let frequency = 440;
-    let duration = 0.1;
-    switch(type) {
-      case 'drop': frequency = 440; duration = 0.05; break;
-      case 'clear': frequency = 880; duration = 0.15; break;
-      case 'gameover': frequency = 220; duration = 0.5; break;
-    }
-    osc.frequency.value = frequency;
-    gain.gain.value = 0.1;
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
-    osc.stop(audioCtx.currentTime + duration);
-    setTimeout(() => audioCtx.close(), duration * 1000);
-  } catch(e) {}
-};
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -73,6 +47,7 @@ export function ScndDropGame() {
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [gameOver, setGameOver] = useState(false);
+  const [finalScore, setFinalScore] = useState(0);
   const [highscores, setHighscores] = useState<Highscore[]>([]);
   const [showNameInput, setShowNameInput] = useState(false);
   const [playerName, setPlayerName] = useState('');
@@ -91,7 +66,6 @@ export function ScndDropGame() {
   const [slowMode, setSlowMode] = useState(false);
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const powerUpLoopRef = useRef<NodeJS.Timeout | null>(null);
-  const titlePulseRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
 
   useEffect(() => {
@@ -112,19 +86,19 @@ export function ScndDropGame() {
     if (saved) setHighscores(JSON.parse(saved));
   }, []);
 
-  // Titel-Puls Animation
   useEffect(() => {
     if (isPlaying && !gameOver) {
-      titlePulseRef.current = setInterval(() => {
+      const interval = setInterval(() => {
         setTitlePulse(prev => !prev);
       }, 500);
+      return () => clearInterval(interval);
     }
-    return () => { if (titlePulseRef.current) clearInterval(titlePulseRef.current); };
   }, [isPlaying, gameOver]);
 
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
+    setFinalScore(0);
     setLevel(1);
     setLinesCleared(0);
     setCombo(0);
@@ -146,56 +120,6 @@ export function ScndDropGame() {
     setPowerUp(randomPower);
     setPowerUpX(Math.floor(Math.random() * BOARD_WIDTH));
     setPowerUpY(0);
-  };
-
-  const giveUp = () => {
-    if (isPlaying && !gameOver) {
-      setGameOver(true);
-      setIsPlaying(false);
-      playSound('gameover');
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-      const isHighscore = highscores.length < 3 || score > highscores[2]?.score;
-      if (score > 0 && isHighscore) {
-        setShowNameInput(true);
-        setNewHighscoreGlow(true);
-        setTimeout(() => setNewHighscoreGlow(false), 2000);
-      }
-    }
-  };
-
-  const spawnNewPiece = () => {
-    const random = Math.floor(Math.random() * TETROMINOS.length);
-    const piece = JSON.parse(JSON.stringify(TETROMINOS[random]));
-    setCurrentPiece(piece);
-    setPieceX(Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2));
-    setPieceY(0);
-    if (collision(piece.shape, Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2), 0)) {
-      setGameOver(true);
-      setIsPlaying(false);
-      playSound('gameover');
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-      const isHighscore = highscores.length < 3 || score > highscores[2]?.score;
-      if (score > 0 && isHighscore) {
-        setShowNameInput(true);
-        setNewHighscoreGlow(true);
-        setTimeout(() => setNewHighscoreGlow(false), 2000);
-      }
-    }
-  };
-
-  const collision = (shape: number[][], offsetX: number, offsetY: number) => {
-    for (let y = 0; y < shape.length; y++) {
-      for (let x = 0; x < shape[y].length; x++) {
-        if (shape[y][x] !== 0) {
-          const boardX = offsetX + x, boardY = offsetY + y;
-          if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
-          if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
-        }
-      }
-    }
-    return false;
   };
 
   const applyPowerUp = (effect: string) => {
@@ -238,9 +162,47 @@ export function ScndDropGame() {
     setPowerUp(null);
   };
 
+  const spawnNewPiece = () => {
+    const random = Math.floor(Math.random() * TETROMINOS.length);
+    const piece = JSON.parse(JSON.stringify(TETROMINOS[random]));
+    setCurrentPiece(piece);
+    setPieceX(Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2));
+    setPieceY(0);
+    if (collision(piece.shape, Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2), 0)) {
+      endGame();
+    }
+  };
+
+  const endGame = () => {
+    setGameOver(true);
+    setFinalScore(score);
+    setIsPlaying(false);
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
+    
+    const isHighscore = highscores.length < 3 || score > highscores[2]?.score;
+    if (score > 0 && isHighscore) {
+      setShowNameInput(true);
+      setNewHighscoreGlow(true);
+      setTimeout(() => setNewHighscoreGlow(false), 2000);
+    }
+  };
+
+  const collision = (shape: number[][], offsetX: number, offsetY: number) => {
+    for (let y = 0; y < shape.length; y++) {
+      for (let x = 0; x < shape[y].length; x++) {
+        if (shape[y][x] !== 0) {
+          const boardX = offsetX + x, boardY = offsetY + y;
+          if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
+          if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
+        }
+      }
+    }
+    return false;
+  };
+
   const mergePiece = () => {
     if (!currentPiece) return;
-    playSound('drop');
     const newBoard = board.map(row => [...row]);
     for (let y = 0; y < currentPiece.shape.length; y++) {
       for (let x = 0; x < currentPiece.shape[y].length; x++) {
@@ -264,7 +226,6 @@ export function ScndDropGame() {
         clearedRows.push(row);
         setFlashRow(row);
         setTimeout(() => setFlashRow(null), 200);
-        // Pixel-Explosion Partikel
         for (let x = 0; x < BOARD_WIDTH; x++) {
           for (let i = 0; i < 3; i++) {
             setParticles(prev => [...prev, { x: x * cellSize + cellSize/2, y: row * cellSize + cellSize/2, life: 1 }]);
@@ -276,9 +237,6 @@ export function ScndDropGame() {
       } else row--;
     }
     
-    if (rowsCleared > 0) playSound('clear');
-    
-    // Combo-System
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[rowsCleared];
     let hasBrandBlock = false;
@@ -292,7 +250,6 @@ export function ScndDropGame() {
       setCombo(newCombo);
       addedScore = Math.floor(addedScore * (1 + newCombo * 0.15));
       
-      // SCND Farb-Bonus (Orange + Schwarz)
       const hasScndColors = clearedRows.some(row => 
         newBoard[row]?.some(cell => cell?.color === '#FF4400' || cell?.color === '#1A1A1A')
       );
@@ -327,7 +284,6 @@ export function ScndDropGame() {
     spawnNewPiece();
   };
 
-  // Partikel-Animation
   useEffect(() => {
     if (particles.length > 0) {
       const interval = setInterval(() => {
@@ -355,6 +311,12 @@ export function ScndDropGame() {
     }
   };
 
+  // Touch-Controller für Handy
+  const handleTouchLeft = () => movePiece(-1, 0);
+  const handleTouchRight = () => movePiece(1, 0);
+  const handleTouchDown = () => movePiece(0, 1);
+  const handleTouchRotate = () => rotatePiece();
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -363,7 +325,6 @@ export function ScndDropGame() {
         case 'ArrowRight': e.preventDefault(); movePiece(1, 0); break;
         case 'ArrowDown': e.preventDefault(); movePiece(0, 1); break;
         case 'ArrowUp': e.preventDefault(); rotatePiece(); break;
-        case 'Escape': e.preventDefault(); giveUp(); break;
         default: break;
       }
     };
@@ -389,11 +350,9 @@ export function ScndDropGame() {
     canvas.height = BOARD_HEIGHT * cellSize;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // CRT-Röhren-Effekt Hintergrund
     ctx.fillStyle = 'var(--bg-secondary)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Retro-Pixel-Rahmen
     ctx.strokeStyle = '#FF4400';
     ctx.lineWidth = 3;
     ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
@@ -401,7 +360,6 @@ export function ScndDropGame() {
     ctx.lineWidth = 1;
     ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
     
-    // Gitterlinien
     ctx.strokeStyle = '#FF44004D';
     ctx.lineWidth = 1;
     for (let x = 0; x <= BOARD_WIDTH; x++) {
@@ -417,7 +375,6 @@ export function ScndDropGame() {
       ctx.stroke();
     }
     
-    // Blöcke zeichnen
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
@@ -440,14 +397,13 @@ export function ScndDropGame() {
       }
     }
     
-    // Power-Up zeichnen
-    if (powerUp) {
+    if (powerUp && powerUpY < BOARD_HEIGHT) {
       ctx.fillStyle = powerUp.color;
       ctx.fillRect(powerUpX * cellSize, powerUpY * cellSize, cellSize - 1, cellSize - 1);
       ctx.fillStyle = '#FFFFFF';
       ctx.font = `bold ${Math.max(10, cellSize * 0.4)}px monospace`;
       ctx.fillText(powerUp.name[0], powerUpX * cellSize + cellSize * 0.4, powerUpY * cellSize + cellSize * 0.7);
-      setPowerUpY(prev => prev + 0.2);
+      setPowerUpY(prev => prev + 0.15);
       if (powerUpY >= BOARD_HEIGHT - 1) {
         setPowerUp(null);
       } else if (collision([[1]], powerUpX, Math.floor(powerUpY))) {
@@ -455,7 +411,6 @@ export function ScndDropGame() {
       }
     }
     
-    // Ghost Piece
     if (currentPiece && !gameOver) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
@@ -491,38 +446,31 @@ export function ScndDropGame() {
       }
     }
     
-    // Scanlines (CRT-Effekt)
     ctx.fillStyle = 'rgba(0,0,0,0.08)';
     for (let i = 0; i < canvas.height; i += 2) {
       ctx.fillRect(0, i, canvas.width, 1);
     }
     
-    // Vignette (CRT-Effekt)
     const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width/2);
     gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.3)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Partikel zeichnen
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
     
-    // Level-Fortschrittsbalken
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
     
-    // Combo-Anzeigen
     if (hotStreak) {
       ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
       ctx.fillStyle = '#FF4400';
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = '#FF4400';
       ctx.fillText('🔥 HOT STREAK!', canvas.width / 2 - 60, 30);
     }
     if (scndMode) {
@@ -545,7 +493,7 @@ export function ScndDropGame() {
 
   const saveHighscore = () => {
     if (playerName.trim() === '') return;
-    const newHighscores = [...highscores, { name: playerName, score }];
+    const newHighscores = [...highscores, { name: playerName, score: finalScore }];
     newHighscores.sort((a,b) => b.score - a.score);
     const top3 = newHighscores.slice(0,3);
     setHighscores(top3);
@@ -578,6 +526,17 @@ export function ScndDropGame() {
         <div className="flex flex-col md:flex-row gap-4 md:gap-8 justify-center items-center md:items-start">
           <div className="relative">
             <canvas ref={canvasRef} className="border-2 md:border-4 border-[#FF4400] shadow-lg shadow-[#FF4400]/20 rounded-sm" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
+            
+            {/* Touch-Controller für Handy */}
+            {isPlaying && !gameOver && (
+              <div className="absolute -bottom-20 left-0 right-0 flex justify-center gap-4 md:hidden mt-4">
+                <button onTouchStart={handleTouchLeft} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">←</button>
+                <button onTouchStart={handleTouchDown} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">↓</button>
+                <button onTouchStart={handleTouchRight} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">→</button>
+                <button onTouchStart={handleTouchRotate} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">↻</button>
+              </div>
+            )}
+            
             {!isPlaying && !gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 md:gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
                 <button onClick={startGame} className="px-4 md:px-8 py-2 md:py-3 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-xs md:text-base hover:bg-[#FF4400]/80 transition-all hover:scale-105 shadow-lg">
@@ -590,8 +549,8 @@ export function ScndDropGame() {
                 <div className="text-base md:text-2xl font-bold tracking-tighter mb-1 md:mb-2">
                   <span className="text-[#FF4400]">GAME</span>_<span className="text-white">OVER</span>
                 </div>
+                <div className="text-sm md:text-xl text-[#FF4400] font-bold mb-2">{finalScore} Punkte</div>
                 <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-xs md:text-sm hover:bg-[#FF4400]/80 transition">NEUSTART</button>
-                <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-sm text-xs md:text-sm hover:bg-[#FF4400]/10 transition">AUFGABEN</button>
               </div>
             )}
           </div>
@@ -599,7 +558,7 @@ export function ScndDropGame() {
           <div className="bg-[var(--bg-primary)] p-3 md:p-5 rounded-lg border border-[#FF4400]/30 min-w-[180px] md:min-w-[220px] w-full md:w-auto">
             <div className="text-center mb-3 md:mb-4 pb-2 md:pb-3 border-b border-[#FF4400]/30">
               <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-widest">SCORE</div>
-              <div className="text-2xl md:text-4xl font-bold text-[#FF4400]">{score}</div>
+              <div className="text-2xl md:text-4xl font-bold text-[#FF4400]">{gameOver ? finalScore : score}</div>
               <div className="text-[8px] md:text-xs text-[var(--text-secondary)] mt-1">LEVEL {level} · LINES {linesCleared}</div>
               {combo > 0 && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1 animate-pulse">{combo}x COMBO!</div>}
               {hotStreak && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1">🔥 HOT STREAK!</div>}
@@ -628,7 +587,6 @@ export function ScndDropGame() {
                 <span className="text-[#FF4400]">↑</span>
                 <span className="text-[var(--text-secondary)]">DREHEN</span>
               </div>
-              <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] mt-1">ESC = AUFGABEN</div>
               <div className="text-[8px] md:text-[10px] text-[#FF4400] mt-1">✨ POWER-UPS FALLEN!</div>
             </div>
           </div>
@@ -641,7 +599,7 @@ export function ScndDropGame() {
             <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2">
               <span className="text-[#FF4400]">✨ NEW</span>_<span className="text-[var(--text-primary)]">HIGHSCORE</span>
             </h3>
-            <p className="text-xs md:text-sm text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-lg md:text-xl">{score}</span></p>
+            <p className="text-xs md:text-sm text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-lg md:text-xl">{finalScore}</span></p>
             <input
               type="text"
               value={playerName}
