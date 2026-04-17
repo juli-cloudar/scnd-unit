@@ -188,3 +188,16 @@ img {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+/* Verhindert Scrollen während des Spiels auf Handy */
+.game-container {
+  touch-action: pan-y pinch-zoom; /* Erlaubt nur vertikales Scrollen, kein horizontales */
+}
+
+.game-container.no-scroll {
+  touch-action: none; /* Komplett verhindern während des Spiels */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
