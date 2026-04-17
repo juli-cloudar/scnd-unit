@@ -1,66 +1,37 @@
 // src/app/ProductClient.tsx
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
   Clock, Shield, ExternalLink, Menu, X, Filter
-} from 'lucide-react'
+} from 'lucide-react';
 
-// ========== NEU: ProductCleaner Component direkt integriert ==========
-// Bekannte Marken
+// ========== ProductCleaner ==========
 const KNOWN_BRANDS = [
   'L.L.BEAN', 'ADIDAS', 'NIKE', 'TOMMY HILFIGER', 'CHAMPION',
   'COLUMBIA', 'PUMA', 'FILA', 'NAPAPIJRI', 'HELLY HANSEN',
   'THE NORTH FACE', 'NEW BALANCE', 'STARTER', 'LEE', 'TIMBERLAND',
   'REEBOK', 'LACOSTE', 'WRANGLER', 'BEXLEYS', 'U.S. POLO ASSN',
-  'STARTER', 'NBA', 'NFL', 'LEE SPORT', 'COLUMBIA', 'ADIDA'
+  'STARTER', 'NBA', 'NFL', 'LEE SPORT'
 ];
 
-// Funktion zum Bereinigen von Produktnamen
-function cleanProductName(rawName: string): {
-  brand: string;
-  description: string;
-  size: string;
-  cleaned: string;
-} {
-  if (!rawName) {
-    return { brand: '', description: '', size: '', cleaned: '' };
-  }
-
+function cleanProductName(rawName: string) {
+  if (!rawName) return { brand: '', description: '', size: '', cleaned: '' };
   const upperName = rawName.toUpperCase();
   let brand = '';
-
-  // Marke erkennen
   for (const knownBrand of KNOWN_BRANDS) {
     if (upperName.startsWith(knownBrand)) {
       brand = knownBrand;
       break;
     }
   }
-
-  // Wenn keine Marke gefunden, nimm das erste Wort
-  if (!brand) {
-    const firstWord = rawName.split(' ')[0];
-    brand = firstWord;
-  }
-
-  // Rest nach der Marke
+  if (!brand) brand = rawName.split(' ')[0];
   let rest = rawName.slice(brand.length).trim();
-
-  // Entferne doppelte Marke (z.B. "ADIDAS ADIDAS Fleece")
   const brandRegex = new RegExp(`^${brand}\\s+`, 'i');
   rest = rest.replace(brandRegex, '');
-
-  // Größen erkennen
-  const sizePatterns = [
-    /\b(XXL|XL|L|M|S|XS|XXXL)\b/i,
-    /\b(34\/6|36\/8|38\/10|40\/12|42\/14)\b/i,
-    /\b(\d+ JAHRE|\d+ \/ \d+)\b/i,
-    /\b(ONE SIZE|OSFM)\b/i
-  ];
-
+  const sizePatterns = [/\b(XXL|XL|L|M|S|XS|XXXL)\b/i];
   let size = '';
   for (const pattern of sizePatterns) {
     const match = rest.match(pattern);
@@ -70,62 +41,34 @@ function cleanProductName(rawName: string): {
       break;
     }
   }
-
-  // Mehrfache Leerzeichen entfernen
   const description = rest.replace(/\s+/g, ' ').trim();
-
-  return {
-    brand: brand,
-    description: description,
-    size: size,
-    cleaned: `${brand} ${description}${size ? ` (${size})` : ''}`.trim()
-  };
+  return { brand, description, size, cleaned: `${brand} ${description}${size ? ` (${size})` : ''}`.trim() };
 }
 
-// Hook für Product Cleaning
 function useProductCleaner(products: Product[]) {
   const [cleanedProducts, setCleanedProducts] = useState<any[]>([]);
   const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
-
   useEffect(() => {
     if (!products || products.length === 0) {
       setCleanedProducts([]);
       setUniqueBrands([]);
       return;
     }
-
-    // Bereinige alle Produkte
     const cleaned = products.map(product => {
       const cleaned = cleanProductName(product.name);
-      return {
-        ...product,
-        cleaned_name: cleaned.cleaned,
-        extracted_brand: cleaned.brand,
-        extracted_description: cleaned.description,
-        extracted_size: cleaned.size
-      };
+      return { ...product, cleaned_name: cleaned.cleaned, extracted_brand: cleaned.brand, extracted_description: cleaned.description, extracted_size: cleaned.size };
     });
-
     setCleanedProducts(cleaned);
-
-    // Extrahiere eindeutige Marken (ohne Duplikate)
     const brands = new Map<string, string>();
-    
     cleaned.forEach(product => {
       const brandName = product.extracted_brand;
       if (brandName) {
         const key = brandName.toUpperCase();
-        if (!brands.has(key)) {
-          brands.set(key, brandName);
-        }
+        if (!brands.has(key)) brands.set(key, brandName);
       }
     });
-
-    const sortedBrands = Array.from(brands.values()).sort();
-    setUniqueBrands(sortedBrands);
-    
+    setUniqueBrands(Array.from(brands.values()).sort());
   }, [products]);
-
   return { cleanedProducts, uniqueBrands };
 }
 // ========== ENDE ProductCleaner ==========
@@ -133,139 +76,99 @@ function useProductCleaner(products: Product[]) {
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
-}
+};
 
 const staggerContainer = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-}
+};
 
 interface Product {
-  id: number
-  name: string
-  category: string
-  price: string
-  size: string
-  condition: string
-  images: string[] | null
-  vinted_url: string
-  sold: boolean
+  id: number;
+  name: string;
+  category: string;
+  price: string;
+  size: string;
+  condition: string;
+  images: string[] | null;
+  vinted_url: string;
+  sold: boolean;
 }
 
 interface ProductClientProps {
-  initialProducts: Product[]
+  initialProducts: Product[];
 }
 
 const proxyImg = (url: string) => {
-  if (!url) return ''
-  if (url.startsWith('/api/')) return url
-  return `/api/image-proxy?url=${encodeURIComponent(url)}`
-}
+  if (!url) return '';
+  if (url.startsWith('/api/')) return url;
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+};
 
 const ImageSlider = ({ images, alt, condition }: { images: string[] | null, alt: string, condition: string }) => {
-  const [current, setCurrent] = useState(0)
-  const [dragStart, setDragStart] = useState<number | null>(null)
-  const [dragging, setDragging] = useState(false)
-
-  const onPointerDown = (e: React.PointerEvent) => { 
-    setDragStart(e.clientX) 
-    setDragging(false) 
-  }
-  
-  const onPointerMove = (e: React.PointerEvent) => { 
-    if (dragStart !== null && Math.abs(e.clientX - dragStart) > 8) setDragging(true) 
-  }
-  
+  const [current, setCurrent] = useState(0);
+  const [dragStart, setDragStart] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const onPointerDown = (e: React.PointerEvent) => { setDragStart(e.clientX); setDragging(false); };
+  const onPointerMove = (e: React.PointerEvent) => { if (dragStart !== null && Math.abs(e.clientX - dragStart) > 8) setDragging(true); };
   const onPointerUp = (e: React.PointerEvent) => {
-    if (dragStart === null) return
-    const diff = dragStart - e.clientX
+    if (dragStart === null) return;
+    const diff = dragStart - e.clientX;
     if (Math.abs(diff) > 40) {
-      e.preventDefault()
-      diff > 0 
-        ? setCurrent(c => (c + 1) % (images ?? []).length) 
-        : setCurrent(c => (c - 1 + (images ?? []).length) % (images ?? []).length)
+      e.preventDefault();
+      diff > 0 ? setCurrent(c => (c + 1) % (images ?? []).length) : setCurrent(c => (c - 1 + (images ?? []).length) % (images ?? []).length);
     }
-    setDragStart(null)
-  }
-  
-  const onClick = (e: React.MouseEvent) => { 
-    if (dragging) e.preventDefault() 
-  }
-
+    setDragStart(null);
+  };
+  const onClick = (e: React.MouseEvent) => { if (dragging) e.preventDefault(); };
   return (
-    <div 
-      className="aspect-[3/4] md:aspect-[4/5] relative overflow-hidden bg-[#0A0A0A] cursor-grab active:cursor-grabbing select-none touch-pan-y"
-      onPointerDown={onPointerDown} 
-      onPointerMove={onPointerMove} 
-      onPointerUp={onPointerUp} 
-      onClick={onClick}
-    >
+    <div className="aspect-[3/4] md:aspect-[4/5] relative overflow-hidden bg-[#0A0A0A] cursor-grab active:cursor-grabbing select-none touch-pan-y" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onClick={onClick}>
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10 pointer-events-none" />
-      <img 
-        src={proxyImg((images ?? [])[current])} 
-        alt={alt} 
-        draggable={false} 
-        className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" 
-      />
-      {condition !== "–" && (
-        <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-[#0A0A0A]/80 backdrop-blur text-xs uppercase tracking-widest border border-[#FF4400] text-[#FF4400] pointer-events-none">
-          {condition}
-        </div>
-      )}
+      <img src={proxyImg((images ?? [])[current])} alt={alt} draggable={false} className="w-full h-full object-cover transition-opacity duration-300 pointer-events-none" />
+      {condition !== "–" && <div className="absolute top-4 left-4 z-20 px-3 py-1 bg-[#0A0A0A]/80 backdrop-blur text-xs uppercase tracking-widest border border-[#FF4400] text-[#FF4400] pointer-events-none">{condition}</div>}
       {(images ?? []).length > 1 && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-2 items-center">
           {(images ?? []).map((_, i) => (
-            <button 
-              key={i} 
-              onClick={(e) => { e.preventDefault(); setCurrent(i) }}
-              className={`rounded-full transition-all duration-200 ${i === current ? 'bg-[#FF4400] w-5 h-2.5' : 'bg-white/40 hover:bg-white/70 w-2.5 h-2.5'}`} 
-            />
+            <button key={i} onClick={(e) => { e.preventDefault(); setCurrent(i); }} className={`rounded-full transition-all duration-200 ${i === current ? 'bg-[#FF4400] w-5 h-2.5' : 'bg-white/40 hover:bg-white/70 w-2.5 h-2.5'}`} />
           ))}
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 export function ProductClient({ initialProducts }: ProductClientProps) {
-  const [products, setProducts] = useState<Product[]>(initialProducts)
-  const [loading, setLoading] = useState(false)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-  const [activeCategory, setActiveCategory] = useState("Alle")
-  
-  // ========== NEU: ProductCleaner Hook verwenden ==========
-  const [activeBrand, setActiveBrand] = useState("Alle")
-  const { cleanedProducts, uniqueBrands } = useProductCleaner(products)
-  // ========== ENDE NEU ==========
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("Alle");
+  const [activeBrand, setActiveBrand] = useState("Alle");
+  const { cleanedProducts, uniqueBrands } = useProductCleaner(products);
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50)
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-  // ========== NEU: Gefilterte Produkte mit Marke + Kategorie ==========
   const filteredProducts = (cleanedProducts.length > 0 ? cleanedProducts : products).filter(product => {
-    const matchesCategory = activeCategory === "Alle" || product.category === activeCategory
-    const matchesBrand = activeBrand === "Alle" || product.extracted_brand?.toUpperCase() === activeBrand.toUpperCase()
-    return matchesCategory && matchesBrand
-  })
-  // ========== ENDE NEU ==========
+    const matchesCategory = activeCategory === "Alle" || product.category === activeCategory;
+    const matchesBrand = activeBrand === "Alle" || product.extracted_brand?.toUpperCase() === activeBrand.toUpperCase();
+    return matchesCategory && matchesBrand;
+  });
 
-  // ========== NEU: Alle Kategorien + Alle Marken ==========
-  const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category))).sort()]
-  // ========== ENDE NEU ==========
+  const allCategories = ["Alle", ...Array.from(new Set(products.map(p => p.category))).sort()];
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans selection:bg-[#FF4400] selection:text-white">
       <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px]" />
 
+      {/* Navigation - Volle Breite */}
       <nav className={`fixed w-full z-40 transition-all duration-300 ${scrolled ? 'bg-[#0A0A0A]/90 backdrop-blur-md py-4' : 'bg-transparent py-6'}`}>
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="text-2xl font-bold tracking-tighter">
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 flex justify-between items-center">
+          <div className="text-2xl font-bold tracking-tighter">
             <span className="text-[#FF4400]">SCND</span>_UNIT
-          </motion.div>
+          </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#products" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">Inventory</a>
             <a href="#about" className="text-sm uppercase tracking-widest hover:text-[#FF4400] transition-colors">About</a>
@@ -289,9 +192,10 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </AnimatePresence>
       </nav>
 
+      {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(26,26,26,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(26,26,26,0.5)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_at_center,black,transparent)]" />
-        <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
+        <div className="relative z-10 text-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 w-full">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             <motion.p variants={fadeIn} className="text-[#FF4400] text-sm uppercase tracking-[0.3em] mb-4">Bad Kreuznach, DE</motion.p>
             <motion.h1 variants={fadeIn} className="text-6xl md:text-9xl font-bold tracking-tighter mb-6">
@@ -316,8 +220,9 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </motion.div>
       </section>
 
+      {/* Info Bar - Volle Breite */}
       <section className="border-y border-[#1A1A1A] bg-[#0A0A0A]">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Clock className="w-5 h-5 text-[#FF4400]" />Versand innerhalb 48h</div>
             <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400"><Shield className="w-5 h-5 text-[#FF4400]" />Ehrliche Beschreibungen</div>
@@ -326,16 +231,16 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      <section id="products" className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
+      {/* Products Section - Volle Breite */}
+      <section id="products" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="w-full">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-10">
             <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4">CURRENT_<span className="text-[#FF4400]">INVENTORY</span></h2>
             <p className="text-gray-400 uppercase tracking-widest text-sm">Alle Artikel auf Vinted verfügbar • Regelmäßig neue Drops</p>
           </motion.div>
-          
-          {/* ========== NEU: Doppelte Filter (Kategorie + Marke) ========== */}
+
+          {/* Filter - Volle Breite */}
           <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-4 mb-12">
-            {/* Kategorie Filter */}
             <div className="flex items-center gap-3 flex-wrap">
               <Filter className="w-4 h-4 text-[#FF4400]" />
               <span className="text-xs uppercase tracking-widest text-gray-500 mr-2">Kategorie:</span>
@@ -346,8 +251,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                 </button>
               ))}
             </div>
-            
-            {/* ========== NEU: Marken Filter (OHNE DUPLIKATE!) ========== */}
             {uniqueBrands.length > 0 && (
               <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-[#1A1A1A]">
                 <Filter className="w-4 h-4 text-[#FF4400]" />
@@ -365,47 +268,41 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
               </div>
             )}
           </motion.div>
-          {/* ========== ENDE NEU ========== */}
-          
-          {loading ? (
-            <div className="text-center py-20 text-gray-500 uppercase tracking-widest">Lade...</div>
-          ) : (
-            <AnimatePresence mode="wait">
-              <motion.div key={`${activeCategory}-${activeBrand}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProducts.map((product, index) => (
-                  <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}
-                    className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
-                    <ImageSlider images={product.images ?? []} alt={product.name} condition={product.condition} />
-                    <div className="p-6">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="min-w-0 pr-2">
-                          <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">
-                            {product.category}
-                            {/* ========== NEU: Zeige extrahierte Marke an ========== */}
-                            {product.extracted_brand && (
-                              <span className="ml-2 text-[#FF4400]">• {product.extracted_brand}</span>
-                            )}
-                          </p>
-                          {/* ========== NEU: Verwende bereinigten Namen ========== */}
-                          <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">
-                            {product.cleaned_name || product.name}
-                          </h3>
-                        </div>
-                        <span className="text-xl font-bold text-[#FF4400] shrink-0">€{product.price}</span>
+
+          {/* Produkte Grid - Mehr Produkte pro Zeile, gleiche Größe */}
+          <AnimatePresence mode="wait">
+            <motion.div key={`${activeCategory}-${activeBrand}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} 
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+              {filteredProducts.map((product, index) => (
+                <motion.a key={product.id} href={product.vinted_url} target="_blank" rel="noopener noreferrer"
+                  initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}
+                  className="group relative bg-[#1A1A1A] overflow-hidden hover:ring-2 hover:ring-[#FF4400] transition-all">
+                  <ImageSlider images={product.images ?? []} alt={product.name} condition={product.condition} />
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="min-w-0 pr-2">
+                        <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">
+                          {product.category}
+                          {product.extracted_brand && <span className="ml-2 text-[#FF4400]">• {product.extracted_brand}</span>}
+                        </p>
+                        <h3 className="text-lg font-bold uppercase tracking-tight group-hover:text-[#FF4400] transition-colors leading-tight">
+                          {product.cleaned_name || product.name}
+                        </h3>
                       </div>
-                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
-                        <span className="text-sm text-gray-400 uppercase tracking-widest">
-                          {product.extracted_size || (product.size !== "–" ? `Size ${product.size}` : "")}
-                        </span>
-                        <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">View <ExternalLink className="w-4 h-4" /></span>
-                      </div>
+                      <span className="text-xl font-bold text-[#FF4400] shrink-0">€{product.price}</span>
                     </div>
-                  </motion.a>
-                ))}
-              </motion.div>
-            </AnimatePresence>
-          )}
+                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#0A0A0A]">
+                      <span className="text-sm text-gray-400 uppercase tracking-widest">
+                        {product.extracted_size || (product.size !== "–" ? `Size ${product.size}` : "")}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-sm uppercase tracking-widest text-[#FF4400] group-hover:gap-2 transition-all">View <ExternalLink className="w-4 h-4" /></span>
+                    </div>
+                  </div>
+                </motion.a>
+              ))}
+            </motion.div>
+          </AnimatePresence>
+
           <div className="mt-16 text-center">
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest">
               Alle Artikel auf Vinted <ExternalLink className="w-4 h-4" />
@@ -414,10 +311,11 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
+      {/* ABOUT SECTION */}
       <section id="about" className="py-24 bg-[#1A1A1A] relative overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_49%,rgba(255,68,0,0.03)_50%,transparent_51%)] bg-[length:20px_20px]" />
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative z-10">
+          <div className="grid md:grid-cols-2 gap-16 items-center max-w-7xl mx-auto">
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
               <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">ABOUT_<span className="text-[#FF4400]">UNIT</span></h2>
               <div className="space-y-4 text-gray-300 leading-relaxed">
@@ -443,7 +341,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      <section id="contact" className="py-24 px-6">
+      {/* CONTACT SECTION */}
+      <section id="contact" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">GET_IN_<span className="text-[#FF4400]">TOUCH</span></h2>
@@ -463,7 +362,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      <footer className="border-t border-[#1A1A1A] py-12 px-6">
+      {/* Footer - Volle Breite */}
+      <footer className="border-t border-[#1A1A1A] py-12 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-2xl font-bold tracking-tighter"><span className="text-[#FF4400]">SCND</span>_UNIT</div>
           <div className="flex gap-6 text-sm uppercase tracking-widest text-gray-500">
@@ -474,5 +374,5 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </footer>
     </div>
-  )
+  );
 }
