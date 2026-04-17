@@ -1,4 +1,3 @@
-// src/app/ProductClient.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -99,12 +98,11 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] font-sans">
       
-      {/* Navigation */}
       <Navigation scrolled={scrolled} />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        <div className="w-full px-4 md:px-6 lg:px-8 text-center">
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 text-center">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             <motion.p variants={fadeIn} className="text-[#FF4400] text-sm uppercase tracking-[0.3em] mb-4">Bad Kreuznach, DE</motion.p>
             <motion.h1 variants={fadeIn} className="text-6xl md:text-9xl font-bold tracking-tighter mb-6">
@@ -118,9 +116,9 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
               <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="group inline-flex items-center gap-2 px-8 py-4 bg-[#FF4400] text-white font-bold uppercase tracking-widest hover:bg-[#FF4400]/80 transition-all">
                 Browse Inventory <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </a>
-              <button onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })} className="inline-flex items-center gap-2 px-8 py-4 border border-[#1A1A1A] hover:border-[#FF4400] hover:text-[#FF4400] transition-all uppercase tracking-widest">
+              <a href="#products" className="inline-flex items-center gap-2 px-8 py-4 border border-[#1A1A1A] hover:border-[#FF4400] hover:text-[#FF4400] transition-all uppercase tracking-widest">
                 View Selection
-              </button>
+              </a>
             </motion.div>
           </motion.div>
         </div>
@@ -128,7 +126,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
 
       {/* Info Bar */}
       <section className="border-y border-[#1A1A1A] bg-[#0A0A0A]">
-        <div className="w-full px-4 md:px-6 lg:px-8 py-8">
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div className="flex items-center justify-center gap-3 text-sm uppercase tracking-widest text-gray-400">
               <Clock className="w-5 h-5 text-[#FF4400]" />Versand innerhalb 48h
@@ -143,10 +141,9 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Filter Section - Volle Breite */}
-      <section className="py-8 px-4 md:px-6 lg:px-8">
+      {/* Filter Section */}
+      <section className="py-8 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="w-full">
-          {/* Marken Filter */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -155,15 +152,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <div className="w-full overflow-x-auto scrollbar-custom">
               <div className="flex gap-2 min-w-max pb-2">
                 {allBrands.map(b => (
-                  <button 
-                    key={b} 
-                    onClick={() => setActiveBrand(b)} 
-                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
-                      activeBrand === b 
-                        ? 'bg-[#FF4400] text-white' 
-                        : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                    }`}
-                  >
+                  <button key={b} onClick={() => setActiveBrand(b)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
                     {b}
                   </button>
                 ))}
@@ -171,7 +160,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             </div>
           </div>
 
-          {/* Kategorien Filter */}
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -180,15 +168,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
             <div className="w-full overflow-x-auto scrollbar-custom">
               <div className="flex gap-2 min-w-max pb-2">
                 {allCategories.map(c => (
-                  <button 
-                    key={c} 
-                    onClick={() => setActiveCategory(c)} 
-                    className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${
-                      activeCategory === c 
-                        ? 'bg-[#FF4400] text-white' 
-                        : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'
-                    }`}
-                  >
+                  <button key={c} onClick={() => setActiveCategory(c)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest transition-all duration-200 rounded-sm ${activeCategory === c ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
                     {c}
                   </button>
                 ))}
@@ -198,56 +178,34 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Products Section - Volle Breite */}
-      <section id="products" className="py-12 px-4 md:px-6 lg:px-8">
+      {/* Products Section */}
+      <section id="products" className="py-12 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="w-full">
-          {/* Search und View Controls */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-              <input 
-                type="text" 
-                placeholder="Suchen..." 
-                value={search} 
-                onChange={e => setSearch(e.target.value)} 
-                className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64 rounded-sm"
-              />
+              <input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64 rounded-sm"/>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex gap-1">
-                <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')}>
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button onClick={() => setViewMode('list')} className={viewButtonClass('list')}>
-                  <List className="w-4 h-4" />
-                </button>
-                <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')}>
-                  <Minimize2 className="w-4 h-4" />
-                </button>
+                <button onClick={() => setViewMode('grid')} className={viewButtonClass('grid')}><LayoutGrid className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('list')} className={viewButtonClass('list')}><List className="w-4 h-4" /></button>
+                <button onClick={() => setViewMode('compact')} className={viewButtonClass('compact')}><Minimize2 className="w-4 h-4" /></button>
               </div>
-              <div className="text-xs text-gray-500">
-                {filteredProducts.length} von {cleanedProducts.length} Artikeln
-              </div>
+              <div className="text-xs text-gray-500">{filteredProducts.length} von {cleanedProducts.length} Artikeln</div>
             </div>
           </div>
           
-          {/* Produkte Grid */}
           <ProductView products={filteredProducts as any} viewMode={viewMode} />
           
-          {/* Lade-Indikator */}
           {isLoadingMore && visibleProducts.length < cleanedProducts.length && (
             <div className="flex justify-center py-8">
               <div className="w-6 h-6 border-2 border-[#FF4400] border-t-transparent rounded-full animate-spin" />
             </div>
           )}
           
-          {/* Vinted Link */}
           <div className="mt-16 text-center">
-            <a 
-              href="https://www.vinted.de/member/3138250645-scndunit" 
-              target="_blank" 
-              className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest"
-            >
+            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="inline-flex items-center gap-2 px-8 py-4 border border-[#FF4400] text-[#FF4400] hover:bg-[#FF4400] hover:text-white transition-all uppercase tracking-widest">
               Alle Artikel auf Vinted <ExternalLink className="w-4 h-4" />
             </a>
           </div>
@@ -257,7 +215,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       {/* ABOUT SECTION */}
       <section id="about" className="py-24 bg-[#1A1A1A] relative overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_49%,rgba(255,68,0,0.03)_50%,transparent_51%)] bg-[length:20px_20px]" />
-        <div className="w-full px-4 md:px-6 lg:px-8 relative z-10">
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative z-10">
           <div className="grid md:grid-cols-2 gap-16 items-center max-w-7xl mx-auto">
             <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
               <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">ABOUT_<span className="text-[#FF4400]">UNIT</span></h2>
@@ -272,22 +230,10 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
                 <div className="text-center">
                   <div className="text-8xl font-bold text-[#FF4400]/20 mb-4">SCND</div>
                   <div className="grid grid-cols-2 gap-4 text-sm uppercase tracking-widest">
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">100%</span>
-                      <span className="text-gray-500">Authentic</span>
-                    </div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">48h</span>
-                      <span className="text-gray-500">Shipping</span>
-                    </div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">DE</span>
-                      <span className="text-gray-500">Based</span>
-                    </div>
-                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]">
-                      <span className="block text-2xl font-bold text-[#FF4400]">{cleanedProducts.length}+</span>
-                      <span className="text-gray-500">Items</span>
-                    </div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">100%</span><span className="text-gray-500">Authentic</span></div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">48h</span><span className="text-gray-500">Shipping</span></div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">DE</span><span className="text-gray-500">Based</span></div>
+                    <div className="p-4 bg-[#1A1A1A] border border-[#0A0A0A]"><span className="block text-2xl font-bold text-[#FF4400]">{cleanedProducts.length}+</span><span className="text-gray-500">Items</span></div>
                   </div>
                 </div>
               </div>
@@ -297,7 +243,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       </section>
 
       {/* CONTACT SECTION */}
-      <section id="contact" className="py-24 px-4 md:px-6 lg:px-8">
+      <section id="contact" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">GET_IN_<span className="text-[#FF4400]">TOUCH</span></h2>
@@ -318,7 +264,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[#1A1A1A] py-12 px-4 md:px-6 lg:px-8">
+      <footer className="border-t border-[#1A1A1A] py-12 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-2xl font-bold tracking-tighter">
             <span className="text-[#FF4400]">SCND</span>_UNIT
