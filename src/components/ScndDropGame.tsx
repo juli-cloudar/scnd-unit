@@ -702,43 +702,51 @@ export function ScndDropGame() {
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
-              
-              {/* GAMEBOY STYLE TOUCH CONTROLLER für Handy */}
-              {isPlaying && !gameOver && (
-                <div className="absolute -bottom-28 left-0 right-0 flex flex-col items-center gap-2 md:hidden mt-4">
-                  <div className="flex items-center justify-center gap-8">
-                    <div className="relative w-32 h-32">
-                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-t-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                        <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▼</button>
-                      </div>
-                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-b-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                        <button onTouchStart={() => movePiece(0, -1)} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▲</button>
-                      </div>
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-l-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                        <button onTouchStart={handleMoveLeft} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">◀</button>
-                      </div>
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-r-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                        <button onTouchStart={handleMoveRight} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▶</button>
-                      </div>
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#2A2A2A] to-[#1A1A1A] rounded-full border border-[#FF4400]/50"></div>
-                    </div>
 
-                    <div className="relative w-32 h-32">
-                      <div className="absolute top-1/2 right-0 -translate-y-1/2 w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                        <button onTouchStart={handleRotate} className="w-full h-full flex items-center justify-center text-white text-xl font-bold tracking-wider">A</button>
-                      </div>
-                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-12 bg-gradient-to-br from-[#FF4400]/80 to-[#CC3300]/80 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                        <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-lg font-bold tracking-wider">B</button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-6 mt-2">
-                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">SELECT</div>
-                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">START</div>
-                  </div>
-                  <div className="text-[8px] text-[var(--text-secondary)] mt-1">TOUCH CONTROLS · GAMEBOY STYLE</div>
-                </div>
-              )}
+
+{/* GAMEBOY STYLE TOUCH CONTROLLER für Handy - KORRIGIERT */}
+{isPlaying && !gameOver && (
+  <div className="absolute -bottom-28 left-0 right-0 flex flex-col items-center gap-2 md:hidden mt-4">
+    {/* D-Pad und Buttons Container */}
+    <div className="flex items-center justify-center gap-12">
+      {/* D-Pad (links) - nur 4 Richtungen */}
+      <div className="relative w-28 h-28">
+        {/* UNTEN Button */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-b-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
+          <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▼</button>
+        </div>
+        {/* LINKS Button */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-l-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
+          <button onTouchStart={handleMoveLeft} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">◀</button>
+        </div>
+        {/* RECHTS Button */}
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-r-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
+          <button onTouchStart={handleMoveRight} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▶</button>
+        </div>
+        {/* Mitte (Deko) */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#2A2A2A] to-[#1A1A1A] rounded-full border border-[#FF4400]/50"></div>
+      </div>
+
+      {/* Action Buttons (rechts) */}
+      <div className="relative w-28 h-28">
+        {/* A Button (rechts) - DREHEN */}
+        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
+          <button onTouchStart={handleRotate} className="w-full h-full flex items-center justify-center text-white text-xl font-bold tracking-wider">A</button>
+        </div>
+        {/* B Button (unten links) - SCHNELLFALL */}
+        <div className="absolute bottom-0 left-0 w-12 h-12 bg-gradient-to-br from-[#FF4400]/80 to-[#CC3300]/80 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
+          <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-lg font-bold tracking-wider">B</button>
+        </div>
+      </div>
+    </div>
+    {/* Start/Select Labels */}
+    <div className="flex gap-8 mt-1">
+      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">SELECT</div>
+      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">START</div>
+    </div>
+    <div className="text-[8px] text-[var(--text-secondary)] mt-0.5">TOUCH CONTROLS · GAMEBOY STYLE</div>
+  </div>
+)}      
               
               {!isPlaying && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
