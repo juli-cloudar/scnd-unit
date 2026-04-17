@@ -8,7 +8,6 @@ export function ThemeToggle() {
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
-    // Gespeichertes Theme laden
     const savedTheme = localStorage.getItem('theme');
     const isDarkMode = savedTheme === 'dark' || (savedTheme === null && true);
     setIsDark(isDarkMode);
@@ -25,9 +24,13 @@ export function ThemeToggle() {
       document.documentElement.classList.remove('dark');
       localStorage.setItem('theme', 'light');
     }
+    // Debug-Ausgabe in der Konsole
+    console.log('Theme changed to:', dark ? 'dark' : 'light');
+    console.log('HTML classes:', document.documentElement.classList);
   };
 
-  const toggleTheme = () => {
+  const toggleTheme = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
     const newIsDark = !isDark;
     setIsDark(newIsDark);
     applyTheme(newIsDark);
@@ -36,7 +39,8 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-full bg-[#1A1A1A] border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400] hover:border-[#FF4400] transition-all"
+      onTouchEnd={toggleTheme}
+      className="p-2 rounded-full bg-[var(--bg-secondary)] border border-[#FF4400]/30 text-[var(--text-secondary)] hover:text-[#FF4400] hover:border-[#FF4400] transition-all active:scale-95"
       aria-label="Theme umschalten"
     >
       {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
