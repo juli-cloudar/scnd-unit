@@ -55,6 +55,7 @@ export function ScndDropGame() {
   const [showNameInput, setShowNameInput] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [linesCleared, setLinesCleared] = useState(0);
   const [flashRow, setFlashRow] = useState<number | null>(null);
   const [popupScore, setPopupScore] = useState<{ score: number; x: number; y: number } | null>(null);
@@ -74,6 +75,20 @@ export function ScndDropGame() {
   const powerUpLoopRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
+
+  // Verhindere Scrollen auf Handy während des Spiels
+  useEffect(() => {
+    if (isPlaying && !gameOver && !isPaused) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+      };
+    }
+  }, [isPlaying, gameOver, isPaused]);
 
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
@@ -106,11 +121,11 @@ export function ScndDropGame() {
   };
 
   useEffect(() => {
-    if (isPlaying && !gameOver) {
+    if (isPlaying && !gameOver && !isPaused) {
       const interval = setInterval(() => setTitlePulse(prev => !prev), 500);
       return () => clearInterval(interval);
     }
-  }, [isPlaying, gameOver]);
+  }, [isPlaying, gameOver, isPaused]);
 
   const showBonus = (text: string) => {
     setBonusMessage({ show: true, text });
@@ -131,6 +146,7 @@ export function ScndDropGame() {
     setScndBonusActive(false);
     setActivePowerUp(null);
     setGameOver(false);
+    setIsPaused(false);
     setShowNameInput(false);
     setParticles([]);
     setPowerUp(null);
@@ -145,6 +161,7 @@ export function ScndDropGame() {
       setGameOver(true);
       setFinalScore(score);
       setIsPlaying(false);
+      setIsPaused(false);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
       
@@ -159,19 +176,18 @@ export function ScndDropGame() {
 
   const togglePause = () => {
     if (!isPlaying || gameOver) return;
-    setIsPlaying(false);
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-  };
-
-  const resumeGame = () => {
-    if (gameOver) return;
-    setIsPlaying(true);
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
+    if (isPaused) {
+      setIsPaused(false);
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
+    } else {
+      setIsPaused(true);
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    }
   };
 
   const spawnPowerUp = () => {
-    if (!isPlaying || gameOver) return;
+    if (!isPlaying || gameOver || isPaused) return;
     if (powerUp) return;
     
     const random = Math.random() * 100;
@@ -274,6 +290,7 @@ export function ScndDropGame() {
     setGameOver(true);
     setFinalScore(score);
     setIsPlaying(false);
+    setIsPaused(false);
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
     
@@ -397,7 +414,7 @@ export function ScndDropGame() {
   }, [particles]);
 
   const movePiece = (dx: number, dy: number) => {
-    if (!currentPiece || gameOver || freezeMode) return;
+    if (!currentPiece || gameOver || freezeMode || isPaused) return;
     if (!collision(currentPiece.shape, pieceX + dx, pieceY + dy)) {
       setPieceX(pieceX + dx);
       setPieceY(pieceY + dy);
@@ -405,7 +422,7 @@ export function ScndDropGame() {
   };
 
   const rotatePiece = () => {
-    if (!currentPiece || gameOver || freezeMode) return;
+    if (!currentPiece || gameOver || freezeMode || isPaused) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
@@ -433,15 +450,15 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
   useEffect(() => {
-    if (isPlaying && !gameOver && !freezeMode) {
+    if (isPlaying && !gameOver && !freezeMode && !isPaused) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
     }
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode, freezeMode]);
+  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode, freezeMode, isPaused]);
 
   // Canvas zeichnen
   useEffect(() => {
@@ -536,7 +553,7 @@ export function ScndDropGame() {
       }
     }
     
-    if (currentPiece && !gameOver && !freezeMode) {
+    if (currentPiece && !gameOver && !freezeMode && !isPaused) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
       if (ghostY > pieceY) {
@@ -629,7 +646,7 @@ export function ScndDropGame() {
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
     }
     ctx.shadowBlur = 0;
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, powerUp, powerUpX, powerUpY, linesCleared, activePowerUp]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, powerUp, powerUpX, powerUpY, linesCleared, activePowerUp, isPaused]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -669,7 +686,7 @@ export function ScndDropGame() {
         <div className="p-4 md:p-6">
           <div className="text-center mb-6">
             <div className="inline-block">
-              <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110' : ''}`}>
+              <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying && !isPaused ? 'scale-110' : ''}`}>
                 SCND DROP
               </h3>
               <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
@@ -692,7 +709,6 @@ export function ScndDropGame() {
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
-              {/* Canvas mit touch-action: none verhindert Scrollen auf Handy */}
               <canvas 
                 ref={canvasRef} 
                 className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl touch-none" 
@@ -700,12 +716,11 @@ export function ScndDropGame() {
                 onTouchMove={(e) => e.preventDefault()}
               />
               
-              {/* TOUCH CONTROLLER für Handy - WIE IM BILD */}
-              {isPlaying && !gameOver && (
+              {/* TOUCH CONTROLLER für Handy */}
+              {isPlaying && !gameOver && !isPaused && (
                 <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
                   {/* Obere Reihe: Drehen und Pause */}
                   <div className="flex justify-center items-center gap-12">
-                    {/* DREHEN Button (A) */}
                     <div className="flex flex-col items-center">
                       <button 
                         onTouchStart={handleRotate}
@@ -716,7 +731,6 @@ export function ScndDropGame() {
                       <span className="text-[7px] text-[var(--text-secondary)] mt-1">DREHEN</span>
                     </div>
                     
-                    {/* PAUSE Button */}
                     <div className="flex flex-col items-center">
                       <button 
                         onTouchStart={togglePause}
@@ -730,7 +744,6 @@ export function ScndDropGame() {
                   
                   {/* Untere Reihe: Links, Unten, Rechts */}
                   <div className="flex items-center justify-center gap-8">
-                    {/* LINKS Button */}
                     <div className="flex flex-col items-center">
                       <button 
                         onTouchStart={handleMoveLeft}
@@ -741,7 +754,6 @@ export function ScndDropGame() {
                       <span className="text-[7px] text-[var(--text-secondary)] mt-1">LINKS</span>
                     </div>
                     
-                    {/* UNTEN Button */}
                     <div className="flex flex-col items-center">
                       <button 
                         onTouchStart={handleMoveDown}
@@ -752,7 +764,6 @@ export function ScndDropGame() {
                       <span className="text-[7px] text-[var(--text-secondary)] mt-1">UNTEN</span>
                     </div>
                     
-                    {/* RECHTS Button */}
                     <div className="flex flex-col items-center">
                       <button 
                         onTouchStart={handleMoveRight}
@@ -769,12 +780,15 @@ export function ScndDropGame() {
               )}
 
               {/* PAUSE OVERLAY */}
-              {!isPlaying && !gameOver && isPlaying === false && (
+              {isPaused && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg z-40">
                   <div className="text-center">
                     <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">PAUSIERT</div>
-                    <button onClick={resumeGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
+                    <button onClick={togglePause} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
                       ▶ WEITER
+                    </button>
+                    <button onClick={giveUp} className="mt-3 px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all ml-2">
+                      AUFGABEN
                     </button>
                   </div>
                 </div>
