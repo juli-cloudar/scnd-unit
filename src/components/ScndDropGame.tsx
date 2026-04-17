@@ -625,7 +625,7 @@ export function ScndDropGame() {
         
         <div className="text-center mb-3 md:mb-4">
           <h3 className={`text-xl md:text-3xl font-bold tracking-tighter transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110 text-[#FF4400]' : ''}`}>
-            <span className="text-[#FF4400]">SCND</span>_<span className="text-[var(--text-primary)]">STACK</span>
+            <span className="text-[#FF4400]">SCND</span>_<span className="text-[var(--text-primary)]">DROP</span>
           </h3>
           {slowMode && <p className="text-[8px] md:text-xs text-[#00FFFF] mt-1 animate-pulse">🐌 TIME SLOW</p>}
           {bonusMessage.show && (
