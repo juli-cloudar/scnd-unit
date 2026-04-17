@@ -654,7 +654,7 @@ export function ScndDropGame() {
           <div className="text-center mb-6">
             <div className="inline-block">
               <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110' : ''}`}>
-                SCND STACK
+                SCND DROP
               </h3>
               <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
             </div>
@@ -681,7 +681,7 @@ export function ScndDropGame() {
               {!isPlaying && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
-                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND STACK</div>
+                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
                     <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
                       ▶ START GAME
                     </button>
