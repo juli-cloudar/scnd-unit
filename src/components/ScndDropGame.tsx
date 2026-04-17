@@ -133,27 +133,48 @@ useEffect(() => {
   };
 
   const startGame = () => {
-    setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
-    setScore(0);
-    setFinalScore(0);
-    setLevel(1);
-    setLinesCleared(0);
-    setCombo(0);
-    setHotStreak(false);
-    setScndMode(false);
-    setSlowMode(false);
-    setFreezeMode(false);
-    setScndBonusActive(false);
-    setActivePowerUp(null);
-    setGameOver(false);
-    setIsPaused(false);
-    setShowNameInput(false);
-    setParticles([]);
-    setPowerUp(null);
-    
-    // WICHTIG: Erst isPlaying auf true setzen, dann neuen Block spawnen
-    setIsPlaying(true);
-    spawnNewPiece();
+  setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
+  setScore(0);
+  setFinalScore(0);
+  setLevel(1);
+  setLinesCleared(0);
+  setCombo(0);
+  setHotStreak(false);
+  setScndMode(false);
+  setSlowMode(false);
+  setFreezeMode(false);
+  setScndBonusActive(false);
+  setActivePowerUp(null);
+  setGameOver(false);
+  setIsPaused(false);
+  setShowNameInput(false);
+  setParticles([]);
+  setPowerUp(null);
+  
+  // 1. Spielstatus auf aktiv setzen
+  setIsPlaying(true);
+  
+  // 2. Erstes Tetromino spawnen
+  spawnNewPiece();
+  
+  // 3. Bestehende Loops stoppen (falls vorhanden)
+  if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+  if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
+  
+  // 4. GAME LOOP STARTEN - Blöcke fallen lassen!
+  gameLoopRef.current = setInterval(() => {
+    if (isPlaying && !gameOver && !isPaused && !freezeMode) {
+      movePiece(0, 1);
+    }
+  }, getFallDelay());
+  
+  // 5. Power-Up Spawner starten
+  powerUpLoopRef.current = setInterval(() => {
+    if (isPlaying && !gameOver && !isPaused) {
+      spawnPowerUp();
+    }
+  }, 8000);
+};
     
     // Power-Up Spawner starten - ALLE 8 SEKUNDEN
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
