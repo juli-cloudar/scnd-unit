@@ -41,16 +41,13 @@ export function Navigation({ scrolled }: NavigationProps) {
           </a>
         </div>
 
-        {/* Mobile: GameButton NEBEN dem Hamburger-Menü */}
-        <div className="flex items-center gap-3 md:hidden">
-          <GameButton onClick={scrollToGame} />
-          <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X /> : <Menu />}
-          </button>
-        </div>
+        {/* Mobile Menu Button */}
+        <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          {isMenuOpen ? <X /> : <Menu />}
+        </button>
       </div>
 
-      {/* Mobile Navigation (Menü-Inhalt) */}
+      {/* Mobile Navigation - GameButton im Menü als BILD */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
@@ -69,6 +66,10 @@ export function Navigation({ scrolled }: NavigationProps) {
               <a href="#contact" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest text-left hover:text-[#FF4400] transition-colors">
                 Contact
               </a>
+              {/* GAME BUTTON ALS BILD IM MENÜ */}
+              <div className="py-2">
+                <GameButton onClick={scrollToGame} />
+              </div>
               <div className="pt-2">
                 <ThemeToggle />
               </div>
