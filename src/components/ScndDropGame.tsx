@@ -24,7 +24,7 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
 ];
 
-// POWER-UPS - Verbesserte Version
+// POWER-UPS
 const POWERUPS = [
   { name: '💣', fullName: 'BOMBE', color: '#FF4444', effect: 'bomb', chance: 30 },
   { name: '⚡', fullName: 'LASER', color: '#FF00FF', effect: 'laser', chance: 25 },
@@ -398,9 +398,11 @@ export function ScndDropGame() {
     }
   };
 
-  const handleTouchLeft = () => movePiece(-1, 0);
-  const handleTouchRight = () => movePiece(1, 0);
-  const handleTouchRotate = () => rotatePiece();
+  // Gameboy Style Touch Controller für Handy
+  const handleMoveLeft = () => movePiece(-1, 0);
+  const handleMoveRight = () => movePiece(1, 0);
+  const handleMoveDown = () => movePiece(0, 1);
+  const handleRotate = () => rotatePiece();
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -483,24 +485,21 @@ export function ScndDropGame() {
       }
     }
     
-    // Power-Up zeichnen - VERBESSERT
+    // Power-Up zeichnen
     if (powerUp && powerUpY < BOARD_HEIGHT) {
       const w = cellSize;
       const x = powerUpX * w;
       const y = powerUpY * w;
       
-      // Glow Effekt
       ctx.shadowBlur = 15;
       ctx.shadowColor = powerUp.color;
       ctx.fillStyle = powerUp.color;
       ctx.fillRect(x, y, w - 1, w - 1);
       
-      // Symbol
       ctx.fillStyle = '#FFFFFF';
       ctx.font = `bold ${Math.max(16, w * 0.5)}px monospace`;
       ctx.fillText(powerUp.name, x + w * 0.3, y + w * 0.7);
       
-      // Text unter dem Power-Up
       ctx.font = `bold ${Math.max(8, w * 0.25)}px monospace`;
       ctx.fillStyle = powerUp.color;
       ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 8);
@@ -550,33 +549,28 @@ export function ScndDropGame() {
       }
     }
     
-    // Scanlines
     ctx.fillStyle = 'rgba(0,0,0,0.06)';
     for (let i = 0; i < canvas.height; i += 2) {
       ctx.fillRect(0, i, canvas.width, 1);
     }
     
-    // Vignette
     const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width/2);
     gradient.addColorStop(0, 'rgba(0,0,0,0)');
     gradient.addColorStop(1, 'rgba(0,0,0,0.35)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Partikel
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
     
-    // Level-Fortschrittsbalken
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
     
-    // Status-Anzeigen
     if (hotStreak) {
       ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
       ctx.fillStyle = '#FF4400';
@@ -677,6 +671,49 @@ export function ScndDropGame() {
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
+              
+              {/* GAMEBOY STYLE TOUCH CONTROLLER für Handy */}
+              {isPlaying && !gameOver && (
+                <div className="absolute -bottom-28 left-0 right-0 flex flex-col items-center gap-2 md:hidden mt-4">
+                  {/* D-Pad und Buttons Container */}
+                  <div className="flex items-center justify-center gap-8">
+                    {/* D-Pad (links) - Gameboy Style */}
+                    <div className="relative w-32 h-32">
+                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-t-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                        <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▼</button>
+                      </div>
+                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-b-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                        <button onTouchStart={handleMoveUp} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▲</button>
+                      </div>
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-l-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                        <button onTouchStart={handleMoveLeft} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">◀</button>
+                      </div>
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-r-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                        <button onTouchStart={handleMoveRight} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▶</button>
+                      </div>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#2A2A2A] to-[#1A1A1A] rounded-full border border-[#FF4400]/50"></div>
+                    </div>
+
+                    {/* Action Buttons (rechts) - Gameboy Style */}
+                    <div className="relative w-32 h-32">
+                      {/* A Button (rechts) */}
+                      <div className="absolute top-1/2 right-0 -translate-y-1/2 w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                        <button onTouchStart={handleRotate} className="w-full h-full flex items-center justify-center text-white text-xl font-bold tracking-wider">A</button>
+                      </div>
+                      {/* B Button (unten) */}
+                      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-12 bg-gradient-to-br from-[#FF4400]/80 to-[#CC3300]/80 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                        <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-lg font-bold tracking-wider">B</button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Start/Select Labels */}
+                  <div className="flex gap-6 mt-2">
+                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">SELECT</div>
+                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">START</div>
+                  </div>
+                  <div className="text-[8px] text-[var(--text-secondary)] mt-1">TOUCH CONTROLS · GAMEBOY STYLE</div>
+                </div>
+              )}
               
               {!isPlaying && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
