@@ -157,6 +157,40 @@ export function ScndDropGame() {
     }
   };
 
+
+const giveUp = () => {
+  if (isPlaying && !gameOver) {
+    setGameOver(true);
+    setFinalScore(score);
+    setIsPlaying(false);
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
+    
+    const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
+    if (score > 0 && isHighscore) {
+      setShowNameInput(true);
+      setNewHighscoreGlow(true);
+      setTimeout(() => setNewHighscoreGlow(false), 2000);
+    }
+  }
+};
+
+// ========== PAUSE FUNKTIONEN ==========
+const togglePause = () => {
+  if (!isPlaying || gameOver) return;
+  setIsPlaying(false);
+  if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+};
+
+const resumeGame = () => {
+  if (gameOver) return;
+  setIsPlaying(true);
+  if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+  gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
+};
+
+
+  
   // VERBESSERTE spawnPowerUp Funktion mit Debug
   const spawnPowerUp = () => {
     console.log('🔄 spawnPowerUp aufgerufen - isPlaying:', isPlaying, 'gameOver:', gameOver);
