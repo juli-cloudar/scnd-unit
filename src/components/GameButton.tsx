@@ -17,8 +17,8 @@ export function GameButton({ onClick }: GameButtonProps) {
       <Image
         src="/scnd-drop-logo.jpg"
         alt="SCND DROP"
-        width={110}
-        height={60}
+        width={120}
+        height={70}
         className="object-contain"
         priority
       />
