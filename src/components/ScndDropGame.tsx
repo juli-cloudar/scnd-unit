@@ -695,7 +695,7 @@ export function ScndDropGame() {
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {/* TOUCH CONTROLLER für Handy - KEIN PAUSE MEHR, STATTDESSEN AUFGABEN */}
+              {/* TOUCH CONTROLLER für Handy - KEIN PAUSE MEHR, STATTDESSEN AUFGEBEN */}
               {isPlaying && !gameOver && (
                 <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
                   <div className="flex items-center justify-center gap-8">
@@ -731,7 +731,7 @@ export function ScndDropGame() {
                       <span className="text-white text-xl font-bold tracking-wider">A</span>
                     </button>
                     
-                    {/* AUFGABEN (statt Pause) */}
+                    {/* AUFGEBEN (statt Pause) */}
                     <button 
                       onTouchStart={giveUp}
                       className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/50 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
@@ -743,7 +743,7 @@ export function ScndDropGame() {
                   <div className="flex gap-8 mt-1">
                     <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">BEWEGEN</div>
                     <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">DREHEN</div>
-                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">AUFGABEN</div>
+                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">AUFGEBEN</div>
                   </div>
                   
                   <div className="text-[7px] text-[var(--text-secondary)] mt-0.5">TOUCH CONTROLS</div>
@@ -769,7 +769,7 @@ export function ScndDropGame() {
                     <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
                     <div className="flex gap-3">
                       <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
-                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
+                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGEBEN</button>
                     </div>
                   </div>
                 </div>
@@ -847,7 +847,7 @@ export function ScndDropGame() {
                 </div>
                 <div className="flex justify-center gap-3 mt-1">
                   <kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd>
-                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGABEN</span>
+                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGEBEN</span>
                 </div>
                 <div className="mt-2 flex flex-wrap justify-center gap-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span>
