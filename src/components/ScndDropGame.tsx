@@ -132,7 +132,7 @@ useEffect(() => {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
-  const startGame = () => {
+ const startGame = () => {
   setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
   setScore(0);
   setFinalScore(0);
@@ -175,33 +175,6 @@ useEffect(() => {
     }
   }, 8000);
 };
-    
-    // Power-Up Spawner starten - ALLE 8 SEKUNDEN
-    if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-    powerUpLoopRef.current = setInterval(spawnPowerUp, 8000);
-    
-    // Game Loop starten
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
-  };
-
-  const giveUp = () => {
-    if (isPlaying && !gameOver) {
-      setGameOver(true);
-      setFinalScore(score);
-      setIsPlaying(false);
-      setIsPaused(false);
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-      
-      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
-      if (score > 0 && isHighscore) {
-        setShowNameInput(true);
-        setNewHighscoreGlow(true);
-        setTimeout(() => setNewHighscoreGlow(false), 2000);
-      }
-    }
-  };
 
   const togglePause = () => {
     if (!isPlaying || gameOver) return;
