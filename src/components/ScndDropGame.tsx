@@ -5,52 +5,23 @@ import { useEffect, useRef, useState } from 'react';
 
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
-const CELL_SIZE = 32;
+// Responsive Cell Size
+const getCellSize = () => {
+  if (typeof window === 'undefined') return 32;
+  if (window.innerWidth < 640) return 24;  // Handy
+  if (window.innerWidth < 768) return 28;  // Tablet
+  return 32;  // Desktop
+};
 
-// DEIN FARBSCHEMA + BAUHAUS DESIGN
+// Bauhaus-inspirierte Tetrominos
 const TETROMINOS = [
-  { 
-    shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], 
-    color: '#FF4400',  // SCND Orange
-    borderColor: '#CC3300',
-    name: 'I'
-  },
-  { 
-    shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], 
-    color: '#FFD700',  // Bauhaus Gelb
-    borderColor: '#CCAA00',
-    name: 'O'
-  },
-  { 
-    shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], 
-    color: '#CC0000',  // Bauhaus Rot
-    borderColor: '#990000',
-    name: 'T'
-  },
-  { 
-    shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], 
-    color: '#1A1A1A',  // Bauhaus Schwarz
-    borderColor: '#333333',
-    name: 'S'
-  },
-  { 
-    shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], 
-    color: '#F5F5F5',  // Bauhaus Weiß
-    borderColor: '#CCCCCC',
-    name: 'Z'
-  },
-  { 
-    shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], 
-    color: '#0055A4',  // Bauhaus Blau
-    borderColor: '#004080',
-    name: 'L'
-  },
-  { 
-    shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], 
-    color: '#00A86B',  // Bauhaus Grün
-    borderColor: '#008050',
-    name: 'J'
-  }
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O' },
+  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#CC0000', borderColor: '#990000', name: 'T' },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#1A1A1A', borderColor: '#333333', name: 'S' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#F5F5F5', borderColor: '#CCCCCC', name: 'Z' },
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#0055A4', borderColor: '#004080', name: 'L' },
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J' }
 ];
 
 interface Highscore {
@@ -60,6 +31,7 @@ interface Highscore {
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [cellSize, setCellSize] = useState(32);
   const [board, setBoard] = useState<{ color: string; borderColor: string }[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -80,7 +52,14 @@ export function ScndDropGame() {
   const [newHighscoreGlow, setNewHighscoreGlow] = useState(false);
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Geschwindigkeit basierend auf Level
+  // Responsive Cell Size
+  useEffect(() => {
+    const handleResize = () => setCellSize(getCellSize());
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const getFallDelay = () => Math.max(100, 400 - (level - 1) * 30);
 
   useEffect(() => {
@@ -160,10 +139,8 @@ export function ScndDropGame() {
       }
     }
     let rowsCleared = 0;
-    const clearedRows: number[] = [];
     for (let row = BOARD_HEIGHT - 1; row >= 0; ) {
       if (newBoard[row].every(cell => cell !== null)) {
-        clearedRows.push(row);
         setFlashRow(row);
         setTimeout(() => setFlashRow(null), 150);
         newBoard.splice(row, 1);
@@ -172,7 +149,6 @@ export function ScndDropGame() {
       } else row--;
     }
     
-    // Punkteberechnung mit Combo-Bonus
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[rowsCleared];
     if (rowsCleared > 0) {
@@ -185,16 +161,13 @@ export function ScndDropGame() {
     const newScore = score + addedScore;
     setScore(newScore);
     
-    // Level basierend auf gelöschten Linien
     const newLines = linesCleared + rowsCleared;
     setLinesCleared(newLines);
     const newLevel = Math.floor(newLines / 10) + 1;
-    if (newLevel !== level) {
-      setLevel(newLevel);
-    }
+    if (newLevel !== level) setLevel(newLevel);
     
     if (addedScore > 0) {
-      setPopupScore({ score: addedScore, x: BOARD_WIDTH * CELL_SIZE / 2, y: BOARD_HEIGHT * CELL_SIZE / 2 - 50 });
+      setPopupScore({ score: addedScore, x: BOARD_WIDTH * cellSize / 2, y: BOARD_HEIGHT * cellSize / 2 - 50 });
       setTimeout(() => setPopupScore(null), 500);
     }
     
@@ -220,7 +193,7 @@ export function ScndDropGame() {
     }
   };
 
-  // Tastatursteuerung mit preventDefault
+  // Tastatursteuerung + Touch
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -237,7 +210,6 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver]);
 
-  // Game Loop mit dynamischer Geschwindigkeit
   useEffect(() => {
     if (isPlaying && !gameOver) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
@@ -246,59 +218,52 @@ export function ScndDropGame() {
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
   }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level]);
 
-  // Canvas zeichnen
+  // Canvas zeichnen (responsive)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    canvas.width = BOARD_WIDTH * CELL_SIZE;
-    canvas.height = BOARD_HEIGHT * CELL_SIZE;
+    canvas.width = BOARD_WIDTH * cellSize;
+    canvas.height = BOARD_HEIGHT * cellSize;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Spielfeld-Hintergrund
     ctx.fillStyle = 'var(--bg-secondary)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Bauhaus-Gitterlinien (dünn, orange)
     ctx.strokeStyle = '#FF44004D';
     ctx.lineWidth = 1;
     for (let x = 0; x <= BOARD_WIDTH; x++) {
       ctx.beginPath();
-      ctx.moveTo(x * CELL_SIZE, 0);
-      ctx.lineTo(x * CELL_SIZE, canvas.height);
+      ctx.moveTo(x * cellSize, 0);
+      ctx.lineTo(x * cellSize, canvas.height);
       ctx.stroke();
     }
     for (let y = 0; y <= BOARD_HEIGHT; y++) {
       ctx.beginPath();
-      ctx.moveTo(0, y * CELL_SIZE);
-      ctx.lineTo(canvas.width, y * CELL_SIZE);
+      ctx.moveTo(0, y * cellSize);
+      ctx.lineTo(canvas.width, y * cellSize);
       ctx.stroke();
     }
     
-    // Blöcke mit Bauhaus-3D-Effekt
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
         if (cell) {
-          // Hauptblock
           ctx.fillStyle = cell.color;
-          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
-          // Heller Rand (oben/links) für 3D-Effekt
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, cellSize - 1);
           ctx.fillStyle = cell.borderColor;
-          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, 2);
-          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, 2, CELL_SIZE - 1);
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, 2);
+          ctx.fillRect(x * cellSize, y * cellSize, 2, cellSize - 1);
         }
         if (flashRow === y) {
           ctx.fillStyle = '#FF440080';
-          ctx.fillRect(0, y * CELL_SIZE, canvas.width, CELL_SIZE);
+          ctx.fillRect(0, y * cellSize, canvas.width, cellSize);
         }
       }
     }
     
-    // Aktuelles Piece mit Vorschau (Ghost)
     if (currentPiece && !gameOver) {
-      // Ghost Piece (wo es landen wird)
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
       if (ghostY > pieceY) {
@@ -309,7 +274,7 @@ export function ScndDropGame() {
               const boardX = pieceX + x, boardY = ghostY + y;
               if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >=0 && boardX < BOARD_WIDTH) {
                 ctx.fillStyle = currentPiece.color;
-                ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+                ctx.fillRect(boardX * cellSize, boardY * cellSize, cellSize - 1, cellSize - 1);
               }
             }
           }
@@ -317,31 +282,24 @@ export function ScndDropGame() {
         ctx.globalAlpha = 1;
       }
       
-      // Aktuelles Piece
       for (let y = 0; y < currentPiece.shape.length; y++) {
         for (let x = 0; x < currentPiece.shape[y].length; x++) {
           if (currentPiece.shape[y][x] !== 0) {
             const boardX = pieceX + x, boardY = pieceY + y;
             if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >=0 && boardX < BOARD_WIDTH) {
               ctx.fillStyle = currentPiece.color;
-              ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+              ctx.fillRect(boardX * cellSize, boardY * cellSize, cellSize - 1, cellSize - 1);
               ctx.fillStyle = currentPiece.borderColor;
-              ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, CELL_SIZE - 1, 2);
-              ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, 2, CELL_SIZE - 1);
+              ctx.fillRect(boardX * cellSize, boardY * cellSize, cellSize - 1, 2);
+              ctx.fillRect(boardX * cellSize, boardY * cellSize, 2, cellSize - 1);
             }
           }
         }
       }
     }
     
-    // Bauhaus-Wasserzeichen
-    ctx.font = 'bold 14px "Bauhaus", monospace';
-    ctx.fillStyle = '#FF440015';
-    ctx.fillText('BAUHAUS', canvas.width / 2 - 35, canvas.height / 2);
-    
-    // Combo-Anzeige
     if (combo > 0) {
-      ctx.font = 'bold 16px monospace';
+      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
       ctx.fillStyle = '#FF4400';
       ctx.shadowBlur = 8;
       ctx.shadowColor = '#FF4400';
@@ -349,16 +307,15 @@ export function ScndDropGame() {
       ctx.shadowBlur = 0;
     }
     
-    // Popup Score
     if (popupScore) {
-      ctx.font = 'bold 24px monospace';
+      ctx.font = `bold ${Math.max(16, cellSize * 0.75)}px monospace`;
       ctx.fillStyle = '#FF4400';
       ctx.shadowBlur = 10;
       ctx.shadowColor = '#FF4400';
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
       ctx.shadowBlur = 0;
     }
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize]);
 
   const saveHighscore = () => {
     if (playerName.trim() === '') return;
@@ -379,95 +336,95 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className={`my-12 p-6 bg-[var(--bg-secondary)] rounded-lg border-2 border-[#FF4400]/30 shadow-xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : ''}`}>
+    <div className={`my-6 md:my-12 p-3 md:p-6 bg-[var(--bg-secondary)] rounded-lg border-2 border-[#FF4400]/30 shadow-xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : ''}`}>
       <div className="relative">
         <div className="absolute inset-0 pointer-events-none rounded-lg overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/20"></div>
         </div>
         
-        <div className="text-center mb-4">
-          <h3 className="text-3xl font-bold tracking-tighter">
+        <div className="text-center mb-3 md:mb-4">
+          <h3 className="text-xl md:text-3xl font-bold tracking-tighter">
             <span className="text-[#FF4400]">SCND</span>_<span className="text-[var(--text-primary)]">DROP</span>
           </h3>
-          <p className="text-xs text-[var(--text-secondary)] uppercase tracking-widest mt-1">BAUHAUS EDITION · 1919-1933</p>
+          <p className="text-[8px] md:text-xs text-[var(--text-secondary)] uppercase tracking-widest mt-1">BAUHAUS EDITION · 1919-1933</p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-8 justify-center items-start">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-8 justify-center items-center md:items-start">
           <div className="relative">
-            <canvas ref={canvasRef} className="border-4 border-[#FF4400] shadow-lg shadow-[#FF4400]/20 rounded-sm" />
+            <canvas ref={canvasRef} className="border-2 md:border-4 border-[#FF4400] shadow-lg shadow-[#FF4400]/20 rounded-sm" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
             {!isPlaying && !gameOver && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
-                <button onClick={startGame} className="px-8 py-3 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF4400]/80 transition-all hover:scale-105 shadow-lg">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 md:gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
+                <button onClick={startGame} className="px-4 md:px-8 py-2 md:py-3 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-xs md:text-base hover:bg-[#FF4400]/80 transition-all hover:scale-105 shadow-lg">
                   ▶ START
                 </button>
               </div>
             )}
             {gameOver && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
-                <div className="text-2xl font-bold tracking-tighter mb-2">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 md:gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
+                <div className="text-base md:text-2xl font-bold tracking-tighter mb-1 md:mb-2">
                   <span className="text-[#FF4400]">GAME</span>_<span className="text-white">OVER</span>
                 </div>
-                <button onClick={startGame} className="px-6 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FF4400]/80 transition">NEUSTART</button>
-                <button onClick={giveUp} className="px-6 py-2 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FF4400]/10 transition">AUFGABEN</button>
+                <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-xs md:text-sm hover:bg-[#FF4400]/80 transition">NEUSTART</button>
+                <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-sm text-xs md:text-sm hover:bg-[#FF4400]/10 transition">AUFGABEN</button>
               </div>
             )}
           </div>
 
-          <div className="bg-[var(--bg-primary)] p-5 rounded-lg border border-[#FF4400]/30 min-w-[220px]">
-            <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/30">
-              <div className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">SCORE</div>
-              <div className="text-4xl font-bold text-[#FF4400]">{score}</div>
-              <div className="text-xs text-[var(--text-secondary)] mt-1">LEVEL {level} · LINES {linesCleared}</div>
-              {combo > 0 && <div className="text-xs text-[#FF4400] mt-1 animate-pulse">{combo}x COMBO!</div>}
+          <div className="bg-[var(--bg-primary)] p-3 md:p-5 rounded-lg border border-[#FF4400]/30 min-w-[180px] md:min-w-[220px] w-full md:w-auto">
+            <div className="text-center mb-3 md:mb-4 pb-2 md:pb-3 border-b border-[#FF4400]/30">
+              <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-widest">SCORE</div>
+              <div className="text-2xl md:text-4xl font-bold text-[#FF4400]">{score}</div>
+              <div className="text-[8px] md:text-xs text-[var(--text-secondary)] mt-1">LEVEL {level} · LINES {linesCleared}</div>
+              {combo > 0 && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1 animate-pulse">{combo}x COMBO!</div>}
             </div>
             
-            <h4 className="font-bold text-sm uppercase tracking-widest text-[#FF4400] mb-3">🏆 HIGHSCORES</h4>
-            <ul className="space-y-2">
+            <h4 className="font-bold text-xs md:text-sm uppercase tracking-widest text-[#FF4400] mb-2 md:mb-3">🏆 HIGHSCORES</h4>
+            <ul className="space-y-1 md:space-y-2">
               {highscores.map((hs, idx) => (
                 <li key={idx} className="flex justify-between items-center border-b border-[var(--border-color)] py-1">
-                  <span className="flex items-center gap-2">
-                    <span className="text-lg">{rankIcon(idx)}</span>
-                    <span className="font-medium">{hs.name}</span>
+                  <span className="flex items-center gap-1 md:gap-2">
+                    <span className="text-sm md:text-lg">{rankIcon(idx)}</span>
+                    <span className="text-xs md:text-base font-medium truncate max-w-[80px] md:max-w-none">{hs.name}</span>
                   </span>
-                  <span className="text-[#FF4400] font-bold">{hs.score}</span>
+                  <span className="text-xs md:text-base text-[#FF4400] font-bold">{hs.score}</span>
                 </li>
               ))}
               {highscores.length === 0 && (
-                <li className="text-center text-[var(--text-secondary)] py-2">— leer —</li>
+                <li className="text-center text-[10px] md:text-xs text-[var(--text-secondary)] py-2">— leer —</li>
               )}
             </ul>
-            <div className="mt-4 pt-3 border-t border-[#FF4400]/30 text-center">
-              <div className="text-[10px] text-[var(--text-secondary)] uppercase tracking-widest">CONTROLS</div>
-              <div className="flex justify-center gap-4 mt-2 text-sm">
+            <div className="mt-3 md:mt-4 pt-2 md:pt-3 border-t border-[#FF4400]/30 text-center">
+              <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-widest">CONTROLS</div>
+              <div className="flex justify-center gap-2 md:gap-4 mt-1 md:mt-2 text-xs md:text-sm">
                 <span>← → ↓</span>
                 <span className="text-[#FF4400]">↑</span>
                 <span className="text-[var(--text-secondary)]">DREHEN</span>
               </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mt-1">ESC = AUFGABEN</div>
+              <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] mt-1">ESC = AUFGABEN</div>
             </div>
           </div>
         </div>
       </div>
 
       {showNameInput && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border-2 border-[#FF4400] max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="text-2xl font-bold tracking-tighter mb-2">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--bg-secondary)] p-4 md:p-6 rounded-lg border-2 border-[#FF4400] max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2">
               <span className="text-[#FF4400]">✨ NEW</span>_<span className="text-[var(--text-primary)]">HIGHSCORE</span>
             </h3>
-            <p className="text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-xl">{score}</span></p>
+            <p className="text-xs md:text-sm text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-lg md:text-xl">{score}</span></p>
             <input
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
               maxLength={15}
-              className="w-full p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider"
+              className="w-full p-2 md:p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-sm md:text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider"
               placeholder="DEIN SPITZNAME"
               autoFocus
             />
             <div className="flex gap-3">
-              <button onClick={saveHighscore} className="flex-1 px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded hover:bg-[#FF4400]/80 transition">SPEICHERN</button>
-              <button onClick={() => setShowNameInput(false)} className="flex-1 px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition">ABBRECHEN</button>
+              <button onClick={saveHighscore} className="flex-1 px-3 md:px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded text-sm md:text-base hover:bg-[#FF4400]/80 transition">SPEICHERN</button>
+              <button onClick={() => setShowNameInput(false)} className="flex-1 px-3 md:px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition text-sm md:text-base">ABBRECHEN</button>
             </div>
           </div>
         </div>
