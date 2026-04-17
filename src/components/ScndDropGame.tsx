@@ -385,7 +385,6 @@ export function ScndDropGame() {
 
   const handleTouchLeft = () => movePiece(-1, 0);
   const handleTouchRight = () => movePiece(1, 0);
-  const handleTouchDown = () => movePiece(0, 1);
   const handleTouchRotate = () => rotatePiece();
 
   useEffect(() => {
