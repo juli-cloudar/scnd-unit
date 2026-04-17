@@ -6,17 +6,31 @@ import { Sun, Moon } from 'lucide-react';
 
 export function ThemeToggle() {
   const [isDark, setIsDark] = useState(true);
-  const isToggling = useRef(false);
+  const isProcessing = useRef(false);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const isDarkMode = savedTheme === 'dark' || (savedTheme === null && true);
     setIsDark(isDarkMode);
-    applyTheme(isDarkMode);
+    
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
   }, []);
 
-  const applyTheme = (dark: boolean) => {
-    if (dark) {
+  const toggleTheme = () => {
+    // Verhindert doppelte Ausführung
+    if (isProcessing.current) return;
+    isProcessing.current = true;
+    
+    const newIsDark = !isDark;
+    setIsDark(newIsDark);
+    
+    if (newIsDark) {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
       localStorage.setItem('theme', 'dark');
@@ -25,34 +39,21 @@ export function ThemeToggle() {
       document.documentElement.classList.remove('dark');
       localStorage.setItem('theme', 'light');
     }
-  };
-
-  const toggleTheme = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
     
-    // Verhindert doppelte Ausführung
-    if (isToggling.current) return;
-    isToggling.current = true;
-    
-    const newIsDark = !isDark;
-    setIsDark(newIsDark);
-    applyTheme(newIsDark);
-    
+    // Entsperrt nach kurzer Zeit
     setTimeout(() => {
-      isToggling.current = false;
-    }, 100);
+      isProcessing.current = false;
+    }, 200);
   };
 
   return (
     <button
       onClick={toggleTheme}
-      onTouchStart={toggleTheme}
-      onTouchEnd={(e) => {
+      onTouchStart={(e) => {
         e.preventDefault();
-        e.stopPropagation();
+        toggleTheme();
       }}
-      className="p-2 rounded-full bg-[var(--bg-secondary)] border border-[#FF4400]/30 text-[var(--text-secondary)] hover:text-[#FF4400] hover:border-[#FF4400] transition-all active:scale-95 touch-manipulation"
+      className="p-2 rounded-full bg-[var(--bg-secondary)] border border-[#FF4400]/30 text-[var(--text-secondary)] hover:text-[#FF4400] hover:border-[#FF4400] transition-all active:scale-95"
       aria-label="Theme umschalten"
     >
       {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
