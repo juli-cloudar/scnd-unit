@@ -15,11 +15,20 @@ export function Navigation({ scrolled }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const scrollToGame = () => {
-    const gameSection = document.getElementById('game');
-    if (gameSection) {
-      gameSection.scrollIntoView({ behavior: 'smooth' });
-      setIsMenuOpen(false);
-    }
+    // Schließe zuerst das Menü
+    setIsMenuOpen(false);
+    
+    // Warte kurz bis das Menü geschlossen ist
+    setTimeout(() => {
+      const gameSection = document.getElementById('game');
+      if (gameSection) {
+        // Sanftes Scrollen wenn gefunden
+        gameSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        // FALLBACK: Direkter Link zur Game Section
+        window.location.href = '/#game';
+      }
+    }, 150);
   };
 
   return (
@@ -47,7 +56,7 @@ export function Navigation({ scrolled }: NavigationProps) {
         </button>
       </div>
 
-      {/* Mobile Navigation - GameButton im Menü als BILD */}
+      {/* Mobile Navigation */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
@@ -66,9 +75,11 @@ export function Navigation({ scrolled }: NavigationProps) {
               <a href="#contact" onClick={() => setIsMenuOpen(false)} className="text-lg uppercase tracking-widest text-left hover:text-[#FF4400] transition-colors">
                 Contact
               </a>
-              {/* GAME BUTTON ALS BILD IM MENÜ */}
+              {/* GameButton im mobilen Menü */}
               <div className="py-2">
-                <GameButton onClick={scrollToGame} />
+                <button onClick={scrollToGame} className="w-full">
+                  <GameButton onClick={scrollToGame} />
+                </button>
               </div>
               <div className="pt-2">
                 <ThemeToggle />
