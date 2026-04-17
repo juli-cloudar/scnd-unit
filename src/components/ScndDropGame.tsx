@@ -24,13 +24,13 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
 ];
 
-// POWER-UPS
+// POWER-UPS - Verbesserte Version
 const POWERUPS = [
-  { name: '💣 BOMBE', color: '#FF4444', effect: 'bomb', chance: 30 },
-  { name: '⚡ LASER', color: '#FF00FF', effect: 'laser', chance: 25 },
-  { name: '🎨 FARBE', color: '#FFD700', effect: 'colorBlast', chance: 20 },
-  { name: '⭐ 3x', color: '#FF4400', effect: 'scndBonus', chance: 15 },
-  { name: '⏰ FREEZE', color: '#00FFFF', effect: 'freeze', chance: 10 }
+  { name: '💣', fullName: 'BOMBE', color: '#FF4444', effect: 'bomb', chance: 30 },
+  { name: '⚡', fullName: 'LASER', color: '#FF00FF', effect: 'laser', chance: 25 },
+  { name: '🎨', fullName: 'FARBE', color: '#FFD700', effect: 'colorBlast', chance: 20 },
+  { name: '⭐', fullName: '3x BONUS', color: '#FF4400', effect: 'scndBonus', chance: 15 },
+  { name: '⏰', fullName: 'FREEZE', color: '#00FFFF', effect: 'freeze', chance: 10 }
 ];
 
 interface Highscore {
@@ -172,9 +172,9 @@ export function ScndDropGame() {
     }
   };
 
-  const applyPowerUp = (effect: string, name: string) => {
-    setActivePowerUp(name);
-    showBonus(`✨ ${name} AKTIVIERT! ✨`);
+  const applyPowerUp = (effect: string, powerItem: any) => {
+    setActivePowerUp(powerItem.fullName);
+    showBonus(`✨ ${powerItem.fullName} AKTIVIERT! ✨`);
     
     switch(effect) {
       case 'bomb':
@@ -183,33 +183,47 @@ export function ScndDropGame() {
           for (let dx = -2; dx <= 2; dx++) {
             const x = powerUpX + dx, y = powerUpY + dy;
             if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
-              bombBoard[y][x] = null;
+              if (bombBoard[y] && bombBoard[y][x]) {
+                bombBoard[y][x] = null;
+                for (let i = 0; i < 5; i++) {
+                  setParticles(prev => [...prev, { x: x * cellSize + cellSize/2, y: y * cellSize + cellSize/2, life: 1 }]);
+                }
+              }
             }
           }
         }
         setBoard(bombBoard);
-        for (let i = 0; i < 50; i++) {
-          setParticles(prev => [...prev, { x: powerUpX * cellSize + cellSize/2, y: powerUpY * cellSize + cellSize/2, life: 1 }]);
-        }
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
+        
       case 'laser':
         const laserBoard = board.map(row => [...row]);
         for (let x = 0; x < BOARD_WIDTH; x++) {
-          laserBoard[powerUpY][x] = null;
+          if (laserBoard[powerUpY] && laserBoard[powerUpY][x]) {
+            laserBoard[powerUpY][x] = null;
+            setParticles(prev => [...prev, { x: x * cellSize + cellSize/2, y: powerUpY * cellSize + cellSize/2, life: 1 }]);
+          }
         }
         setBoard(laserBoard);
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
+        
       case 'colorBlast':
         const colors = ['#FF4400', '#FFD700', '#CC0000', '#0055A4', '#00A86B', '#1A1A1A', '#F5F5F5'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
         const colorBlastBoard = board.map(row => 
-          row.map(cell => cell?.color === randomColor ? null : cell)
+          row.map(cell => {
+            if (cell && cell.color === randomColor) {
+              setParticles(prev => [...prev, { x: Math.random() * BOARD_WIDTH * cellSize, y: Math.random() * BOARD_HEIGHT * cellSize, life: 1 }]);
+              return null;
+            }
+            return cell;
+          })
         );
         setBoard(colorBlastBoard);
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
+        
       case 'scndBonus':
         setScndBonusActive(true);
         setTimeout(() => {
@@ -217,6 +231,7 @@ export function ScndDropGame() {
           setActivePowerUp(null);
         }, 30000);
         break;
+        
       case 'freeze':
         setFreezeMode(true);
         setTimeout(() => {
@@ -424,7 +439,6 @@ export function ScndDropGame() {
     ctx.fillStyle = 'var(--bg-secondary)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Retro-Pixel-Rahmen
     ctx.strokeStyle = '#FF4400';
     ctx.lineWidth = 3;
     ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
@@ -432,7 +446,6 @@ export function ScndDropGame() {
     ctx.lineWidth = 1;
     ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
     
-    // Gitterlinien
     ctx.strokeStyle = '#FF44004D';
     ctx.lineWidth = 1;
     for (let x = 0; x <= BOARD_WIDTH; x++) {
@@ -470,18 +483,35 @@ export function ScndDropGame() {
       }
     }
     
-    // Power-Up zeichnen
+    // Power-Up zeichnen - VERBESSERT
     if (powerUp && powerUpY < BOARD_HEIGHT) {
+      const w = cellSize;
+      const x = powerUpX * w;
+      const y = powerUpY * w;
+      
+      // Glow Effekt
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = powerUp.color;
       ctx.fillStyle = powerUp.color;
-      ctx.fillRect(powerUpX * cellSize, powerUpY * cellSize, cellSize - 1, cellSize - 1);
+      ctx.fillRect(x, y, w - 1, w - 1);
+      
+      // Symbol
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = `bold ${Math.max(10, cellSize * 0.4)}px monospace`;
-      ctx.fillText(powerUp.name[0], powerUpX * cellSize + cellSize * 0.4, powerUpY * cellSize + cellSize * 0.7);
-      setPowerUpY(prev => prev + 0.12);
+      ctx.font = `bold ${Math.max(16, w * 0.5)}px monospace`;
+      ctx.fillText(powerUp.name, x + w * 0.3, y + w * 0.7);
+      
+      // Text unter dem Power-Up
+      ctx.font = `bold ${Math.max(8, w * 0.25)}px monospace`;
+      ctx.fillStyle = powerUp.color;
+      ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 8);
+      
+      ctx.shadowBlur = 0;
+      
+      setPowerUpY(prev => prev + 0.08);
       if (powerUpY >= BOARD_HEIGHT - 1) {
         setPowerUp(null);
       } else if (collision([[1]], powerUpX, Math.floor(powerUpY))) {
-        applyPowerUp(powerUp.effect, powerUp.name);
+        applyPowerUp(powerUp.effect, powerUp);
       }
     }
     
@@ -618,11 +648,9 @@ export function ScndDropGame() {
   return (
     <div className={`my-6 md:my-12 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : 'shadow-[0_0_15px_rgba(0,0,0,0.5)]'}`}>
       <div className="relative">
-        {/* Dekorativer Header-Bereich */}
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl"></div>
         
         <div className="p-4 md:p-6">
-          {/* Titelbereich mit SCND Logo */}
           <div className="text-center mb-6">
             <div className="inline-block">
               <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110' : ''}`}>
@@ -646,22 +674,10 @@ export function ScndDropGame() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start">
-            {/* Spielfeld-Bereich */}
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
               
-              {/* Touch-Controller */}
-              {isPlaying && !gameOver && (
-                <div className="absolute -bottom-16 left-0 right-0 flex justify-center gap-3 md:hidden mt-3">
-                  <button onTouchStart={handleTouchLeft} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">←</button>
-                  <button onTouchStart={handleTouchDown} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">↓</button>
-                  <button onTouchStart={handleTouchRight} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">→</button>
-                  <button onTouchStart={handleTouchRotate} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">↻</button>
-                </div>
-              )}
-              
-              {/* Overlays */}
               {!isPlaying && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
@@ -688,10 +704,7 @@ export function ScndDropGame() {
               )}
             </div>
 
-            {/* Info-Panel - NEUES DESIGN */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
-              
-              {/* Score-Karte */}
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
                 <div className="text-3xl md:text-5xl font-black text-[#FF4400] drop-shadow-[0_0_10px_rgba(255,68,0,0.5)]">{gameOver ? finalScore : score}</div>
@@ -711,7 +724,6 @@ export function ScndDropGame() {
                 </div>
               </div>
               
-              {/* Status-Karten */}
               <div className="grid grid-cols-2 gap-2 mb-4">
                 {hotStreak && (
                   <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]">
@@ -733,7 +745,6 @@ export function ScndDropGame() {
                 )}
               </div>
               
-              {/* Highscore-Bereich - Karten-Design */}
               <div className="bg-[var(--bg-secondary)]/50 rounded-xl p-3 mb-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-1 h-4 bg-[#FF4400] rounded-full"></div>
@@ -755,7 +766,6 @@ export function ScndDropGame() {
                 </ul>
               </div>
               
-              {/* Steuerungs-Info */}
               <div className="text-center pt-2 border-t border-[#FF4400]/20">
                 <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
                 <div className="flex justify-center gap-3 mt-1">
