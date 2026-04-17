@@ -82,10 +82,12 @@ export function ScndDropGame() {
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
+      document.body.style.touchAction = 'none';
       return () => {
         document.body.style.overflow = '';
         document.body.style.position = '';
         document.body.style.width = '';
+        document.body.style.touchAction = '';
       };
     }
   }, [isPlaying, gameOver, isPaused]);
@@ -150,10 +152,18 @@ export function ScndDropGame() {
     setShowNameInput(false);
     setParticles([]);
     setPowerUp(null);
-    spawnNewPiece();
+    
+    // WICHTIG: Erst isPlaying auf true setzen, dann neuen Block spawnen
     setIsPlaying(true);
+    spawnNewPiece();
+    
+    // Power-Up Spawner starten - ALLE 8 SEKUNDEN
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
     powerUpLoopRef.current = setInterval(spawnPowerUp, 8000);
+    
+    // Game Loop starten
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
   };
 
   const giveUp = () => {
@@ -177,10 +187,12 @@ export function ScndDropGame() {
   const togglePause = () => {
     if (!isPlaying || gameOver) return;
     if (isPaused) {
+      // Fortsetzen
       setIsPaused(false);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
     } else {
+      // Pausieren
       setIsPaused(true);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     }
@@ -444,21 +456,13 @@ export function ScndDropGame() {
         case 'ArrowRight': e.preventDefault(); movePiece(1, 0); break;
         case 'ArrowDown': e.preventDefault(); movePiece(0, 1); break;
         case 'ArrowUp': e.preventDefault(); rotatePiece(); break;
-        case 'Escape': e.preventDefault(); giveUp(); break;
+        case 'Escape': e.preventDefault(); togglePause(); break;
         default: break;
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
-
-  useEffect(() => {
-    if (isPlaying && !gameOver && !freezeMode && !isPaused) {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
-    }
-    return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode, freezeMode, isPaused]);
 
   // Canvas zeichnen
   useEffect(() => {
@@ -779,16 +783,25 @@ export function ScndDropGame() {
                 </div>
               )}
 
-              {/* PAUSE OVERLAY */}
+              {/* PAUSE OVERLAY - MIT AUFGABEN BUTTON */}
               {isPaused && !gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg z-40">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
                   <div className="text-center">
-                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">PAUSIERT</div>
-                    <button onClick={togglePause} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
+                    <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSIERT</div>
+                    <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
+                    
+                    <button 
+                      onClick={togglePause} 
+                      className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg"
+                    >
                       ▶ WEITER
                     </button>
-                    <button onClick={giveUp} className="mt-3 px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all ml-2">
-                      AUFGABEN
+                    
+                    <button 
+                      onClick={giveUp} 
+                      className="w-48 py-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all"
+                    >
+                      ⚡ AUFGABEN
                     </button>
                   </div>
                 </div>
@@ -813,7 +826,6 @@ export function ScndDropGame() {
                     <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
                     <div className="flex gap-3">
                       <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
-                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
                     </div>
                   </div>
                 </div>
@@ -891,7 +903,7 @@ export function ScndDropGame() {
                 </div>
                 <div className="flex justify-center gap-3 mt-1">
                   <kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd>
-                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGABEN</span>
+                  <span className="text-[8px] text-[var(--text-secondary)]">PAUSE</span>
                 </div>
                 <div className="mt-2 flex flex-wrap justify-center gap-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span>
