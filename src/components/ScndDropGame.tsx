@@ -802,7 +802,7 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* PAUSE OVERLAY - MIT AUFGABEN BUTTON */}
+              {/* PAUSE OVERLAY - MIT AUFGEBEN BUTTON */}
               {isPaused && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
                   <div className="text-center">
@@ -820,7 +820,7 @@ useEffect(() => {
                       onClick={giveUp} 
                       className="w-48 py-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all"
                     >
-                      ⚡ AUFGABEN
+                      ⚡ AUFGEBEN
                     </button>
                   </div>
                 </div>
