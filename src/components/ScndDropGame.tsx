@@ -7,49 +7,49 @@ const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 const CELL_SIZE = 32;
 
-// Bauhaus-inspirierte Tetrominos
+// DEIN FARBSCHEMA + BAUHAUS DESIGN
 const TETROMINOS = [
   { 
     shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], 
     color: '#FF4400',  // SCND Orange
-    name: 'I',
-    borderColor: '#CC3300'
+    borderColor: '#CC3300',
+    name: 'I'
   },
   { 
     shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], 
     color: '#FFD700',  // Bauhaus Gelb
-    name: 'O',
-    borderColor: '#CCAA00'
+    borderColor: '#CCAA00',
+    name: 'O'
   },
   { 
     shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], 
     color: '#CC0000',  // Bauhaus Rot
-    name: 'T',
-    borderColor: '#990000'
+    borderColor: '#990000',
+    name: 'T'
   },
   { 
     shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], 
     color: '#1A1A1A',  // Bauhaus Schwarz
-    name: 'S',
-    borderColor: '#333333'
+    borderColor: '#333333',
+    name: 'S'
   },
   { 
     shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], 
     color: '#F5F5F5',  // Bauhaus Weiß
-    name: 'Z',
-    borderColor: '#CCCCCC'
+    borderColor: '#CCCCCC',
+    name: 'Z'
   },
   { 
     shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], 
     color: '#0055A4',  // Bauhaus Blau
-    name: 'L',
-    borderColor: '#004080'
+    borderColor: '#004080',
+    name: 'L'
   },
   { 
     shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], 
     color: '#00A86B',  // Bauhaus Grün
-    name: 'J',
-    borderColor: '#008050'
+    borderColor: '#008050',
+    name: 'J'
   }
 ];
 
@@ -67,6 +67,7 @@ export function ScndDropGame() {
   const [pieceX, setPieceX] = useState(0);
   const [pieceY, setPieceY] = useState(0);
   const [score, setScore] = useState(0);
+  const [level, setLevel] = useState(1);
   const [gameOver, setGameOver] = useState(false);
   const [highscores, setHighscores] = useState<Highscore[]>([]);
   const [showNameInput, setShowNameInput] = useState(false);
@@ -75,35 +76,12 @@ export function ScndDropGame() {
   const [linesCleared, setLinesCleared] = useState(0);
   const [flashRow, setFlashRow] = useState<number | null>(null);
   const [popupScore, setPopupScore] = useState<{ score: number; x: number; y: number } | null>(null);
+  const [combo, setCombo] = useState(0);
   const [newHighscoreGlow, setNewHighscoreGlow] = useState(false);
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
-  const audioCtx = useRef<AudioContext | null>(null);
 
-  // Sound initialisieren
-  const playSound = (type: 'move' | 'rotate' | 'clear' | 'gameover') => {
-    if (!audioCtx.current) {
-      audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    const ctx = audioCtx.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    let frequency = 440;
-    let duration = 0.1;
-    switch(type) {
-      case 'move': frequency = 440; duration = 0.05; break;
-      case 'rotate': frequency = 660; duration = 0.07; break;
-      case 'clear': frequency = 880; duration = 0.15; break;
-      case 'gameover': frequency = 220; duration = 0.5; break;
-    }
-    osc.frequency.value = frequency;
-    gain.gain.value = 0.1;
-    osc.start();
-    gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
-    osc.stop(ctx.currentTime + duration);
-  };
+  // Geschwindigkeit basierend auf Level
+  const getFallDelay = () => Math.max(100, 400 - (level - 1) * 30);
 
   useEffect(() => {
     const saved = localStorage.getItem('scnd_block_highscores');
@@ -113,11 +91,27 @@ export function ScndDropGame() {
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
+    setLevel(1);
     setLinesCleared(0);
+    setCombo(0);
     setGameOver(false);
     setShowNameInput(false);
     spawnNewPiece();
     setIsPlaying(true);
+  };
+
+  const giveUp = () => {
+    if (isPlaying && !gameOver) {
+      setGameOver(true);
+      setIsPlaying(false);
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      const isHighscore = highscores.length < 3 || score > highscores[2]?.score;
+      if (score > 0 && isHighscore) {
+        setShowNameInput(true);
+        setNewHighscoreGlow(true);
+        setTimeout(() => setNewHighscoreGlow(false), 2000);
+      }
+    }
   };
 
   const spawnNewPiece = () => {
@@ -129,14 +123,13 @@ export function ScndDropGame() {
     if (collision(piece.shape, Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2), 0)) {
       setGameOver(true);
       setIsPlaying(false);
-      playSound('gameover');
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       const isHighscore = highscores.length < 3 || score > highscores[2]?.score;
       if (score > 0 && isHighscore) {
         setShowNameInput(true);
         setNewHighscoreGlow(true);
         setTimeout(() => setNewHighscoreGlow(false), 2000);
       }
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     }
   };
 
@@ -155,7 +148,6 @@ export function ScndDropGame() {
 
   const mergePiece = () => {
     if (!currentPiece) return;
-    playSound('clear');
     const newBoard = board.map(row => [...row]);
     for (let y = 0; y < currentPiece.shape.length; y++) {
       for (let x = 0; x < currentPiece.shape[y].length; x++) {
@@ -168,24 +160,44 @@ export function ScndDropGame() {
       }
     }
     let rowsCleared = 0;
+    const clearedRows: number[] = [];
     for (let row = BOARD_HEIGHT - 1; row >= 0; ) {
       if (newBoard[row].every(cell => cell !== null)) {
+        clearedRows.push(row);
         setFlashRow(row);
-        setTimeout(() => setFlashRow(null), 200);
+        setTimeout(() => setFlashRow(null), 150);
         newBoard.splice(row, 1);
         newBoard.unshift(Array(BOARD_WIDTH).fill(null));
         rowsCleared++;
       } else row--;
     }
+    
+    // Punkteberechnung mit Combo-Bonus
     const points = [0, 40, 100, 300, 1200];
-    const addedScore = points[rowsCleared];
+    let addedScore = points[rowsCleared];
+    if (rowsCleared > 0) {
+      setCombo(prev => prev + 1);
+      addedScore = Math.floor(addedScore * (1 + combo * 0.1));
+    } else {
+      setCombo(0);
+    }
+    
     const newScore = score + addedScore;
     setScore(newScore);
+    
+    // Level basierend auf gelöschten Linien
+    const newLines = linesCleared + rowsCleared;
+    setLinesCleared(newLines);
+    const newLevel = Math.floor(newLines / 10) + 1;
+    if (newLevel !== level) {
+      setLevel(newLevel);
+    }
+    
     if (addedScore > 0) {
       setPopupScore({ score: addedScore, x: BOARD_WIDTH * CELL_SIZE / 2, y: BOARD_HEIGHT * CELL_SIZE / 2 - 50 });
       setTimeout(() => setPopupScore(null), 500);
     }
-    setLinesCleared(prev => prev + rowsCleared);
+    
     setBoard(newBoard);
     spawnNewPiece();
   };
@@ -195,7 +207,6 @@ export function ScndDropGame() {
     if (!collision(currentPiece.shape, pieceX + dx, pieceY + dy)) {
       setPieceX(pieceX + dx);
       setPieceY(pieceY + dy);
-      if (dy === 0) playSound('move');
     } else if (dy === 1) mergePiece();
   };
 
@@ -206,29 +217,36 @@ export function ScndDropGame() {
     );
     if (!collision(rotated, pieceX, pieceY)) {
       setCurrentPiece({ ...currentPiece, shape: rotated });
-      playSound('rotate');
     }
   };
 
+  // Tastatursteuerung mit preventDefault
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
-      if (e.key === 'ArrowLeft') movePiece(-1, 0);
-      if (e.key === 'ArrowRight') movePiece(1, 0);
-      if (e.key === 'ArrowDown') movePiece(0, 1);
-      if (e.key === 'ArrowUp') rotatePiece();
+      switch (e.key) {
+        case 'ArrowLeft': e.preventDefault(); movePiece(-1, 0); break;
+        case 'ArrowRight': e.preventDefault(); movePiece(1, 0); break;
+        case 'ArrowDown': e.preventDefault(); movePiece(0, 1); break;
+        case 'ArrowUp': e.preventDefault(); rotatePiece(); break;
+        case 'Escape': e.preventDefault(); giveUp(); break;
+        default: break;
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver]);
 
+  // Game Loop mit dynamischer Geschwindigkeit
   useEffect(() => {
     if (isPlaying && !gameOver) {
-      gameLoopRef.current = setInterval(() => movePiece(0, 1), 450);
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
     }
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board]);
+  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level]);
 
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -242,7 +260,7 @@ export function ScndDropGame() {
     ctx.fillStyle = 'var(--bg-secondary)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Gitterlinien
+    // Bauhaus-Gitterlinien (dünn, orange)
     ctx.strokeStyle = '#FF44004D';
     ctx.lineWidth = 1;
     for (let x = 0; x <= BOARD_WIDTH; x++) {
@@ -258,16 +276,18 @@ export function ScndDropGame() {
       ctx.stroke();
     }
     
-    // Blöcke zeichnen
+    // Blöcke mit Bauhaus-3D-Effekt
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
         if (cell) {
+          // Hauptblock
           ctx.fillStyle = cell.color;
-          ctx.fillRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+          // Heller Rand (oben/links) für 3D-Effekt
           ctx.fillStyle = cell.borderColor;
-          ctx.fillRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, 2);
-          ctx.fillRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, 2, CELL_SIZE - 2);
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, 2);
+          ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, 2, CELL_SIZE - 1);
         }
         if (flashRow === y) {
           ctx.fillStyle = '#FF440080';
@@ -276,34 +296,58 @@ export function ScndDropGame() {
       }
     }
     
-    // Aktuelles Piece
+    // Aktuelles Piece mit Vorschau (Ghost)
     if (currentPiece && !gameOver) {
+      // Ghost Piece (wo es landen wird)
+      let ghostY = pieceY;
+      while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
+      if (ghostY > pieceY) {
+        ctx.globalAlpha = 0.3;
+        for (let y = 0; y < currentPiece.shape.length; y++) {
+          for (let x = 0; x < currentPiece.shape[y].length; x++) {
+            if (currentPiece.shape[y][x] !== 0) {
+              const boardX = pieceX + x, boardY = ghostY + y;
+              if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >=0 && boardX < BOARD_WIDTH) {
+                ctx.fillStyle = currentPiece.color;
+                ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+              }
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+      
+      // Aktuelles Piece
       for (let y = 0; y < currentPiece.shape.length; y++) {
         for (let x = 0; x < currentPiece.shape[y].length; x++) {
           if (currentPiece.shape[y][x] !== 0) {
             const boardX = pieceX + x, boardY = pieceY + y;
             if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >=0 && boardX < BOARD_WIDTH) {
               ctx.fillStyle = currentPiece.color;
-              ctx.fillRect(boardX * CELL_SIZE + 1, boardY * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+              ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
               ctx.fillStyle = currentPiece.borderColor;
-              ctx.fillRect(boardX * CELL_SIZE + 1, boardY * CELL_SIZE + 1, CELL_SIZE - 2, 2);
-              ctx.fillRect(boardX * CELL_SIZE + 1, boardY * CELL_SIZE + 1, 2, CELL_SIZE - 2);
+              ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, CELL_SIZE - 1, 2);
+              ctx.fillRect(boardX * CELL_SIZE, boardY * CELL_SIZE, 2, CELL_SIZE - 1);
             }
           }
         }
       }
     }
     
-    // Retro-Scanlines
-    ctx.fillStyle = 'rgba(0,0,0,0.05)';
-    for (let i = 0; i < canvas.height; i += 2) {
-      ctx.fillRect(0, i, canvas.width, 1);
-    }
-    
-    // SCND Wasserzeichen
-    ctx.font = 'bold 14px monospace';
+    // Bauhaus-Wasserzeichen
+    ctx.font = 'bold 14px "Bauhaus", monospace';
     ctx.fillStyle = '#FF440015';
-    ctx.fillText('SCND', canvas.width / 2 - 25, canvas.height / 2);
+    ctx.fillText('BAUHAUS', canvas.width / 2 - 35, canvas.height / 2);
+    
+    // Combo-Anzeige
+    if (combo > 0) {
+      ctx.font = 'bold 16px monospace';
+      ctx.fillStyle = '#FF4400';
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#FF4400';
+      ctx.fillText(`${combo}x COMBO!`, canvas.width - 80, 40);
+      ctx.shadowBlur = 0;
+    }
     
     // Popup Score
     if (popupScore) {
@@ -314,7 +358,7 @@ export function ScndDropGame() {
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
       ctx.shadowBlur = 0;
     }
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo]);
 
   const saveHighscore = () => {
     if (playerName.trim() === '') return;
@@ -352,18 +396,19 @@ export function ScndDropGame() {
           <div className="relative">
             <canvas ref={canvasRef} className="border-4 border-[#FF4400] shadow-lg shadow-[#FF4400]/20 rounded-sm" />
             {!isPlaying && !gameOver && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm rounded-sm">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
                 <button onClick={startGame} className="px-8 py-3 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF4400]/80 transition-all hover:scale-105 shadow-lg">
                   ▶ START
                 </button>
               </div>
             )}
             {gameOver && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm rounded-sm">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
                 <div className="text-2xl font-bold tracking-tighter mb-2">
                   <span className="text-[#FF4400]">GAME</span>_<span className="text-white">OVER</span>
                 </div>
                 <button onClick={startGame} className="px-6 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FF4400]/80 transition">NEUSTART</button>
+                <button onClick={giveUp} className="px-6 py-2 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#FF4400]/10 transition">AUFGABEN</button>
               </div>
             )}
           </div>
@@ -372,7 +417,8 @@ export function ScndDropGame() {
             <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/30">
               <div className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">SCORE</div>
               <div className="text-4xl font-bold text-[#FF4400]">{score}</div>
-              <div className="text-xs text-[var(--text-secondary)] mt-1">LINES: {linesCleared}</div>
+              <div className="text-xs text-[var(--text-secondary)] mt-1">LEVEL {level} · LINES {linesCleared}</div>
+              {combo > 0 && <div className="text-xs text-[#FF4400] mt-1 animate-pulse">{combo}x COMBO!</div>}
             </div>
             
             <h4 className="font-bold text-sm uppercase tracking-widest text-[#FF4400] mb-3">🏆 HIGHSCORES</h4>
@@ -397,6 +443,7 @@ export function ScndDropGame() {
                 <span className="text-[#FF4400]">↑</span>
                 <span className="text-[var(--text-secondary)]">DREHEN</span>
               </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-1">ESC = AUFGABEN</div>
             </div>
           </div>
         </div>
