@@ -24,13 +24,13 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
 ];
 
-// POWER-UPS
+// POWER-UPS mit Pixel-Mustern
 const POWERUPS = [
-  { name: '💣', fullName: 'BOMBE', color: '#FF4444', effect: 'bomb', chance: 30 },
-  { name: '⚡', fullName: 'LASER', color: '#FF00FF', effect: 'laser', chance: 25 },
-  { name: '🎨', fullName: 'FARBE', color: '#FFD700', effect: 'colorBlast', chance: 20 },
-  { name: '⭐', fullName: '3x BONUS', color: '#FF4400', effect: 'scndBonus', chance: 15 },
-  { name: '⏰', fullName: 'FREEZE', color: '#00FFFF', effect: 'freeze', chance: 10 }
+  { name: '💣', fullName: 'BOMBE', color: '#FF4444', bgColor: '#FF4444', effect: 'bomb', chance: 30, retroIcon: '💣' },
+  { name: '⚡', fullName: 'LASER', color: '#FF00FF', bgColor: '#FF00FF', effect: 'laser', chance: 25, retroIcon: '⚡' },
+  { name: '🎨', fullName: 'FARBE', color: '#FFD700', bgColor: '#FFD700', effect: 'colorBlast', chance: 20, retroIcon: '🎨' },
+  { name: '⭐', fullName: '3x BONUS', color: '#FFAA00', bgColor: '#FFAA00', effect: 'scndBonus', chance: 15, retroIcon: '⭐' },
+  { name: '⏰', fullName: 'FREEZE', color: '#00FFFF', bgColor: '#00FFFF', effect: 'freeze', chance: 10, retroIcon: '⏰' }
 ];
 
 interface Highscore {
@@ -157,13 +157,28 @@ export function ScndDropGame() {
     }
   };
 
+  // VERBESSERTE spawnPowerUp Funktion mit Debug
   const spawnPowerUp = () => {
-    if (!isPlaying || gameOver) return;
+    console.log('🔄 spawnPowerUp aufgerufen - isPlaying:', isPlaying, 'gameOver:', gameOver);
+    
+    if (!isPlaying || gameOver) {
+      console.log('❌ Power-Up nicht gespawnt (Spiel läuft nicht)');
+      return;
+    }
+    
+    // Verhindere mehrere Power-Ups gleichzeitig
+    if (powerUp) {
+      console.log('❌ Power-Up nicht gespawnt (bereits ein Power-Up aktiv)');
+      return;
+    }
+    
     const random = Math.random() * 100;
     let cumulative = 0;
+    
     for (const pu of POWERUPS) {
       cumulative += pu.chance;
       if (random <= cumulative) {
+        console.log('✅ Power-Up gespawnt:', pu.fullName, 'bei X:', Math.floor(Math.random() * BOARD_WIDTH));
         setPowerUp(pu);
         setPowerUpX(Math.floor(Math.random() * BOARD_WIDTH));
         setPowerUpY(0);
@@ -398,7 +413,6 @@ export function ScndDropGame() {
     }
   };
 
-  // Gameboy Style Touch Controller für Handy
   const handleMoveLeft = () => movePiece(-1, 0);
   const handleMoveRight = () => movePiece(1, 0);
   const handleMoveDown = () => movePiece(0, 1);
@@ -485,32 +499,49 @@ export function ScndDropGame() {
       }
     }
     
-    // Power-Up zeichnen
+    // VERBESSERTE Power-Up Zeichnung
     if (powerUp && powerUpY < BOARD_HEIGHT) {
       const w = cellSize;
       const x = powerUpX * w;
       const y = powerUpY * w;
       
-      ctx.shadowBlur = 15;
+      // Leuchtender Hintergrund mit Glow
+      ctx.shadowBlur = 10;
       ctx.shadowColor = powerUp.color;
-      ctx.fillStyle = powerUp.color;
+      ctx.fillStyle = powerUp.bgColor;
       ctx.fillRect(x, y, w - 1, w - 1);
       
+      // Retro Emoji/Symbol
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = `bold ${Math.max(16, w * 0.5)}px monospace`;
-      ctx.fillText(powerUp.name, x + w * 0.3, y + w * 0.7);
+      ctx.font = `bold ${Math.max(20, w * 0.6)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+      ctx.fillText(powerUp.retroIcon, x + w * 0.25, y + w * 0.75);
       
-      ctx.font = `bold ${Math.max(8, w * 0.25)}px monospace`;
+      // Text unter dem Power-Up
+      ctx.font = `bold ${Math.max(9, w * 0.28)}px monospace`;
       ctx.fillStyle = powerUp.color;
-      ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 8);
+      ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 10);
       
       ctx.shadowBlur = 0;
       
-      setPowerUpY(prev => prev + 0.08);
-      if (powerUpY >= BOARD_HEIGHT - 1) {
+      // Bewegung nach unten
+      setPowerUpY(prev => prev + 0.06);
+      
+      // Prüfe ob Power-Up Boden erreicht hat
+      if (powerUpY >= BOARD_HEIGHT - 0.8) {
+        console.log('Power-Up verschwunden (Boden)');
         setPowerUp(null);
-      } else if (collision([[1]], powerUpX, Math.floor(powerUpY))) {
-        applyPowerUp(powerUp.effect, powerUp);
+      } 
+      // Prüfe Kollision mit Blöcken
+      else {
+        const pieceRow = Math.floor(powerUpY);
+        if (pieceRow >= 0 && pieceRow < BOARD_HEIGHT) {
+          const cell = board[pieceRow]?.[powerUpX];
+          if (cell !== null && cell !== undefined) {
+            console.log('Power-Up Kollision mit Block!', powerUp.fullName);
+            applyPowerUp(powerUp.effect, powerUp);
+            setPowerUp(null);
+          }
+        }
       }
     }
     
@@ -675,15 +706,13 @@ export function ScndDropGame() {
               {/* GAMEBOY STYLE TOUCH CONTROLLER für Handy */}
               {isPlaying && !gameOver && (
                 <div className="absolute -bottom-28 left-0 right-0 flex flex-col items-center gap-2 md:hidden mt-4">
-                  {/* D-Pad und Buttons Container */}
                   <div className="flex items-center justify-center gap-8">
-                    {/* D-Pad (links) - Gameboy Style */}
                     <div className="relative w-32 h-32">
                       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-t-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
                         <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▼</button>
                       </div>
                       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-b-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                        <button onTouchStart={handleMoveUp} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▲</button>
+                        <button onTouchStart={() => movePiece(0, -1)} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">▲</button>
                       </div>
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-l-lg flex items-center justify-center shadow-lg active:scale-95 transition-all">
                         <button onTouchStart={handleMoveLeft} className="w-full h-full flex items-center justify-center text-white text-2xl font-bold">◀</button>
@@ -694,19 +723,15 @@ export function ScndDropGame() {
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-b from-[#2A2A2A] to-[#1A1A1A] rounded-full border border-[#FF4400]/50"></div>
                     </div>
 
-                    {/* Action Buttons (rechts) - Gameboy Style */}
                     <div className="relative w-32 h-32">
-                      {/* A Button (rechts) */}
                       <div className="absolute top-1/2 right-0 -translate-y-1/2 w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
                         <button onTouchStart={handleRotate} className="w-full h-full flex items-center justify-center text-white text-xl font-bold tracking-wider">A</button>
                       </div>
-                      {/* B Button (unten) */}
                       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-12 bg-gradient-to-br from-[#FF4400]/80 to-[#CC3300]/80 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
                         <button onTouchStart={handleMoveDown} className="w-full h-full flex items-center justify-center text-white text-lg font-bold tracking-wider">B</button>
                       </div>
                     </div>
                   </div>
-                  {/* Start/Select Labels */}
                   <div className="flex gap-6 mt-2">
                     <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">SELECT</div>
                     <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">START</div>
