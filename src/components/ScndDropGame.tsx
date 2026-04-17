@@ -739,61 +739,79 @@ const resumeGame = () => {
 
 {/* TOUCH CONTROLLER für Handy - OPTIMIERT */}
 {isPlaying && !gameOver && (
-  <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
-    {/* Haupt-Controls */}
-    <div className="flex items-center justify-center gap-8">
-      {/* LINKS Button */}
-      <button 
-        onTouchStart={handleMoveLeft}
-        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-3xl font-bold">◀</span>
-      </button>
+  <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-2 md:hidden z-50">
+    {/* Obere Reihe: Pause und Drehen */}
+    <div className="flex justify-between items-center w-full px-8 mb-2">
+      {/* Leerer Bereich links für Balance */}
+      <div className="w-16"></div>
       
-      {/* UNTEN Button */}
-      <button 
-        onTouchStart={handleMoveDown}
-        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-3xl font-bold">▼</span>
-      </button>
+      {/* DREHEN Button (mitte) */}
+      <div className="flex flex-col items-center">
+        <button 
+          onTouchStart={handleRotate}
+          className="w-12 h-12 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+        >
+          <span className="text-white text-base font-bold">↻</span>
+        </button>
+        <span className="text-[7px] text-[var(--text-secondary)] mt-1">DREHEN</span>
+      </div>
       
-      {/* RECHTS Button */}
-      <button 
-        onTouchStart={handleMoveRight}
-        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-3xl font-bold">▶</span>
-      </button>
-      
-      {/* DREHEN Button (A) */}
-      <button 
-        onTouchStart={handleRotate}
-        className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-xl font-bold tracking-wider">A</span>
-      </button>
-      
-      {/* PAUSE Button (neu) */}
-      <button 
-        onTouchStart={() => setIsPlaying(false)}
-        className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/50 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-sm font-bold">⏸</span>
-      </button>
+      {/* PAUSE Button (rechts) */}
+      <div className="flex flex-col items-center">
+        <button 
+          onTouchStart={togglePause}
+          className="w-10 h-10 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/60 rounded-lg flex items-center justify-center shadow-lg active:scale-95 transition-all"
+        >
+          <span className="text-white text-sm font-bold">II</span>
+        </button>
+        <span className="text-[7px] text-[var(--text-secondary)] mt-1">PAUSE</span>
+      </div>
     </div>
     
-    {/* Beschriftung */}
-    <div className="flex gap-8 mt-1">
-      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">BEWEGEN</div>
-      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">DREHEN</div>
-      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">PAUSE</div>
+ {/* Untere Reihe: Links und Rechts */}
+    <div className="flex items-center justify-center gap-10">
+      {/* LINKS Button */}
+      <div className="flex flex-col items-center">
+        <button 
+          onTouchStart={handleMoveLeft}
+          className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+        >
+          <span className="text-white text-2xl font-bold">◀</span>
+        </button>
+        <span className="text-[7px] text-[var(--text-secondary)] mt-1 uppercase tracking-wider">LINKS</span>
+      </div>
+      
+      {/* RECHTS Button */}
+      <div className="flex flex-col items-center">
+        <button 
+          onTouchStart={handleMoveRight}
+          className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+        >
+          <span className="text-white text-2xl font-bold">▶</span>
+        </button>
+        <span className="text-[7px] text-[var(--text-secondary)] mt-1 uppercase tracking-wider">RECHTS</span>
+      </div>
     </div>
     
     {/* Info */}
-    <div className="text-[7px] text-[var(--text-secondary)] mt-0.5">TOUCH CONTROLS</div>
+    <div className="text-[6px] text-[var(--text-secondary)] mt-2">TOUCH CONTROLS</div>
   </div>
 )}
+
+{/* PAUSE OVERLAY (wenn pausiert) */}
+{!isPlaying && !gameOver && isPlaying === false && (
+  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg z-40">
+    <div className="text-center">
+      <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">PAUSIERT</div>
+      <button onClick={resumeGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
+        ▶ WEITER
+      </button>
+    </div>
+  </div>
+)}
+
+
+              
 
 
       
