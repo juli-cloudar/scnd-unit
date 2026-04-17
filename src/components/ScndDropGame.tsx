@@ -176,6 +176,26 @@ useEffect(() => {
   }, 8000);
 };
 
+// ========== GIVE UP FUNKTION - HIER EINFÜGEN ==========
+const giveUp = () => {
+  if (isPlaying && !gameOver) {
+    setGameOver(true);
+    setFinalScore(score);
+    setIsPlaying(false);
+    setIsPaused(false);
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
+    
+    const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
+    if (score > 0 && isHighscore) {
+      setShowNameInput(true);
+      setNewHighscoreGlow(true);
+      setTimeout(() => setNewHighscoreGlow(false), 2000);
+    }
+  }
+};
+
+  
   const togglePause = () => {
     if (!isPlaying || gameOver) return;
     if (isPaused) {
