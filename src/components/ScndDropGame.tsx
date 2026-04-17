@@ -76,21 +76,19 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
-  // Verhindere Scrollen auf Handy während des Spiels
-  useEffect(() => {
-    if (isPlaying && !gameOver && !isPaused) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-      document.body.style.touchAction = 'none';
-      return () => {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
-        document.body.style.touchAction = '';
-      };
-    }
-  }, [isPlaying, gameOver, isPaused]);
+  // Verhindere Scrollen auf Handy während des Spiels (OHNE Verschiebung)
+useEffect(() => {
+  if (isPlaying && !gameOver && !isPaused) {
+    // Nur Scrollen verhindern, keine Positionsänderung
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+    };
+  }
+}, [isPlaying, gameOver, isPaused]);
 
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
