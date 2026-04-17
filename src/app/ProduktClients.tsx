@@ -7,6 +7,7 @@ import {
   Instagram, MessageCircle, ArrowRight, MapPin,
   Clock, Shield, ExternalLink, Menu, X, Filter
 } from 'lucide-react';
+import { ScndDropGame } from '@/components/ScndDropGame';
 
 // ========== ProductCleaner ==========
 const KNOWN_BRANDS = [
@@ -338,6 +339,13 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
               </div>
             </motion.div>
           </div>
+        </div>
+      </section>
+
+      {/* SCND DROP GAME SECTION */}
+      <section id="game" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="max-w-7xl mx-auto">
+          <ScndDropGame />
         </div>
       </section>
 
