@@ -158,22 +158,6 @@ export function ScndDropGame() {
   };
 
 
-const giveUp = () => {
-  if (isPlaying && !gameOver) {
-    setGameOver(true);
-    setFinalScore(score);
-    setIsPlaying(false);
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-    
-    const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
-    if (score > 0 && isHighscore) {
-      setShowNameInput(true);
-      setNewHighscoreGlow(true);
-      setTimeout(() => setNewHighscoreGlow(false), 2000);
-    }
-  }
-};
 
 // ========== PAUSE FUNKTIONEN ==========
 const togglePause = () => {
