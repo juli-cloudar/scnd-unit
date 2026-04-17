@@ -3,31 +3,32 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const BOARD_WIDTH = 10;
-const BOARD_HEIGHT = 20;
+// NEU: HEXAGONALES SPIELFELD 12x18
+const BOARD_WIDTH = 12;
+const BOARD_HEIGHT = 18;
 const getCellSize = () => {
   if (typeof window === 'undefined') return 32;
-  if (window.innerWidth < 640) return 24;
-  if (window.innerWidth < 768) return 28;
-  return 32;
+  if (window.innerWidth < 640) return 20;
+  if (window.innerWidth < 768) return 24;
+  return 28;
 };
 
-// SCND UNIT Themed Tetrominos
-const TETROMINOS = [
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I', isBrand: true },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O', isBrand: false },
-  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#CC0000', borderColor: '#990000', name: 'T', isBrand: false },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#1A1A1A', borderColor: '#333333', name: 'S', isBrand: false },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#F5F5F5', borderColor: '#CCCCCC', name: 'Z', isBrand: false },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#0055A4', borderColor: '#004080', name: 'L', isBrand: false },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
+// NEUE FORMEN (statt Tetrominos)
+const SHAPES = [
+  { shape: [[1,1,1]], color: '#FF4400', borderColor: '#CC3300', name: 'LINE', isBrand: true, pixels: ['█','░','█','░'] },
+  { shape: [[1,1],[1,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'L', isBrand: false, pixels: ['░','█','░','█'] },
+  { shape: [[1,1],[0,1]], color: '#CC0000', borderColor: '#990000', name: 'R', isBrand: false, pixels: ['█','░','█','░'] },
+  { shape: [[1,0],[1,1]], color: '#0055A4', borderColor: '#004080', name: 'T', isBrand: false, pixels: ['░','█','░','█'] },
+  { shape: [[1,1],[1,1]], color: '#00A86B', borderColor: '#008050', name: 'BLOCK', isBrand: false, pixels: ['█','█','█','█'] }
 ];
 
+// NEUE POWER-UPS
 const POWERUPS = [
-  { name: 'SLOW', color: '#00FFFF', effect: 'slow' },
-  { name: 'BOMB', color: '#FF4444', effect: 'bomb' },
-  { name: 'COLOR', color: '#FF00FF', effect: 'colorSwap' },
-  { name: 'SCND', color: '#FF4400', effect: 'scndBlitz' }
+  { name: '💣 BOMBE', color: '#FF4444', effect: 'bomb', chance: 30 },
+  { name: '⚡ LASER', color: '#FF00FF', effect: 'laser', chance: 25 },
+  { name: '🎨 COLOR', color: '#FFD700', effect: 'colorBlast', chance: 20 },
+  { name: '⭐ SCND', color: '#FF4400', effect: 'scndBonus', chance: 15 },
+  { name: '⏰ FREEZE', color: '#00FFFF', effect: 'freeze', chance: 10 }
 ];
 
 interface Highscore {
@@ -37,7 +38,7 @@ interface Highscore {
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cellSize, setCellSize] = useState(32);
+  const [cellSize, setCellSize] = useState(28);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -64,9 +65,13 @@ export function ScndDropGame() {
   const [powerUpX, setPowerUpX] = useState(0);
   const [powerUpY, setPowerUpY] = useState(0);
   const [slowMode, setSlowMode] = useState(false);
+  const [freezeMode, setFreezeMode] = useState(false);
+  const [scndBonusActive, setScndBonusActive] = useState(false);
+  const [shieldActive, setShieldActive] = useState(false);
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
   const powerUpLoopRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
+  const [colorBonusInfo, setColorBonusInfo] = useState<{ show: boolean; message: string }>({ show: false, message: '' });
 
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
@@ -76,24 +81,28 @@ export function ScndDropGame() {
   }, []);
 
   const getFallDelay = () => {
+    if (freezeMode) return Infinity;
     let delay = Math.max(80, 300 - (level - 1) * 25);
     if (slowMode) delay = delay * 2;
     return delay;
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('scnd_block_highscores');
+    const saved = localStorage.getItem('scnd_stack_highscores');
     if (saved) setHighscores(JSON.parse(saved));
   }, []);
 
   useEffect(() => {
     if (isPlaying && !gameOver) {
-      const interval = setInterval(() => {
-        setTitlePulse(prev => !prev);
-      }, 500);
+      const interval = setInterval(() => setTitlePulse(prev => !prev), 500);
       return () => clearInterval(interval);
     }
   }, [isPlaying, gameOver]);
+
+  const showColorBonus = (message: string) => {
+    setColorBonusInfo({ show: true, message });
+    setTimeout(() => setColorBonusInfo({ show: false, message: '' }), 1500);
+  };
 
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
@@ -105,66 +114,85 @@ export function ScndDropGame() {
     setHotStreak(false);
     setScndMode(false);
     setSlowMode(false);
+    setFreezeMode(false);
+    setScndBonusActive(false);
+    setShieldActive(false);
     setGameOver(false);
     setShowNameInput(false);
     setParticles([]);
     spawnNewPiece();
     setIsPlaying(true);
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-    powerUpLoopRef.current = setInterval(spawnPowerUp, 15000);
+    powerUpLoopRef.current = setInterval(spawnPowerUp, 8000);
   };
 
   const spawnPowerUp = () => {
     if (!isPlaying || gameOver) return;
-    const randomPower = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
-    setPowerUp(randomPower);
-    setPowerUpX(Math.floor(Math.random() * BOARD_WIDTH));
-    setPowerUpY(0);
+    const random = Math.random() * 100;
+    let cumulative = 0;
+    for (const pu of POWERUPS) {
+      cumulative += pu.chance;
+      if (random <= cumulative) {
+        setPowerUp(pu);
+        setPowerUpX(Math.floor(Math.random() * BOARD_WIDTH));
+        setPowerUpY(0);
+        break;
+      }
+    }
   };
 
   const applyPowerUp = (effect: string) => {
     switch(effect) {
-      case 'slow':
-        setSlowMode(true);
-        setTimeout(() => setSlowMode(false), 10000);
-        break;
       case 'bomb':
-        const newBoard = board.map(row => [...row]);
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
+        const bombBoard = board.map(row => [...row]);
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
             const x = powerUpX + dx, y = powerUpY + dy;
             if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
-              newBoard[y][x] = null;
+              bombBoard[y][x] = null;
             }
           }
         }
-        setBoard(newBoard);
-        break;
-      case 'colorSwap':
-        const colors = ['#FF4400', '#0055A4', '#FFD700', '#CC0000'];
-        const newColorBoard = board.map(row => 
-          row.map(cell => cell ? { ...cell, color: colors[Math.floor(Math.random() * colors.length)] } : null)
-        );
-        setBoard(newColorBoard);
-        break;
-      case 'scndBlitz':
-        const blitzBoard = board.map(row => [...row]);
-        for (let x = 0; x < BOARD_WIDTH; x++) {
-          blitzBoard[BOARD_HEIGHT - 1][x] = null;
+        setBoard(bombBoard);
+        for (let i = 0; i < 50; i++) {
+          setParticles(prev => [...prev, { x: powerUpX * cellSize + cellSize/2, y: powerUpY * cellSize + cellSize/2, life: 1 }]);
         }
-        setBoard(blitzBoard);
-        const bonus = 500;
-        setScore(prev => prev + bonus);
-        setPopupScore({ score: bonus, x: BOARD_WIDTH * cellSize / 2, y: 100 });
-        setTimeout(() => setPopupScore(null), 500);
+        showColorBonus('💣 BOMBE! Radius 2 Blöcke zerstört!');
+        break;
+      case 'laser':
+        const laserBoard = board.map(row => [...row]);
+        for (let x = 0; x < BOARD_WIDTH; x++) {
+          laserBoard[powerUpY][x] = null;
+        }
+        setBoard(laserBoard);
+        showColorBonus('⚡ LASER! Ganze Reihe zerstört!');
+        break;
+      case 'colorBlast':
+        const colors = ['#FF4400', '#FFD700', '#CC0000', '#0055A4', '#00A86B', '#1A1A1A', '#F5F5F5'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const colorBlastBoard = board.map(row => 
+          row.map(cell => cell?.color === randomColor ? null : cell)
+        );
+        setBoard(colorBlastBoard);
+        showColorBonus(`🎨 COLOR BLAST! Alle ${randomColor} Blöcke weg!`);
+        break;
+      case 'scndBonus':
+        setScndBonusActive(true);
+        setTimeout(() => setScndBonusActive(false), 30000);
+        showColorBonus('⭐ SCND BONUS! 30 Sekunden 3x Punkte!');
+        break;
+      case 'freeze':
+        setFreezeMode(true);
+        setTimeout(() => setFreezeMode(false), 3000);
+        showColorBonus('⏰ TIME FREEZE! 3 Sekunden Pause!');
         break;
     }
     setPowerUp(null);
   };
 
   const spawnNewPiece = () => {
-    const random = Math.floor(Math.random() * TETROMINOS.length);
-    const piece = JSON.parse(JSON.stringify(TETROMINOS[random]));
+    const random = Math.floor(Math.random() * SHAPES.length);
+    const piece = JSON.parse(JSON.stringify(SHAPES[random]));
     setCurrentPiece(piece);
     setPieceX(Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2));
     setPieceY(0);
@@ -212,7 +240,8 @@ export function ScndDropGame() {
             newBoard[boardY][boardX] = { 
               color: currentPiece.color, 
               borderColor: currentPiece.borderColor,
-              isBrand: currentPiece.isBrand
+              isBrand: currentPiece.isBrand,
+              pixels: currentPiece.pixels
             };
           }
         }
@@ -248,17 +277,23 @@ export function ScndDropGame() {
     if (rowsCleared > 0) {
       const newCombo = combo + 1;
       setCombo(newCombo);
-      addedScore = Math.floor(addedScore * (1 + newCombo * 0.15));
+      let multiplier = 1 + newCombo * 0.15;
+      if (scndBonusActive) multiplier *= 3;
+      addedScore = Math.floor(addedScore * multiplier);
       
       const hasScndColors = clearedRows.some(row => 
         newBoard[row]?.some(cell => cell?.color === '#FF4400' || cell?.color === '#1A1A1A')
       );
-      if (hasScndColors) addedScore = Math.floor(addedScore * 2);
+      if (hasScndColors) {
+        addedScore = Math.floor(addedScore * 2);
+        showColorBonus('🎨 ORANGE + SCHWARZ = 2x PUNKTE!');
+      }
       
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
         setScndMode(true);
         setTimeout(() => setScndMode(false), 10000);
+        showColorBonus('⚡ SCND MODE AKTIVIERT! 10x COMBO!');
       }
     } else {
       setCombo(0);
@@ -294,7 +329,7 @@ export function ScndDropGame() {
   }, [particles]);
 
   const movePiece = (dx: number, dy: number) => {
-    if (!currentPiece || gameOver) return;
+    if (!currentPiece || gameOver || freezeMode) return;
     if (!collision(currentPiece.shape, pieceX + dx, pieceY + dy)) {
       setPieceX(pieceX + dx);
       setPieceY(pieceY + dy);
@@ -302,7 +337,7 @@ export function ScndDropGame() {
   };
 
   const rotatePiece = () => {
-    if (!currentPiece || gameOver) return;
+    if (!currentPiece || gameOver || freezeMode) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
@@ -311,7 +346,6 @@ export function ScndDropGame() {
     }
   };
 
-  // Touch-Controller für Handy
   const handleTouchLeft = () => movePiece(-1, 0);
   const handleTouchRight = () => movePiece(1, 0);
   const handleTouchDown = () => movePiece(0, 1);
@@ -330,15 +364,52 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode]);
 
   useEffect(() => {
-    if (isPlaying && !gameOver) {
+    if (isPlaying && !gameOver && !freezeMode) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
     }
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode]);
+  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode, freezeMode]);
+
+  // Hexagonale Pixel-Blöcke zeichnen
+  const drawHexPixelBlock = (ctx: CanvasRenderingContext2D, x: number, y: number, cell: any) => {
+    const w = cellSize;
+    const h = cellSize;
+    const offsetX = x * w;
+    const offsetY = y * h;
+    
+    // Hexagon-Form
+    ctx.beginPath();
+    const hexX = offsetX + w/2;
+    const hexY = offsetY + h/2;
+    const radius = w * 0.4;
+    for (let i = 0; i < 6; i++) {
+      const angle = i * Math.PI * 2 / 6;
+      const px = hexX + radius * Math.cos(angle);
+      const py = hexY + radius * Math.sin(angle);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = cell.color;
+    ctx.fill();
+    ctx.strokeStyle = cell.borderColor;
+    ctx.stroke();
+    
+    // Pixel-Art Muster
+    if (cell.pixels) {
+      ctx.font = `bold ${Math.max(10, w * 0.35)}px monospace`;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(cell.pixels[0] === '█' ? 'S' : '■', hexX - 6, hexY + 5);
+    } else if (cell.isBrand) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.max(10, w * 0.4)}px monospace`;
+      ctx.fillText('S', hexX - 4, hexY + 5);
+    }
+  };
 
   // Canvas zeichnen
   useEffect(() => {
@@ -353,42 +424,33 @@ export function ScndDropGame() {
     ctx.fillStyle = 'var(--bg-secondary)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    ctx.strokeStyle = '#FF4400';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
-    
-    ctx.strokeStyle = '#FF44004D';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= BOARD_WIDTH; x++) {
-      ctx.beginPath();
-      ctx.moveTo(x * cellSize, 0);
-      ctx.lineTo(x * cellSize, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= BOARD_HEIGHT; y++) {
-      ctx.beginPath();
-      ctx.moveTo(0, y * cellSize);
-      ctx.lineTo(canvas.width, y * cellSize);
-      ctx.stroke();
-    }
-    
+    // Hexagon-Gitter
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
         if (cell) {
-          ctx.fillStyle = cell.color;
-          ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, cellSize - 1);
-          ctx.fillStyle = cell.borderColor;
-          ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, 2);
-          ctx.fillRect(x * cellSize, y * cellSize, 2, cellSize - 1);
-          if (cell.isBrand) {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
-            ctx.fillText('S', x * cellSize + cellSize * 0.35, y * cellSize + cellSize * 0.7);
+          drawHexPixelBlock(ctx, x, y, cell);
+        } else {
+          const w = cellSize;
+          const h = cellSize;
+          const offsetX = x * w;
+          const offsetY = y * h;
+          ctx.beginPath();
+          const hexX = offsetX + w/2;
+          const hexY = offsetY + h/2;
+          const radius = w * 0.4;
+          for (let i = 0; i < 6; i++) {
+            const angle = i * Math.PI * 2 / 6;
+            const px = hexX + radius * Math.cos(angle);
+            const py = hexY + radius * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
           }
+          ctx.closePath();
+          ctx.fillStyle = '#1A1A1A';
+          ctx.fill();
+          ctx.strokeStyle = '#333333';
+          ctx.stroke();
         }
         if (flashRow === y) {
           ctx.fillStyle = '#FF440080';
@@ -398,12 +460,18 @@ export function ScndDropGame() {
     }
     
     if (powerUp && powerUpY < BOARD_HEIGHT) {
+      const w = cellSize;
+      const h = cellSize;
+      const offsetX = powerUpX * w;
+      const offsetY = powerUpY * h;
+      ctx.beginPath();
+      ctx.arc(offsetX + w/2, offsetY + h/2, w * 0.35, 0, Math.PI * 2);
       ctx.fillStyle = powerUp.color;
-      ctx.fillRect(powerUpX * cellSize, powerUpY * cellSize, cellSize - 1, cellSize - 1);
+      ctx.fill();
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = `bold ${Math.max(10, cellSize * 0.4)}px monospace`;
-      ctx.fillText(powerUp.name[0], powerUpX * cellSize + cellSize * 0.4, powerUpY * cellSize + cellSize * 0.7);
-      setPowerUpY(prev => prev + 0.15);
+      ctx.font = `bold ${Math.max(12, w * 0.4)}px monospace`;
+      ctx.fillText(powerUp.name[0], offsetX + w/2 - 6, offsetY + h/2 + 5);
+      setPowerUpY(prev => prev + 0.12);
       if (powerUpY >= BOARD_HEIGHT - 1) {
         setPowerUp(null);
       } else if (collision([[1]], powerUpX, Math.floor(powerUpY))) {
@@ -411,7 +479,7 @@ export function ScndDropGame() {
       }
     }
     
-    if (currentPiece && !gameOver) {
+    if (currentPiece && !gameOver && !freezeMode) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
       if (ghostY > pieceY) {
@@ -421,8 +489,7 @@ export function ScndDropGame() {
             if (currentPiece.shape[y][x] !== 0) {
               const boardX = pieceX + x, boardY = ghostY + y;
               if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >=0 && boardX < BOARD_WIDTH) {
-                ctx.fillStyle = currentPiece.color;
-                ctx.fillRect(boardX * cellSize, boardY * cellSize, cellSize - 1, cellSize - 1);
+                drawHexPixelBlock(ctx, boardX, boardY, currentPiece);
               }
             }
           }
@@ -435,61 +502,72 @@ export function ScndDropGame() {
           if (currentPiece.shape[y][x] !== 0) {
             const boardX = pieceX + x, boardY = pieceY + y;
             if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >=0 && boardX < BOARD_WIDTH) {
-              ctx.fillStyle = currentPiece.color;
-              ctx.fillRect(boardX * cellSize, boardY * cellSize, cellSize - 1, cellSize - 1);
-              ctx.fillStyle = currentPiece.borderColor;
-              ctx.fillRect(boardX * cellSize, boardY * cellSize, cellSize - 1, 2);
-              ctx.fillRect(boardX * cellSize, boardY * cellSize, 2, cellSize - 1);
+              drawHexPixelBlock(ctx, boardX, boardY, currentPiece);
             }
           }
         }
       }
     }
     
-    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    // Scanlines
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
     for (let i = 0; i < canvas.height; i += 2) {
       ctx.fillRect(0, i, canvas.width, 1);
     }
     
+    // Vignette
     const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width/2);
     gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.3)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.35)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
+    // Partikel
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
     
+    // Level-Fortschritt
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
     
+    // Status-Anzeigen
     if (hotStreak) {
-      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
+      ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
       ctx.fillStyle = '#FF4400';
-      ctx.fillText('🔥 HOT STREAK!', canvas.width / 2 - 60, 30);
+      ctx.fillText('🔥 HOT STREAK!', canvas.width - 85, 25);
     }
     if (scndMode) {
-      ctx.font = `bold ${Math.max(14, cellSize * 0.6)}px monospace`;
+      ctx.font = `bold ${Math.max(11, cellSize * 0.5)}px monospace`;
       ctx.fillStyle = '#FF4400';
-      ctx.fillText('⚡ SCND MODE!', canvas.width / 2 - 50, 60);
+      ctx.fillText('⚡ SCND MODE!', canvas.width - 85, 50);
+    }
+    if (scndBonusActive) {
+      ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('⭐ 3x BONUS!', canvas.width - 85, 75);
+    }
+    if (freezeMode) {
+      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
+      ctx.fillStyle = '#00FFFF';
+      ctx.fillText('⏰ FREEZE!', canvas.width / 2 - 40, 30);
     }
     if (combo > 0) {
-      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
+      ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
       ctx.fillStyle = '#FF4400';
-      ctx.fillText(`${combo}x COMBO!`, canvas.width - 70, 30);
+      ctx.fillText(`${combo}x COMBO!`, canvas.width - 70, 100);
     }
     if (popupScore) {
-      ctx.font = `bold ${Math.max(16, cellSize * 0.75)}px monospace`;
+      ctx.font = `bold ${Math.max(14, cellSize * 0.65)}px monospace`;
       ctx.fillStyle = '#FF4400';
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
     }
     ctx.shadowBlur = 0;
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, particles, powerUp, powerUpX, powerUpY, linesCleared]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, powerUp, powerUpX, powerUpY, linesCleared]);
 
   const saveHighscore = () => {
     if (playerName.trim() === '') return;
@@ -497,7 +575,7 @@ export function ScndDropGame() {
     newHighscores.sort((a,b) => b.score - a.score);
     const top3 = newHighscores.slice(0,3);
     setHighscores(top3);
-    localStorage.setItem('scnd_block_highscores', JSON.stringify(top3));
+    localStorage.setItem('scnd_stack_highscores', JSON.stringify(top3));
     setShowNameInput(false);
     setPlayerName('');
     setNewHighscoreGlow(false);
@@ -518,22 +596,25 @@ export function ScndDropGame() {
         
         <div className="text-center mb-3 md:mb-4">
           <h3 className={`text-xl md:text-3xl font-bold tracking-tighter transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110 text-[#FF4400]' : ''}`}>
-            <span className="text-[#FF4400]">SCND</span>_<span className="text-[var(--text-primary)]">DROP</span>
+            <span className="text-[#FF4400]">SCND</span>_<span className="text-[var(--text-primary)]">STACK</span>
           </h3>
-          {slowMode && <p className="text-[8px] md:text-xs text-[#00FFFF] mt-1 animate-pulse">⏱️ TIME SLOW</p>}
+          {slowMode && <p className="text-[8px] md:text-xs text-[#00FFFF] mt-1 animate-pulse">🐌 TIME SLOW</p>}
+          {colorBonusInfo.show && (
+            <p className="text-[8px] md:text-xs text-[#FFD700] mt-1 animate-bounce">{colorBonusInfo.message}</p>
+          )}
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 md:gap-8 justify-center items-center md:items-start">
           <div className="relative">
             <canvas ref={canvasRef} className="border-2 md:border-4 border-[#FF4400] shadow-lg shadow-[#FF4400]/20 rounded-sm" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
             
-            {/* Touch-Controller für Handy */}
+            {/* Touch-Controller für Handy - OHNE den unnötigen Pfeil */}
             {isPlaying && !gameOver && (
-              <div className="absolute -bottom-20 left-0 right-0 flex justify-center gap-4 md:hidden mt-4">
-                <button onTouchStart={handleTouchLeft} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">←</button>
-                <button onTouchStart={handleTouchDown} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">↓</button>
-                <button onTouchStart={handleTouchRight} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">→</button>
-                <button onTouchStart={handleTouchRotate} className="w-16 h-16 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-2xl font-bold active:bg-[#FF4400]/50">↻</button>
+              <div className="absolute -bottom-16 left-0 right-0 flex justify-center gap-3 md:hidden mt-2">
+                <button onTouchStart={handleTouchLeft} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">←</button>
+                <button onTouchStart={handleTouchDown} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">↓</button>
+                <button onTouchStart={handleTouchRight} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">→</button>
+                <button onTouchStart={handleTouchRotate} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">↻</button>
               </div>
             )}
             
@@ -563,6 +644,7 @@ export function ScndDropGame() {
               {combo > 0 && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1 animate-pulse">{combo}x COMBO!</div>}
               {hotStreak && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1">🔥 HOT STREAK!</div>}
               {scndMode && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1">⚡ SCND MODE!</div>}
+              {scndBonusActive && <div className="text-[10px] md:text-xs text-[#FFD700] mt-1">⭐ 3x BONUS AKTIV!</div>}
             </div>
             
             <h4 className="font-bold text-xs md:text-sm uppercase tracking-widest text-[#FF4400] mb-2 md:mb-3">🏆 HIGHSCORES</h4>
@@ -587,7 +669,8 @@ export function ScndDropGame() {
                 <span className="text-[#FF4400]">↑</span>
                 <span className="text-[var(--text-secondary)]">DREHEN</span>
               </div>
-              <div className="text-[8px] md:text-[10px] text-[#FF4400] mt-1">✨ POWER-UPS FALLEN!</div>
+              <div className="text-[8px] md:text-[10px] text-[#FF4400] mt-1">🎁 POWER-UPS ALLE 8 SEK!</div>
+              <div className="text-[8px] md:text-[10px] text-[#FFD700] mt-1">🎨 ORANGE+SCHWARZ = 2x PUNKTE</div>
             </div>
           </div>
         </div>
