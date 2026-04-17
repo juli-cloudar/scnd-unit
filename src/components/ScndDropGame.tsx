@@ -132,7 +132,7 @@ useEffect(() => {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
- const startGame = () => {
+const startGame = () => {
   setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
   setScore(0);
   setFinalScore(0);
@@ -151,29 +151,21 @@ useEffect(() => {
   setParticles([]);
   setPowerUp(null);
   
-  // 1. Spielstatus auf aktiv setzen
-  setIsPlaying(true);
-  
-  // 2. Erstes Tetromino spawnen
+  // 1. Erstes Tetromino spawnen
   spawnNewPiece();
   
-  // 3. Bestehende Loops stoppen (falls vorhanden)
+  // 2. Spielstatus auf aktiv setzen
+  setIsPlaying(true);
+  
+  // 3. Bestehende Loops stoppen
   if (gameLoopRef.current) clearInterval(gameLoopRef.current);
   if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
   
-  // 4. GAME LOOP STARTEN - Blöcke fallen lassen!
-  gameLoopRef.current = setInterval(() => {
-    if (isPlaying && !gameOver && !isPaused && !freezeMode) {
-      movePiece(0, 1);
-    }
-  }, getFallDelay());
+  // 4. GAME LOOP STARTEN - OHNE isPlaying Check im Interval!
+  gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
   
   // 5. Power-Up Spawner starten
-  powerUpLoopRef.current = setInterval(() => {
-    if (isPlaying && !gameOver && !isPaused) {
-      spawnPowerUp();
-    }
-  }, 8000);
+  powerUpLoopRef.current = setInterval(() => spawnPowerUp(), 8000);
 };
 
 // ========== GIVE UP FUNKTION - HIER EINFÜGEN ==========
