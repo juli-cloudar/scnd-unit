@@ -36,9 +36,8 @@ export default function ProductPage() {
   const [imageError, setImageError] = useState(false);
 
   // Platzhalter für zukünftige eBay und Facebook Links
-  // Später kannst du hier für jedes Produkt individuelle Links hinterlegen
-  const ebayUrl = null; // z.B. `https://www.ebay.de/itm/${product?.id}`
-  const facebookUrl = null; // z.B. `https://www.facebook.com/marketplace/item/${product?.id}`
+  const ebayUrl = null;
+  const facebookUrl = null;
 
   useEffect(() => {
     async function fetchProduct() {
@@ -92,10 +91,10 @@ export default function ProductPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-[#FF4400] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-500 text-sm uppercase tracking-widest">Lade...</p>
+          <p className="text-[var(--text-secondary)] text-sm uppercase tracking-widest">Lade...</p>
         </div>
       </div>
     );
@@ -103,7 +102,7 @@ export default function ProductPage() {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center p-6">
         <div className="text-center max-w-md">
           <div className="text-8xl font-bold text-[#FF4400]/20 mb-4">404</div>
           <h2 className="text-xl font-bold uppercase tracking-widest mb-4">Nicht gefunden</h2>
@@ -127,11 +126,11 @@ export default function ProductPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5]">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Header */}
-      <div className="border-b border-[#1A1A1A] sticky top-0 bg-[#0A0A0A]/95 backdrop-blur z-50">
+      <div className="border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-primary)]/95 backdrop-blur z-50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
-          <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-[#FF4400] transition-colors group">
+          <Link href="/" className="inline-flex items-center gap-2 text-[var(--text-secondary)] hover:text-[#FF4400] transition-colors group">
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span className="text-sm uppercase tracking-widest">Zurück</span>
           </Link>
@@ -144,7 +143,7 @@ export default function ProductPage() {
           {/* Bildergalerie */}
           <div>
             <div className="sticky top-0 md:top-24">
-              <div className="relative aspect-[3/4] bg-[#1A1A1A] overflow-hidden rounded-sm group">
+              <div className="relative aspect-[3/4] bg-[var(--bg-secondary)] overflow-hidden rounded-sm group">
                 {images.length > 0 && !imageError ? (
                   <img 
                     src={proxyImg(images[currentImage])} 
@@ -153,7 +152,7 @@ export default function ProductPage() {
                     onError={() => setImageError(true)}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500">
+                  <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)]">
                     Kein Bild verfügbar
                   </div>
                 )}
@@ -165,7 +164,7 @@ export default function ProductPage() {
                     <button onClick={nextImage} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 p-2 rounded-full opacity-100 md:opacity-0 group-hover:opacity-100 hover:bg-[#FF4400] transition-opacity">
                       <ChevronRight className="w-5 h-5" />
                     </button>
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 px-3 py-1 rounded-full text-xs">
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 px-3 py-1 rounded-full text-xs text-white">
                       {currentImage + 1} / {images.length}
                     </div>
                   </>
@@ -180,7 +179,7 @@ export default function ProductPage() {
                         setCurrentImage(idx);
                         setImageError(false);
                       }} 
-                      className={`w-14 h-14 md:w-20 md:h-20 shrink-0 bg-[#1A1A1A] overflow-hidden rounded-sm transition-all ${
+                      className={`w-14 h-14 md:w-20 md:h-20 shrink-0 bg-[var(--bg-secondary)] overflow-hidden rounded-sm transition-all ${
                         currentImage === idx ? 'ring-2 ring-[#FF4400]' : 'opacity-50 hover:opacity-100'
                       }`}
                     >
@@ -211,13 +210,13 @@ export default function ProductPage() {
             
             {/* Brand & Category */}
             <div className="flex flex-wrap items-center gap-2 mb-3 md:mb-4">
-              <span className="text-xs text-gray-500 uppercase tracking-widest">{product.brand || 'Keine Marke'}</span>
-              <span className="text-gray-600">•</span>
-              <span className="text-xs text-gray-500 uppercase tracking-widest">{product.category || 'Sonstiges'}</span>
+              <span className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{product.brand || 'Keine Marke'}</span>
+              <span className="text-[var(--text-secondary)]">•</span>
+              <span className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">{product.category || 'Sonstiges'}</span>
             </div>
             
             {/* Title */}
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-3 md:mb-4">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-3 md:mb-4 text-[var(--text-primary)]">
               {product.name}
             </h1>
             
@@ -227,38 +226,38 @@ export default function ProductPage() {
             </div>
             
             {/* Size & Condition */}
-            <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#1A1A1A] rounded-sm">
+            <div className="grid grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[var(--bg-secondary)] rounded-sm">
               <div>
-                <p className="text-xs text-gray-500 uppercase mb-1">Größe</p>
-                <p className="font-medium text-sm md:text-base">{product.size !== "–" ? product.size : 'Einheitsgröße'}</p>
+                <p className="text-xs text-[var(--text-secondary)] uppercase mb-1">Größe</p>
+                <p className="font-medium text-sm md:text-base text-[var(--text-primary)]">{product.size !== "–" ? product.size : 'Einheitsgröße'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase mb-1">Zustand</p>
-                <p className="font-medium text-sm md:text-base">{product.condition || 'Gut'}</p>
+                <p className="text-xs text-[var(--text-secondary)] uppercase mb-1">Zustand</p>
+                <p className="font-medium text-sm md:text-base text-[var(--text-primary)]">{product.condition || 'Gut'}</p>
               </div>
             </div>
 
             {/* Platform Links - ALLE DREI PLATTFORMEN */}
             <div className="space-y-3 mb-6 md:mb-8">
-              <p className="text-xs text-gray-500 uppercase tracking-widest">Verfügbar auf</p>
+              <p className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">Verfügbar auf</p>
               
               {/* Vinted Link - Aktiv */}
               <a 
                 href={product.vinted_url} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="flex items-center justify-between p-3 md:p-4 bg-[#1A1A1A] border border-[#FF4400]/30 hover:border-[#FF4400] transition-all group"
+                className="flex items-center justify-between p-3 md:p-4 bg-[var(--bg-secondary)] border border-[#FF4400]/30 hover:border-[#FF4400] transition-all group"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-[#FF4400]/10 rounded-full flex items-center justify-center shrink-0">
                     <ShoppingBag className="w-4 h-4 text-[#FF4400]" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">Auf Vinted kaufen</p>
-                    <p className="text-xs text-gray-500">Direkt zum Angebot</p>
+                    <p className="font-medium text-sm text-[var(--text-primary)]">Auf Vinted kaufen</p>
+                    <p className="text-xs text-[var(--text-secondary)]">Direkt zum Angebot</p>
                   </div>
                 </div>
-                <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-[#FF4400] shrink-0" />
+                <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[#FF4400] shrink-0" />
               </a>
               
               {/* eBay Link - Für spätere individuelle Verlinkung */}
@@ -267,31 +266,31 @@ export default function ProductPage() {
                   href={ebayUrl} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="flex items-center justify-between p-3 md:p-4 bg-[#1A1A1A] border border-[#E53238]/30 hover:border-[#E53238] transition-all group"
+                  className="flex items-center justify-between p-3 md:p-4 bg-[var(--bg-secondary)] border border-[#E53238]/30 hover:border-[#E53238] transition-all group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-[#E53238]/10 rounded-full flex items-center justify-center shrink-0">
                       <ShoppingBag className="w-4 h-4 text-[#E53238]" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm">Auf eBay kaufen</p>
-                      <p className="text-xs text-gray-500">Zum Angebot</p>
+                      <p className="font-medium text-sm text-[var(--text-primary)]">Auf eBay kaufen</p>
+                      <p className="text-xs text-[var(--text-secondary)]">Zum Angebot</p>
                     </div>
                   </div>
-                  <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-[#E53238] shrink-0" />
+                  <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[#E53238] shrink-0" />
                 </a>
               ) : (
-                <div className="flex items-center justify-between p-3 md:p-4 bg-[#1A1A1A] border border-dashed border-gray-700 opacity-60">
+                <div className="flex items-center justify-between p-3 md:p-4 bg-[var(--bg-secondary)] border border-dashed border-[var(--border-color)] opacity-60">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-[#E53238]/10 rounded-full flex items-center justify-center shrink-0">
                       <ShoppingBag className="w-4 h-4 text-[#E53238]" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm">Auf eBay kaufen</p>
-                      <p className="text-xs text-gray-500">Bald verfügbar</p>
+                      <p className="font-medium text-sm text-[var(--text-primary)]">Auf eBay kaufen</p>
+                      <p className="text-xs text-[var(--text-secondary)]">Bald verfügbar</p>
                     </div>
                   </div>
-                  <ExternalLink className="w-4 h-4 text-gray-500 shrink-0" />
+                  <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
                 </div>
               )}
               
@@ -301,31 +300,31 @@ export default function ProductPage() {
                   href={facebookUrl} 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className="flex items-center justify-between p-3 md:p-4 bg-[#1A1A1A] border border-[#1877F2]/30 hover:border-[#1877F2] transition-all group"
+                  className="flex items-center justify-between p-3 md:p-4 bg-[var(--bg-secondary)] border border-[#1877F2]/30 hover:border-[#1877F2] transition-all group"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-[#1877F2]/10 rounded-full flex items-center justify-center shrink-0">
                       <Facebook className="w-4 h-4 text-[#1877F2]" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm">Auf Facebook Marketplace</p>
-                      <p className="text-xs text-gray-500">Zum Angebot</p>
+                      <p className="font-medium text-sm text-[var(--text-primary)]">Auf Facebook Marketplace</p>
+                      <p className="text-xs text-[var(--text-secondary)]">Zum Angebot</p>
                     </div>
                   </div>
-                  <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-[#1877F2] shrink-0" />
+                  <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[#1877F2] shrink-0" />
                 </a>
               ) : (
-                <div className="flex items-center justify-between p-3 md:p-4 bg-[#1A1A1A] border border-dashed border-gray-700 opacity-60">
+                <div className="flex items-center justify-between p-3 md:p-4 bg-[var(--bg-secondary)] border border-dashed border-[var(--border-color)] opacity-60">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-[#1877F2]/10 rounded-full flex items-center justify-center shrink-0">
                       <Facebook className="w-4 h-4 text-[#1877F2]" />
                     </div>
                     <div>
-                      <p className="font-medium text-sm">Auf Facebook Marketplace</p>
-                      <p className="text-xs text-gray-500">Bald verfügbar</p>
+                      <p className="font-medium text-sm text-[var(--text-primary)]">Auf Facebook Marketplace</p>
+                      <p className="text-xs text-[var(--text-secondary)]">Bald verfügbar</p>
                     </div>
                   </div>
-                  <ExternalLink className="w-4 h-4 text-gray-500 shrink-0" />
+                  <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
                 </div>
               )}
             </div>
@@ -336,7 +335,7 @@ export default function ProductPage() {
                 navigator.clipboard.writeText(window.location.href); 
                 alert('Link kopiert!'); 
               }} 
-              className="w-full py-3 border border-gray-700 text-gray-400 hover:text-[#FF4400] hover:border-[#FF4400] transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-widest mt-auto"
+              className="w-full py-3 border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[#FF4400] hover:border-[#FF4400] transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-widest mt-auto"
             >
               <Share2 className="w-4 h-4" /> Teilen
             </button>
