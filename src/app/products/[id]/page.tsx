@@ -28,6 +28,22 @@ const proxyImg = (url: string) => {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 
+// ========== THEME SYNC COMPONENT ==========
+function ThemeSync() {
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+  return null;
+}
+// ========== ENDE THEME SYNC ==========
+
 export default function ProductPage() {
   const params = useParams();
   const [product, setProduct] = useState<Product | null>(null);
@@ -127,6 +143,9 @@ export default function ProductPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {/* Theme Sync - synchronisiert den Theme-Modus mit der Hauptseite */}
+      <ThemeSync />
+      
       {/* Header */}
       <div className="border-b border-[var(--border-color)] sticky top-0 bg-[var(--bg-primary)]/95 backdrop-blur z-50">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4">
