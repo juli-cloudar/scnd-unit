@@ -782,7 +782,7 @@ export function ScndDropGame() {
                     <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
                     <div className="flex gap-3">
                       <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
-                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
+                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGEBEN</button>
                     </div>
                   </div>
                 </div>
@@ -860,7 +860,7 @@ export function ScndDropGame() {
                 </div>
                 <div className="flex justify-center gap-3 mt-1">
                   <kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd>
-                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGABEN</span>
+                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGEBEN</span>
                 </div>
                 <div className="mt-2 flex flex-wrap justify-center gap-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span>
