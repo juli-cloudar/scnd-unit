@@ -5,23 +5,30 @@ import { useEffect, useRef, useState } from 'react';
 
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
-// Responsive Cell Size
 const getCellSize = () => {
   if (typeof window === 'undefined') return 32;
-  if (window.innerWidth < 640) return 24;  // Handy
-  if (window.innerWidth < 768) return 28;  // Tablet
-  return 32;  // Desktop
+  if (window.innerWidth < 640) return 24;
+  if (window.innerWidth < 768) return 28;
+  return 32;
 };
 
-// Bauhaus-inspirierte Tetrominos
+// SCND UNIT Themed Tetrominos mit Branding
 const TETROMINOS = [
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I' },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O' },
-  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#CC0000', borderColor: '#990000', name: 'T' },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#1A1A1A', borderColor: '#333333', name: 'S' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#F5F5F5', borderColor: '#CCCCCC', name: 'Z' },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#0055A4', borderColor: '#004080', name: 'L' },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J' }
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I', isBrand: true },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O', isBrand: false },
+  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#CC0000', borderColor: '#990000', name: 'T', isBrand: false },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#1A1A1A', borderColor: '#333333', name: 'S', isBrand: false },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#F5F5F5', borderColor: '#CCCCCC', name: 'Z', isBrand: false },
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#0055A4', borderColor: '#004080', name: 'L', isBrand: false },
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
+];
+
+// Power-Up Typen
+const POWERUPS = [
+  { name: 'SLOW', color: '#00FFFF', effect: 'slow' },
+  { name: 'BOMB', color: '#FF4444', effect: 'bomb' },
+  { name: 'COLOR', color: '#FF00FF', effect: 'colorSwap' },
+  { name: 'SCND', color: '#FF4400', effect: 'scndBlitz' }
 ];
 
 interface Highscore {
@@ -29,10 +36,35 @@ interface Highscore {
   score: number;
 }
 
+// Sound-Funktionen (optional, aber deaktivierbar)
+const playSound = (type: 'drop' | 'clear' | 'gameover') => {
+  if (typeof window === 'undefined') return;
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    let frequency = 440;
+    let duration = 0.1;
+    switch(type) {
+      case 'drop': frequency = 440; duration = 0.05; break;
+      case 'clear': frequency = 880; duration = 0.15; break;
+      case 'gameover': frequency = 220; duration = 0.5; break;
+    }
+    osc.frequency.value = frequency;
+    gain.gain.value = 0.1;
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+    osc.stop(audioCtx.currentTime + duration);
+    setTimeout(() => audioCtx.close(), duration * 1000);
+  } catch(e) {}
+};
+
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cellSize, setCellSize] = useState(32);
-  const [board, setBoard] = useState<{ color: string; borderColor: string }[][]>(() => 
+  const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
   const [currentPiece, setCurrentPiece] = useState<any>(null);
@@ -49,10 +81,19 @@ export function ScndDropGame() {
   const [flashRow, setFlashRow] = useState<number | null>(null);
   const [popupScore, setPopupScore] = useState<{ score: number; x: number; y: number } | null>(null);
   const [combo, setCombo] = useState(0);
+  const [hotStreak, setHotStreak] = useState(false);
+  const [scndMode, setScndMode] = useState(false);
   const [newHighscoreGlow, setNewHighscoreGlow] = useState(false);
+  const [particles, setParticles] = useState<{ x: number; y: number; life: number }[]>([]);
+  const [powerUp, setPowerUp] = useState<any>(null);
+  const [powerUpX, setPowerUpX] = useState(0);
+  const [powerUpY, setPowerUpY] = useState(0);
+  const [slowMode, setSlowMode] = useState(false);
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
+  const powerUpLoopRef = useRef<NodeJS.Timeout | null>(null);
+  const titlePulseRef = useRef<NodeJS.Timeout | null>(null);
+  const [titlePulse, setTitlePulse] = useState(false);
 
-  // Responsive Cell Size
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
     handleResize();
@@ -60,12 +101,26 @@ export function ScndDropGame() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const getFallDelay = () => Math.max(100, 400 - (level - 1) * 30);
+  const getFallDelay = () => {
+    let delay = Math.max(80, 300 - (level - 1) * 25);
+    if (slowMode) delay = delay * 2;
+    return delay;
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('scnd_block_highscores');
     if (saved) setHighscores(JSON.parse(saved));
   }, []);
+
+  // Titel-Puls Animation
+  useEffect(() => {
+    if (isPlaying && !gameOver) {
+      titlePulseRef.current = setInterval(() => {
+        setTitlePulse(prev => !prev);
+      }, 500);
+    }
+    return () => { if (titlePulseRef.current) clearInterval(titlePulseRef.current); };
+  }, [isPlaying, gameOver]);
 
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
@@ -73,17 +128,33 @@ export function ScndDropGame() {
     setLevel(1);
     setLinesCleared(0);
     setCombo(0);
+    setHotStreak(false);
+    setScndMode(false);
+    setSlowMode(false);
     setGameOver(false);
     setShowNameInput(false);
+    setParticles([]);
     spawnNewPiece();
     setIsPlaying(true);
+    if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
+    powerUpLoopRef.current = setInterval(spawnPowerUp, 15000);
+  };
+
+  const spawnPowerUp = () => {
+    if (!isPlaying || gameOver) return;
+    const randomPower = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
+    setPowerUp(randomPower);
+    setPowerUpX(Math.floor(Math.random() * BOARD_WIDTH));
+    setPowerUpY(0);
   };
 
   const giveUp = () => {
     if (isPlaying && !gameOver) {
       setGameOver(true);
       setIsPlaying(false);
+      playSound('gameover');
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
       const isHighscore = highscores.length < 3 || score > highscores[2]?.score;
       if (score > 0 && isHighscore) {
         setShowNameInput(true);
@@ -102,7 +173,9 @@ export function ScndDropGame() {
     if (collision(piece.shape, Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2), 0)) {
       setGameOver(true);
       setIsPlaying(false);
+      playSound('gameover');
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
       const isHighscore = highscores.length < 3 || score > highscores[2]?.score;
       if (score > 0 && isHighscore) {
         setShowNameInput(true);
@@ -125,45 +198,124 @@ export function ScndDropGame() {
     return false;
   };
 
+  const applyPowerUp = (effect: string) => {
+    switch(effect) {
+      case 'slow':
+        setSlowMode(true);
+        setTimeout(() => setSlowMode(false), 10000);
+        break;
+      case 'bomb':
+        const newBoard = board.map(row => [...row]);
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const x = powerUpX + dx, y = powerUpY + dy;
+            if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
+              newBoard[y][x] = null;
+            }
+          }
+        }
+        setBoard(newBoard);
+        break;
+      case 'colorSwap':
+        const colors = ['#FF4400', '#0055A4', '#FFD700', '#CC0000'];
+        const newColorBoard = board.map(row => 
+          row.map(cell => cell ? { ...cell, color: colors[Math.floor(Math.random() * colors.length)] } : null)
+        );
+        setBoard(newColorBoard);
+        break;
+      case 'scndBlitz':
+        const blitzBoard = board.map(row => [...row]);
+        for (let x = 0; x < BOARD_WIDTH; x++) {
+          blitzBoard[BOARD_HEIGHT - 1][x] = null;
+        }
+        setBoard(blitzBoard);
+        const bonus = 500;
+        setScore(prev => prev + bonus);
+        setPopupScore({ score: bonus, x: BOARD_WIDTH * cellSize / 2, y: 100 });
+        setTimeout(() => setPopupScore(null), 500);
+        break;
+    }
+    setPowerUp(null);
+  };
+
   const mergePiece = () => {
     if (!currentPiece) return;
+    playSound('drop');
     const newBoard = board.map(row => [...row]);
     for (let y = 0; y < currentPiece.shape.length; y++) {
       for (let x = 0; x < currentPiece.shape[y].length; x++) {
         if (currentPiece.shape[y][x] !== 0) {
           const boardX = pieceX + x, boardY = pieceY + y;
           if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >= 0 && boardX < BOARD_WIDTH) {
-            newBoard[boardY][boardX] = { color: currentPiece.color, borderColor: currentPiece.borderColor };
+            newBoard[boardY][boardX] = { 
+              color: currentPiece.color, 
+              borderColor: currentPiece.borderColor,
+              isBrand: currentPiece.isBrand
+            };
           }
         }
       }
     }
+    
     let rowsCleared = 0;
+    const clearedRows: number[] = [];
     for (let row = BOARD_HEIGHT - 1; row >= 0; ) {
       if (newBoard[row].every(cell => cell !== null)) {
+        clearedRows.push(row);
         setFlashRow(row);
-        setTimeout(() => setFlashRow(null), 150);
+        setTimeout(() => setFlashRow(null), 200);
+        // Pixel-Explosion Partikel
+        for (let x = 0; x < BOARD_WIDTH; x++) {
+          for (let i = 0; i < 3; i++) {
+            setParticles(prev => [...prev, { x: x * cellSize + cellSize/2, y: row * cellSize + cellSize/2, life: 1 }]);
+          }
+        }
         newBoard.splice(row, 1);
         newBoard.unshift(Array(BOARD_WIDTH).fill(null));
         rowsCleared++;
       } else row--;
     }
     
+    if (rowsCleared > 0) playSound('clear');
+    
+    // Combo-System
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[rowsCleared];
+    let hasBrandBlock = false;
+    
+    for (const row of clearedRows) {
+      if (newBoard[row]?.some(cell => cell?.isBrand)) hasBrandBlock = true;
+    }
+    
     if (rowsCleared > 0) {
-      setCombo(prev => prev + 1);
-      addedScore = Math.floor(addedScore * (1 + combo * 0.1));
+      const newCombo = combo + 1;
+      setCombo(newCombo);
+      addedScore = Math.floor(addedScore * (1 + newCombo * 0.15));
+      
+      // SCND Farb-Bonus (Orange + Schwarz)
+      const hasScndColors = clearedRows.some(row => 
+        newBoard[row]?.some(cell => cell?.color === '#FF4400' || cell?.color === '#1A1A1A')
+      );
+      if (hasScndColors) addedScore = Math.floor(addedScore * 2);
+      
+      if (newCombo >= 5 && !hotStreak) setHotStreak(true);
+      if (newCombo >= 10 && !scndMode) {
+        setScndMode(true);
+        setTimeout(() => setScndMode(false), 10000);
+      }
     } else {
       setCombo(0);
+      setHotStreak(false);
     }
+    
+    if (hasBrandBlock) addedScore = Math.floor(addedScore * 1.5);
     
     const newScore = score + addedScore;
     setScore(newScore);
     
     const newLines = linesCleared + rowsCleared;
     setLinesCleared(newLines);
-    const newLevel = Math.floor(newLines / 10) + 1;
+    const newLevel = Math.floor(newLines / 8) + 1;
     if (newLevel !== level) setLevel(newLevel);
     
     if (addedScore > 0) {
@@ -174,6 +326,16 @@ export function ScndDropGame() {
     setBoard(newBoard);
     spawnNewPiece();
   };
+
+  // Partikel-Animation
+  useEffect(() => {
+    if (particles.length > 0) {
+      const interval = setInterval(() => {
+        setParticles(prev => prev.filter(p => p.life > 0).map(p => ({ ...p, life: p.life - 0.05 })));
+      }, 30);
+      return () => clearInterval(interval);
+    }
+  }, [particles]);
 
   const movePiece = (dx: number, dy: number) => {
     if (!currentPiece || gameOver) return;
@@ -193,7 +355,6 @@ export function ScndDropGame() {
     }
   };
 
-  // Tastatursteuerung + Touch
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -216,9 +377,9 @@ export function ScndDropGame() {
       gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
     }
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level]);
+  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode]);
 
-  // Canvas zeichnen (responsive)
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -228,9 +389,19 @@ export function ScndDropGame() {
     canvas.height = BOARD_HEIGHT * cellSize;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // CRT-Röhren-Effekt Hintergrund
     ctx.fillStyle = 'var(--bg-secondary)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
+    // Retro-Pixel-Rahmen
+    ctx.strokeStyle = '#FF4400';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+    
+    // Gitterlinien
     ctx.strokeStyle = '#FF44004D';
     ctx.lineWidth = 1;
     for (let x = 0; x <= BOARD_WIDTH; x++) {
@@ -246,6 +417,7 @@ export function ScndDropGame() {
       ctx.stroke();
     }
     
+    // Blöcke zeichnen
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
@@ -255,6 +427,11 @@ export function ScndDropGame() {
           ctx.fillStyle = cell.borderColor;
           ctx.fillRect(x * cellSize, y * cellSize, cellSize - 1, 2);
           ctx.fillRect(x * cellSize, y * cellSize, 2, cellSize - 1);
+          if (cell.isBrand) {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+            ctx.fillText('S', x * cellSize + cellSize * 0.35, y * cellSize + cellSize * 0.7);
+          }
         }
         if (flashRow === y) {
           ctx.fillStyle = '#FF440080';
@@ -263,6 +440,22 @@ export function ScndDropGame() {
       }
     }
     
+    // Power-Up zeichnen
+    if (powerUp) {
+      ctx.fillStyle = powerUp.color;
+      ctx.fillRect(powerUpX * cellSize, powerUpY * cellSize, cellSize - 1, cellSize - 1);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.max(10, cellSize * 0.4)}px monospace`;
+      ctx.fillText(powerUp.name[0], powerUpX * cellSize + cellSize * 0.4, powerUpY * cellSize + cellSize * 0.7);
+      setPowerUpY(prev => prev + 0.2);
+      if (powerUpY >= BOARD_HEIGHT - 1) {
+        setPowerUp(null);
+      } else if (collision([[1]], powerUpX, Math.floor(powerUpY))) {
+        applyPowerUp(powerUp.effect);
+      }
+    }
+    
+    // Ghost Piece
     if (currentPiece && !gameOver) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
@@ -298,24 +491,57 @@ export function ScndDropGame() {
       }
     }
     
-    if (combo > 0) {
+    // Scanlines (CRT-Effekt)
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    for (let i = 0; i < canvas.height; i += 2) {
+      ctx.fillRect(0, i, canvas.width, 1);
+    }
+    
+    // Vignette (CRT-Effekt)
+    const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width/2);
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Partikel zeichnen
+    for (const p of particles) {
+      ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+    
+    // Level-Fortschrittsbalken
+    const progress = ((linesCleared % 8) / 8) * canvas.width;
+    ctx.fillStyle = '#1A1A1A';
+    ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
+    ctx.fillStyle = '#FF4400';
+    ctx.fillRect(0, canvas.height - 5, progress, 4);
+    
+    // Combo-Anzeigen
+    if (hotStreak) {
       ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
       ctx.fillStyle = '#FF4400';
       ctx.shadowBlur = 8;
       ctx.shadowColor = '#FF4400';
-      ctx.fillText(`${combo}x COMBO!`, canvas.width - 80, 40);
-      ctx.shadowBlur = 0;
+      ctx.fillText('🔥 HOT STREAK!', canvas.width / 2 - 60, 30);
     }
-    
+    if (scndMode) {
+      ctx.font = `bold ${Math.max(14, cellSize * 0.6)}px monospace`;
+      ctx.fillStyle = '#FF4400';
+      ctx.fillText('⚡ SCND MODE!', canvas.width / 2 - 50, 60);
+    }
+    if (combo > 0) {
+      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
+      ctx.fillStyle = '#FF4400';
+      ctx.fillText(`${combo}x COMBO!`, canvas.width - 70, 30);
+    }
     if (popupScore) {
       ctx.font = `bold ${Math.max(16, cellSize * 0.75)}px monospace`;
       ctx.fillStyle = '#FF4400';
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#FF4400';
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
-      ctx.shadowBlur = 0;
     }
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize]);
+    ctx.shadowBlur = 0;
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, particles, powerUp, powerUpX, powerUpY, linesCleared]);
 
   const saveHighscore = () => {
     if (playerName.trim() === '') return;
@@ -343,10 +569,10 @@ export function ScndDropGame() {
         </div>
         
         <div className="text-center mb-3 md:mb-4">
-          <h3 className="text-xl md:text-3xl font-bold tracking-tighter">
+          <h3 className={`text-xl md:text-3xl font-bold tracking-tighter transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110 text-[#FF4400]' : ''}`}>
             <span className="text-[#FF4400]">SCND</span>_<span className="text-[var(--text-primary)]">DROP</span>
           </h3>
-          <p className="text-[8px] md:text-xs text-[var(--text-secondary)] uppercase tracking-widest mt-1">BAUHAUS EDITION · 1919-1933</p>
+          {slowMode && <p className="text-[8px] md:text-xs text-[#00FFFF] mt-1 animate-pulse">⏱️ TIME SLOW</p>}
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 md:gap-8 justify-center items-center md:items-start">
@@ -376,6 +602,8 @@ export function ScndDropGame() {
               <div className="text-2xl md:text-4xl font-bold text-[#FF4400]">{score}</div>
               <div className="text-[8px] md:text-xs text-[var(--text-secondary)] mt-1">LEVEL {level} · LINES {linesCleared}</div>
               {combo > 0 && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1 animate-pulse">{combo}x COMBO!</div>}
+              {hotStreak && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1">🔥 HOT STREAK!</div>}
+              {scndMode && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1">⚡ SCND MODE!</div>}
             </div>
             
             <h4 className="font-bold text-xs md:text-sm uppercase tracking-widest text-[#FF4400] mb-2 md:mb-3">🏆 HIGHSCORES</h4>
@@ -401,6 +629,7 @@ export function ScndDropGame() {
                 <span className="text-[var(--text-secondary)]">DREHEN</span>
               </div>
               <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] mt-1">ESC = AUFGABEN</div>
+              <div className="text-[8px] md:text-[10px] text-[#FF4400] mt-1">✨ POWER-UPS FALLEN!</div>
             </div>
           </div>
         </div>
