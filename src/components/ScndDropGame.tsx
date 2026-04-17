@@ -13,7 +13,7 @@ const getCellSize = () => {
   return 32;
 };
 
-// TETROMINOS
+// TETROMINOS (Standardformen)
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I', isBrand: true },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O', isBrand: false },
@@ -24,7 +24,7 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
 ];
 
-// POWER-UPS
+// POWER-UPS mit Pixel-Mustern
 const POWERUPS = [
   { name: '💣', fullName: 'BOMBE', color: '#FF4444', bgColor: '#FF4444', effect: 'bomb', chance: 30, retroIcon: '💣' },
   { name: '⚡', fullName: 'LASER', color: '#FF00FF', bgColor: '#FF00FF', effect: 'laser', chance: 25, retroIcon: '⚡' },
@@ -55,7 +55,6 @@ export function ScndDropGame() {
   const [showNameInput, setShowNameInput] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [linesCleared, setLinesCleared] = useState(0);
   const [flashRow, setFlashRow] = useState<number | null>(null);
   const [popupScore, setPopupScore] = useState<{ score: number; x: number; y: number } | null>(null);
@@ -75,20 +74,6 @@ export function ScndDropGame() {
   const powerUpLoopRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
-
-  // Verhindere Scrollen auf Handy während des Spiels (OHNE Verschiebung)
-useEffect(() => {
-  if (isPlaying && !gameOver && !isPaused) {
-    // Nur Scrollen verhindern, keine Positionsänderung
-    document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
-    
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.touchAction = '';
-    };
-  }
-}, [isPlaying, gameOver, isPaused]);
 
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
@@ -121,90 +106,71 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    if (isPlaying && !gameOver && !isPaused) {
+    if (isPlaying && !gameOver) {
       const interval = setInterval(() => setTitlePulse(prev => !prev), 500);
       return () => clearInterval(interval);
     }
-  }, [isPlaying, gameOver, isPaused]);
+  }, [isPlaying, gameOver]);
 
   const showBonus = (text: string) => {
     setBonusMessage({ show: true, text });
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
-const startGame = () => {
-  setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
-  setScore(0);
-  setFinalScore(0);
-  setLevel(1);
-  setLinesCleared(0);
-  setCombo(0);
-  setHotStreak(false);
-  setScndMode(false);
-  setSlowMode(false);
-  setFreezeMode(false);
-  setScndBonusActive(false);
-  setActivePowerUp(null);
-  setGameOver(false);
-  setIsPaused(false);
-  setShowNameInput(false);
-  setParticles([]);
-  setPowerUp(null);
-  
-  // 1. Erstes Tetromino spawnen
-  spawnNewPiece();
-  
-  // 2. Spielstatus auf aktiv setzen
-  setIsPlaying(true);
-  
-  // 3. Bestehende Loops stoppen
-  if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-  if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-  
-  // 4. GAME LOOP STARTEN - OHNE isPlaying Check im Interval!
-  gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
-  
-  // 5. Power-Up Spawner starten
-  powerUpLoopRef.current = setInterval(() => spawnPowerUp(), 8000);
-};
-
-// ========== GIVE UP FUNKTION - HIER EINFÜGEN ==========
-const giveUp = () => {
-  if (isPlaying && !gameOver) {
-    setGameOver(true);
-    setFinalScore(score);
-    setIsPlaying(false);
-    setIsPaused(false);
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+  const startGame = () => {
+    setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
+    setScore(0);
+    setFinalScore(0);
+    setLevel(1);
+    setLinesCleared(0);
+    setCombo(0);
+    setHotStreak(false);
+    setScndMode(false);
+    setSlowMode(false);
+    setFreezeMode(false);
+    setScndBonusActive(false);
+    setActivePowerUp(null);
+    setGameOver(false);
+    setShowNameInput(false);
+    setParticles([]);
+    setPowerUp(null);
+    spawnNewPiece();
+    setIsPlaying(true);
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-    
-    const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
-    if (score > 0 && isHighscore) {
-      setShowNameInput(true);
-      setNewHighscoreGlow(true);
-      setTimeout(() => setNewHighscoreGlow(false), 2000);
-    }
-  }
-};
+    powerUpLoopRef.current = setInterval(spawnPowerUp, 8000);
+  };
 
-  
-  const togglePause = () => {
-    if (!isPlaying || gameOver) return;
-    if (isPaused) {
-      // Fortsetzen
-      setIsPaused(false);
+  const giveUp = () => {
+    if (isPlaying && !gameOver) {
+      setGameOver(true);
+      setFinalScore(score);
+      setIsPlaying(false);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
-    } else {
-      // Pausieren
-      setIsPaused(true);
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
+      
+      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
+      if (score > 0 && isHighscore) {
+        setShowNameInput(true);
+        setNewHighscoreGlow(true);
+        setTimeout(() => setNewHighscoreGlow(false), 2000);
+      }
     }
   };
 
+  // VERBESSERTE spawnPowerUp Funktion mit Debug
   const spawnPowerUp = () => {
-    if (!isPlaying || gameOver || isPaused) return;
-    if (powerUp) return;
+    console.log('🔄 spawnPowerUp aufgerufen - isPlaying:', isPlaying, 'gameOver:', gameOver);
+    
+    if (!isPlaying || gameOver) {
+      console.log('❌ Power-Up nicht gespawnt (Spiel läuft nicht)');
+      return;
+    }
+    
+    // Verhindere mehrere Power-Ups gleichzeitig
+    if (powerUp) {
+      console.log('❌ Power-Up nicht gespawnt (bereits ein Power-Up aktiv)');
+      return;
+    }
     
     const random = Math.random() * 100;
     let cumulative = 0;
@@ -212,6 +178,7 @@ const giveUp = () => {
     for (const pu of POWERUPS) {
       cumulative += pu.chance;
       if (random <= cumulative) {
+        console.log('✅ Power-Up gespawnt:', pu.fullName, 'bei X:', Math.floor(Math.random() * BOARD_WIDTH));
         setPowerUp(pu);
         setPowerUpX(Math.floor(Math.random() * BOARD_WIDTH));
         setPowerUpY(0);
@@ -306,7 +273,6 @@ const giveUp = () => {
     setGameOver(true);
     setFinalScore(score);
     setIsPlaying(false);
-    setIsPaused(false);
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
     
@@ -430,7 +396,7 @@ const giveUp = () => {
   }, [particles]);
 
   const movePiece = (dx: number, dy: number) => {
-    if (!currentPiece || gameOver || freezeMode || isPaused) return;
+    if (!currentPiece || gameOver || freezeMode) return;
     if (!collision(currentPiece.shape, pieceX + dx, pieceY + dy)) {
       setPieceX(pieceX + dx);
       setPieceY(pieceY + dy);
@@ -438,7 +404,7 @@ const giveUp = () => {
   };
 
   const rotatePiece = () => {
-    if (!currentPiece || gameOver || freezeMode || isPaused) return;
+    if (!currentPiece || gameOver || freezeMode) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
@@ -460,13 +426,21 @@ const giveUp = () => {
         case 'ArrowRight': e.preventDefault(); movePiece(1, 0); break;
         case 'ArrowDown': e.preventDefault(); movePiece(0, 1); break;
         case 'ArrowUp': e.preventDefault(); rotatePiece(); break;
-        case 'Escape': e.preventDefault(); togglePause(); break;
+        case 'Escape': e.preventDefault(); giveUp(); break;
         default: break;
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode]);
+
+  useEffect(() => {
+    if (isPlaying && !gameOver && !freezeMode) {
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
+    }
+    return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
+  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode, freezeMode]);
 
   // Canvas zeichnen
   useEffect(() => {
@@ -525,35 +499,45 @@ const giveUp = () => {
       }
     }
     
-    // Power-Up zeichnen
+    // VERBESSERTE Power-Up Zeichnung
     if (powerUp && powerUpY < BOARD_HEIGHT) {
       const w = cellSize;
       const x = powerUpX * w;
       const y = powerUpY * w;
       
+      // Leuchtender Hintergrund mit Glow
       ctx.shadowBlur = 10;
       ctx.shadowColor = powerUp.color;
       ctx.fillStyle = powerUp.bgColor;
       ctx.fillRect(x, y, w - 1, w - 1);
       
+      // Retro Emoji/Symbol
       ctx.fillStyle = '#FFFFFF';
       ctx.font = `bold ${Math.max(20, w * 0.6)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
       ctx.fillText(powerUp.retroIcon, x + w * 0.25, y + w * 0.75);
       
+      // Text unter dem Power-Up
       ctx.font = `bold ${Math.max(9, w * 0.28)}px monospace`;
       ctx.fillStyle = powerUp.color;
       ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 10);
       
       ctx.shadowBlur = 0;
       
+      // Bewegung nach unten
       setPowerUpY(prev => prev + 0.06);
+      
+      // Prüfe ob Power-Up Boden erreicht hat
       if (powerUpY >= BOARD_HEIGHT - 0.8) {
+        console.log('Power-Up verschwunden (Boden)');
         setPowerUp(null);
-      } else {
+      } 
+      // Prüfe Kollision mit Blöcken
+      else {
         const pieceRow = Math.floor(powerUpY);
         if (pieceRow >= 0 && pieceRow < BOARD_HEIGHT) {
           const cell = board[pieceRow]?.[powerUpX];
           if (cell !== null && cell !== undefined) {
+            console.log('Power-Up Kollision mit Block!', powerUp.fullName);
             applyPowerUp(powerUp.effect, powerUp);
             setPowerUp(null);
           }
@@ -561,7 +545,7 @@ const giveUp = () => {
       }
     }
     
-    if (currentPiece && !gameOver && !freezeMode && !isPaused) {
+    if (currentPiece && !gameOver && !freezeMode) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
       if (ghostY > pieceY) {
@@ -654,7 +638,7 @@ const giveUp = () => {
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
     }
     ctx.shadowBlur = 0;
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, powerUp, powerUpX, powerUpY, linesCleared, activePowerUp, isPaused]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, powerUp, powerUpX, powerUpY, linesCleared, activePowerUp]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -694,7 +678,7 @@ const giveUp = () => {
         <div className="p-4 md:p-6">
           <div className="text-center mb-6">
             <div className="inline-block">
-              <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying && !isPaused ? 'scale-110' : ''}`}>
+              <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110' : ''}`}>
                 SCND DROP
               </h3>
               <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
@@ -717,101 +701,69 @@ const giveUp = () => {
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start">
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
-              <canvas 
-                ref={canvasRef} 
-                className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl touch-none" 
-                style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }}
-                onTouchMove={(e) => e.preventDefault()}
-              />
-              
-              {/* TOUCH CONTROLLER für Handy */}
-              {isPlaying && !gameOver && !isPaused && (
-                <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
-                  {/* Obere Reihe: Drehen und Pause */}
-                  <div className="flex justify-center items-center gap-12">
-                    <div className="flex flex-col items-center">
-                      <button 
-                        onTouchStart={handleRotate}
-                        className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                      >
-                        <span className="text-white text-xl font-bold">A</span>
-                      </button>
-                      <span className="text-[7px] text-[var(--text-secondary)] mt-1">DREHEN</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center">
-                      <button 
-                        onTouchStart={togglePause}
-                        className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/60 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                      >
-                        <span className="text-white text-sm font-bold">II</span>
-                      </button>
-                      <span className="text-[7px] text-[var(--text-secondary)] mt-1">PAUSE</span>
-                    </div>
-                  </div>
-                  
-                  {/* Untere Reihe: Links, Unten, Rechts */}
-                  <div className="flex items-center justify-center gap-8">
-                    <div className="flex flex-col items-center">
-                      <button 
-                        onTouchStart={handleMoveLeft}
-                        className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                      >
-                        <span className="text-white text-2xl font-bold">◀</span>
-                      </button>
-                      <span className="text-[7px] text-[var(--text-secondary)] mt-1">LINKS</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center">
-                      <button 
-                        onTouchStart={handleMoveDown}
-                        className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                      >
-                        <span className="text-white text-2xl font-bold">▼</span>
-                      </button>
-                      <span className="text-[7px] text-[var(--text-secondary)] mt-1">UNTEN</span>
-                    </div>
-                    
-                    <div className="flex flex-col items-center">
-                      <button 
-                        onTouchStart={handleMoveRight}
-                        className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                      >
-                        <span className="text-white text-2xl font-bold">▶</span>
-                      </button>
-                      <span className="text-[7px] text-[var(--text-secondary)] mt-1">RECHTS</span>
-                    </div>
-                  </div>
-                  
-                  <div className="text-[6px] text-[var(--text-secondary)] mt-1">TOUCH CONTROLS</div>
-                </div>
-              )}
+              <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {/* PAUSE OVERLAY - MIT AUFGEBEN BUTTON */}
-              {isPaused && !gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
-                  <div className="text-center">
-                    <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSIERT</div>
-                    <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
-                    
-                    <button 
-                      onClick={togglePause} 
-                      className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg"
-                    >
-                      ▶ WEITER
-                    </button>
-                    
-                    <button 
-                      onClick={giveUp} 
-                      className="w-48 py-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all"
-                    >
-                      ⚡ AUFGEBEN
-                    </button>
-                  </div>
-                </div>
-              )}
-              
-              {!isPlaying && !gameOver && (
+{/* TOUCH CONTROLLER für Handy - OPTIMIERT */}
+{isPlaying && !gameOver && (
+  <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
+    {/* Haupt-Controls */}
+    <div className="flex items-center justify-center gap-8">
+      {/* LINKS Button */}
+      <button 
+        onTouchStart={handleMoveLeft}
+        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+      >
+        <span className="text-white text-3xl font-bold">◀</span>
+      </button>
+      
+      {/* UNTEN Button */}
+      <button 
+        onTouchStart={handleMoveDown}
+        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+      >
+        <span className="text-white text-3xl font-bold">▼</span>
+      </button>
+      
+      {/* RECHTS Button */}
+      <button 
+        onTouchStart={handleMoveRight}
+        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+      >
+        <span className="text-white text-3xl font-bold">▶</span>
+      </button>
+      
+      {/* DREHEN Button (A) */}
+      <button 
+        onTouchStart={handleRotate}
+        className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+      >
+        <span className="text-white text-xl font-bold tracking-wider">A</span>
+      </button>
+      
+      {/* PAUSE Button (neu) */}
+      <button 
+        onTouchStart={() => setIsPlaying(false)}
+        className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/50 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+      >
+        <span className="text-white text-sm font-bold">⏸</span>
+      </button>
+    </div>
+    
+    {/* Beschriftung */}
+    <div className="flex gap-8 mt-1">
+      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">BEWEGEN</div>
+      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">DREHEN</div>
+      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">PAUSE</div>
+    </div>
+    
+    {/* Info */}
+    <div className="text-[7px] text-[var(--text-secondary)] mt-0.5">TOUCH CONTROLS</div>
+  </div>
+)}
+
+
+      
+           {!isPlaying && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
                     <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
@@ -830,6 +782,7 @@ const giveUp = () => {
                     <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
                     <div className="flex gap-3">
                       <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
+                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
                     </div>
                   </div>
                 </div>
@@ -907,7 +860,7 @@ const giveUp = () => {
                 </div>
                 <div className="flex justify-center gap-3 mt-1">
                   <kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd>
-                  <span className="text-[8px] text-[var(--text-secondary)]">PAUSE</span>
+                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGABEN</span>
                 </div>
                 <div className="mt-2 flex flex-wrap justify-center gap-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span>
