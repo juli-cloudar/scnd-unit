@@ -617,92 +617,164 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className={`my-6 md:my-12 p-3 md:p-6 bg-[var(--bg-secondary)] rounded-lg border-2 border-[#FF4400]/30 shadow-xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : ''}`}>
+    <div className={`my-6 md:my-12 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : 'shadow-[0_0_15px_rgba(0,0,0,0.5)]'}`}>
       <div className="relative">
-        <div className="absolute inset-0 pointer-events-none rounded-lg overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/20"></div>
-        </div>
+        {/* Dekorativer Header-Bereich */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl"></div>
         
-        <div className="text-center mb-3 md:mb-4">
-          <h3 className={`text-xl md:text-3xl font-bold tracking-tighter transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110 text-[#FF4400]' : ''}`}>
-            <span className="text-[#FF4400]">SCND</span>_<span className="text-[var(--text-primary)]">DROP</span>
-          </h3>
-          {slowMode && <p className="text-[8px] md:text-xs text-[#00FFFF] mt-1 animate-pulse">🐌 TIME SLOW</p>}
-          {bonusMessage.show && (
-            <p className="text-[8px] md:text-xs text-[#FFD700] mt-1 animate-bounce">{bonusMessage.text}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-4 md:gap-8 justify-center items-center md:items-start">
-          <div className="relative">
-            <canvas ref={canvasRef} className="border-2 md:border-4 border-[#FF4400] shadow-lg shadow-[#FF4400]/20 rounded-sm" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
-            
-            {/* Touch-Controller für Handy */}
-            {isPlaying && !gameOver && (
-              <div className="absolute -bottom-16 left-0 right-0 flex justify-center gap-3 md:hidden mt-2">
-                <button onTouchStart={handleTouchLeft} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">←</button>
-                <button onTouchStart={handleTouchDown} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">↓</button>
-                <button onTouchStart={handleTouchRight} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">→</button>
-                <button onTouchStart={handleTouchRotate} className="w-14 h-14 bg-black/70 border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:bg-[#FF4400]/50">↻</button>
-              </div>
-            )}
-            
-            {!isPlaying && !gameOver && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 md:gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
-                <button onClick={startGame} className="px-4 md:px-8 py-2 md:py-3 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-xs md:text-base hover:bg-[#FF4400]/80 transition-all hover:scale-105 shadow-lg">
-                  ▶ START
-                </button>
-              </div>
-            )}
-            {gameOver && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 md:gap-3 bg-black/70 backdrop-blur-sm rounded-sm">
-                <div className="text-base md:text-2xl font-bold tracking-tighter mb-1 md:mb-2">
-                  <span className="text-[#FF4400]">GAME</span>_<span className="text-white">OVER</span>
-                </div>
-                <div className="text-sm md:text-xl text-[#FF4400] font-bold mb-2">{finalScore} Punkte</div>
-                <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded-sm text-xs md:text-sm hover:bg-[#FF4400]/80 transition">NEUSTART</button>
-                <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-sm text-xs md:text-sm hover:bg-[#FF4400]/10 transition">AUFGABEN</button>
+        <div className="p-4 md:p-6">
+          {/* Titelbereich mit SCND Logo */}
+          <div className="text-center mb-6">
+            <div className="inline-block">
+              <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110' : ''}`}>
+                SCND STACK
+              </h3>
+              <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
+            </div>
+            <div className="flex justify-center gap-3 mt-2">
+              {slowMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full">🐌 TIME SLOW</span>}
+              {freezeMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full animate-pulse">⏰ FREEZE</span>}
+              {scndBonusActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[10px] rounded-full animate-pulse">⭐ 3x BONUS</span>}
+              {activePowerUp && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[10px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
+            </div>
+            {bonusMessage.show && (
+              <div className="mt-2 animate-bounce">
+                <span className="inline-block px-3 py-1 bg-[#FFD700]/20 text-[#FFD700] text-[10px] md:text-xs rounded-full border border-[#FFD700]/30">
+                  {bonusMessage.text}
+                </span>
               </div>
             )}
           </div>
 
-          <div className="bg-[var(--bg-primary)] p-3 md:p-5 rounded-lg border border-[#FF4400]/30 min-w-[180px] md:min-w-[220px] w-full md:w-auto">
-            <div className="text-center mb-3 md:mb-4 pb-2 md:pb-3 border-b border-[#FF4400]/30">
-              <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-widest">SCORE</div>
-              <div className="text-2xl md:text-4xl font-bold text-[#FF4400]">{gameOver ? finalScore : score}</div>
-              <div className="text-[8px] md:text-xs text-[var(--text-secondary)] mt-1">LEVEL {level} · LINES {linesCleared}</div>
-              {combo > 0 && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1 animate-pulse">{combo}x COMBO!</div>}
-              {hotStreak && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1">🔥 HOT STREAK!</div>}
-              {scndMode && <div className="text-[10px] md:text-xs text-[#FF4400] mt-1">⚡ SCND MODE!</div>}
-              {scndBonusActive && <div className="text-[10px] md:text-xs text-[#FFD700] mt-1">⭐ 3x BONUS AKTIV!</div>}
-              {activePowerUp && <div className="text-[10px] md:text-xs text-[#00FF00] mt-1">✨ {activePowerUp} AKTIV!</div>}
-            </div>
-            
-            <h4 className="font-bold text-xs md:text-sm uppercase tracking-widest text-[#FF4400] mb-2 md:mb-3">🏆 HIGHSCORES</h4>
-            <ul className="space-y-1 md:space-y-2">
-              {highscores.map((hs, idx) => (
-                <li key={idx} className="flex justify-between items-center border-b border-[var(--border-color)] py-1">
-                  <span className="flex items-center gap-1 md:gap-2">
-                    <span className="text-sm md:text-lg">{rankIcon(idx)}</span>
-                    <span className="text-xs md:text-base font-medium truncate max-w-[80px] md:max-w-none">{hs.player_name}</span>
-                  </span>
-                  <span className="text-xs md:text-base text-[#FF4400] font-bold">{hs.score}</span>
-                </li>
-              ))}
-              {highscores.length === 0 && (
-                <li className="text-center text-[10px] md:text-xs text-[var(--text-secondary)] py-2">— leer —</li>
+          <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start">
+            {/* Spielfeld-Bereich */}
+            <div className="relative">
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
+              <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
+              
+              {/* Touch-Controller */}
+              {isPlaying && !gameOver && (
+                <div className="absolute -bottom-16 left-0 right-0 flex justify-center gap-3 md:hidden mt-3">
+                  <button onTouchStart={handleTouchLeft} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">←</button>
+                  <button onTouchStart={handleTouchDown} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">↓</button>
+                  <button onTouchStart={handleTouchRight} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">→</button>
+                  <button onTouchStart={handleTouchRotate} className="w-14 h-14 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full text-white text-xl font-bold active:scale-95 transition-all shadow-lg">↻</button>
+                </div>
               )}
-            </ul>
-            <div className="mt-3 md:mt-4 pt-2 md:pt-3 border-t border-[#FF4400]/30 text-center">
-              <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-widest">CONTROLS</div>
-              <div className="flex justify-center gap-2 md:gap-4 mt-1 md:mt-2 text-xs md:text-sm">
-                <span>← → ↓</span>
-                <span className="text-[#FF4400]">↑</span>
-                <span className="text-[var(--text-secondary)]">DREHEN</span>
+              
+              {/* Overlays */}
+              {!isPlaying && !gameOver && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
+                  <div className="text-center">
+                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND STACK</div>
+                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
+                      ▶ START GAME
+                    </button>
+                  </div>
+                </div>
+              )}
+              {gameOver && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
+                  <div className="text-center">
+                    <div className="text-xl md:text-3xl font-black mb-1">
+                      <span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span>
+                    </div>
+                    <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
+                    <div className="flex gap-3">
+                      <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
+                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Info-Panel - NEUES DESIGN */}
+            <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
+              
+              {/* Score-Karte */}
+              <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
+                <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
+                <div className="text-3xl md:text-5xl font-black text-[#FF4400] drop-shadow-[0_0_10px_rgba(255,68,0,0.5)]">{gameOver ? finalScore : score}</div>
+                <div className="flex justify-center gap-4 mt-2">
+                  <div className="text-center">
+                    <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)]">LEVEL</div>
+                    <div className="text-sm md:text-base font-bold text-[#FF4400]">{level}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)]">LINIEN</div>
+                    <div className="text-sm md:text-base font-bold text-[var(--text-primary)]">{linesCleared}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)]">COMBO</div>
+                    <div className="text-sm md:text-base font-bold text-[#FF4400]">{combo}x</div>
+                  </div>
+                </div>
               </div>
-              <div className="text-[8px] md:text-[10px] text-[#FF4400] mt-1">🎁 POWER-UPS ALLE 8 SEK!</div>
-              <div className="text-[8px] md:text-[10px] text-[#FFD700] mt-1">🎨 ORANGE+SCHWARZ = 2x PUNKTE</div>
-              <div className="text-[8px] md:text-[10px] text-[#FF4400] mt-1">ESC = AUFGABEN</div>
+              
+              {/* Status-Karten */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {hotStreak && (
+                  <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]">
+                    <div className="text-[10px] text-[var(--text-secondary)]">🔥 STREAK</div>
+                    <div className="text-xs font-bold text-[#FF4400]">HOT STREAK!</div>
+                  </div>
+                )}
+                {scndMode && (
+                  <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]">
+                    <div className="text-[10px] text-[var(--text-secondary)]">⚡ MODUS</div>
+                    <div className="text-xs font-bold text-[#FF4400]">SCND MODE!</div>
+                  </div>
+                )}
+                {scndBonusActive && (
+                  <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FFD700]">
+                    <div className="text-[10px] text-[var(--text-secondary)]">⭐ BONUS</div>
+                    <div className="text-xs font-bold text-[#FFD700]">3x PUNKTE!</div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Highscore-Bereich - Karten-Design */}
+              <div className="bg-[var(--bg-secondary)]/50 rounded-xl p-3 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-4 bg-[#FF4400] rounded-full"></div>
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-[#FF4400]">🏆 BESTENLISTE TOP 3</h4>
+                </div>
+                <ul className="space-y-1">
+                  {highscores.map((hs, idx) => (
+                    <li key={idx} className="flex justify-between items-center bg-[var(--bg-primary)]/50 rounded-lg px-3 py-1.5">
+                      <span className="flex items-center gap-2">
+                        <span className="text-base md:text-lg">{rankIcon(idx)}</span>
+                        <span className="text-xs md:text-sm font-medium truncate max-w-[80px] md:max-w-[100px]">{hs.player_name}</span>
+                      </span>
+                      <span className="text-xs md:text-sm text-[#FF4400] font-bold">{hs.score}</span>
+                    </li>
+                  ))}
+                  {highscores.length === 0 && (
+                    <li className="text-center text-[10px] md:text-xs text-[var(--text-secondary)] py-2 italic">— noch keine Einträge —</li>
+                  )}
+                </ul>
+              </div>
+              
+              {/* Steuerungs-Info */}
+              <div className="text-center pt-2 border-t border-[#FF4400]/20">
+                <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
+                <div className="flex justify-center gap-3 mt-1">
+                  <kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">← → ↓</kbd>
+                  <kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">↑</kbd>
+                  <kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[var(--text-secondary)]">DREHEN</kbd>
+                </div>
+                <div className="flex justify-center gap-3 mt-1">
+                  <kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd>
+                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGABEN</span>
+                </div>
+                <div className="mt-2 flex flex-wrap justify-center gap-1">
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span>
+                  <span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">POWER-UPS alle 8 Sek.</span>
+                  <span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span>
+                  <span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+SCHWARZ = 2x</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
