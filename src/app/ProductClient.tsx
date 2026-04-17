@@ -1,3 +1,4 @@
+// src/app/ProductClient.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,6 +12,7 @@ import { type ViewMode } from '@/components/ViewToggle';
 import { ProductView } from '@/components/ProductView';
 import { useProductCleaner } from '@/hooks/useProductCleaner';
 import { Navigation } from '@/components/Navigation';
+import { ScndDropGame } from '@/components/ScndDropGame';  // ← SPIEL IMPORT
 
 interface Product {
   id: number;
@@ -239,6 +241,13 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
               </div>
             </motion.div>
           </div>
+        </div>
+      </section>
+
+      {/* ========== SCND DROP GAME SECTION ========== */}
+      <section id="game" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="max-w-7xl mx-auto">
+          <ScndDropGame />
         </div>
       </section>
 
