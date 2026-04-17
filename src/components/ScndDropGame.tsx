@@ -75,6 +75,18 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
+  // Verhindere Scrollen auf Handy während des Spiels
+  useEffect(() => {
+    if (isPlaying && !gameOver) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.touchAction = '';
+      };
+    }
+  }, [isPlaying, gameOver]);
+
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
     handleResize();
@@ -98,13 +110,12 @@ export function ScndDropGame() {
     loadHighscores();
   }, []);
 
- const getFallDelay = () => {
-  if (freezeMode) return Infinity;
-  // Start bei 1000ms (1 Sekunde), dann langsameres Level-Up
-  let delay = Math.max(150, 1000 - (level - 1) * 80);
-  if (slowMode) delay = delay * 2;
-  return delay;
-};
+  const getFallDelay = () => {
+    if (freezeMode) return Infinity;
+    let delay = Math.max(80, 300 - (level - 1) * 25);
+    if (slowMode) delay = delay * 2;
+    return delay;
+  };
 
   useEffect(() => {
     if (isPlaying && !gameOver) {
@@ -158,20 +169,9 @@ export function ScndDropGame() {
     }
   };
 
-  // VERBESSERTE spawnPowerUp Funktion mit Debug
   const spawnPowerUp = () => {
-    console.log('🔄 spawnPowerUp aufgerufen - isPlaying:', isPlaying, 'gameOver:', gameOver);
-    
-    if (!isPlaying || gameOver) {
-      console.log('❌ Power-Up nicht gespawnt (Spiel läuft nicht)');
-      return;
-    }
-    
-    // Verhindere mehrere Power-Ups gleichzeitig
-    if (powerUp) {
-      console.log('❌ Power-Up nicht gespawnt (bereits ein Power-Up aktiv)');
-      return;
-    }
+    if (!isPlaying || gameOver) return;
+    if (powerUp) return;
     
     const random = Math.random() * 100;
     let cumulative = 0;
@@ -179,7 +179,6 @@ export function ScndDropGame() {
     for (const pu of POWERUPS) {
       cumulative += pu.chance;
       if (random <= cumulative) {
-        console.log('✅ Power-Up gespawnt:', pu.fullName, 'bei X:', Math.floor(Math.random() * BOARD_WIDTH));
         setPowerUp(pu);
         setPowerUpX(Math.floor(Math.random() * BOARD_WIDTH));
         setPowerUpY(0);
@@ -435,6 +434,7 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode]);
 
+  // Automatischer Game Loop
   useEffect(() => {
     if (isPlaying && !gameOver && !freezeMode) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
@@ -500,45 +500,36 @@ export function ScndDropGame() {
       }
     }
     
-    // VERBESSERTE Power-Up Zeichnung
+    // Power-Up Zeichnung
     if (powerUp && powerUpY < BOARD_HEIGHT) {
       const w = cellSize;
       const x = powerUpX * w;
       const y = powerUpY * w;
       
-      // Leuchtender Hintergrund mit Glow
       ctx.shadowBlur = 10;
       ctx.shadowColor = powerUp.color;
       ctx.fillStyle = powerUp.bgColor;
       ctx.fillRect(x, y, w - 1, w - 1);
       
-      // Retro Emoji/Symbol
       ctx.fillStyle = '#FFFFFF';
       ctx.font = `bold ${Math.max(20, w * 0.6)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
       ctx.fillText(powerUp.retroIcon, x + w * 0.25, y + w * 0.75);
       
-      // Text unter dem Power-Up
       ctx.font = `bold ${Math.max(9, w * 0.28)}px monospace`;
       ctx.fillStyle = powerUp.color;
       ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 10);
       
       ctx.shadowBlur = 0;
       
-      // Bewegung nach unten
       setPowerUpY(prev => prev + 0.06);
       
-      // Prüfe ob Power-Up Boden erreicht hat
       if (powerUpY >= BOARD_HEIGHT - 0.8) {
-        console.log('Power-Up verschwunden (Boden)');
         setPowerUp(null);
-      } 
-      // Prüfe Kollision mit Blöcken
-      else {
+      } else {
         const pieceRow = Math.floor(powerUpY);
         if (pieceRow >= 0 && pieceRow < BOARD_HEIGHT) {
           const cell = board[pieceRow]?.[powerUpX];
           if (cell !== null && cell !== undefined) {
-            console.log('Power-Up Kollision mit Block!', powerUp.fullName);
             applyPowerUp(powerUp.effect, powerUp);
             setPowerUp(null);
           }
@@ -704,67 +695,62 @@ export function ScndDropGame() {
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-{/* TOUCH CONTROLLER für Handy - OPTIMIERT */}
-{isPlaying && !gameOver && (
-  <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
-    {/* Haupt-Controls */}
-    <div className="flex items-center justify-center gap-8">
-      {/* LINKS Button */}
-      <button 
-        onTouchStart={handleMoveLeft}
-        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-3xl font-bold">◀</span>
-      </button>
-      
-      {/* UNTEN Button */}
-      <button 
-        onTouchStart={handleMoveDown}
-        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-3xl font-bold">▼</span>
-      </button>
-      
-      {/* RECHTS Button */}
-      <button 
-        onTouchStart={handleMoveRight}
-        className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-3xl font-bold">▶</span>
-      </button>
-      
-      {/* DREHEN Button (A) */}
-      <button 
-        onTouchStart={handleRotate}
-        className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-xl font-bold tracking-wider">A</span>
-      </button>
-      
-      {/* PAUSE Button (neu) */}
-      <button 
-        onTouchStart={() => setIsPlaying(false)}
-        className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/50 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="text-white text-sm font-bold">⏸</span>
-      </button>
-    </div>
-    
-    {/* Beschriftung */}
-    <div className="flex gap-8 mt-1">
-      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">BEWEGEN</div>
-      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">DREHEN</div>
-      <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">PAUSE</div>
-    </div>
-    
-    {/* Info */}
-    <div className="text-[7px] text-[var(--text-secondary)] mt-0.5">TOUCH CONTROLS</div>
-  </div>
-)}
+              {/* TOUCH CONTROLLER für Handy - KEIN PAUSE MEHR, STATTDESSEN AUFGABEN */}
+              {isPlaying && !gameOver && (
+                <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
+                  <div className="flex items-center justify-center gap-8">
+                    {/* LINKS */}
+                    <button 
+                      onTouchStart={handleMoveLeft}
+                      className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                    >
+                      <span className="text-white text-3xl font-bold">◀</span>
+                    </button>
+                    
+                    {/* UNTEN */}
+                    <button 
+                      onTouchStart={handleMoveDown}
+                      className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                    >
+                      <span className="text-white text-3xl font-bold">▼</span>
+                    </button>
+                    
+                    {/* RECHTS */}
+                    <button 
+                      onTouchStart={handleMoveRight}
+                      className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                    >
+                      <span className="text-white text-3xl font-bold">▶</span>
+                    </button>
+                    
+                    {/* DREHEN (A) */}
+                    <button 
+                      onTouchStart={handleRotate}
+                      className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                    >
+                      <span className="text-white text-xl font-bold tracking-wider">A</span>
+                    </button>
+                    
+                    {/* AUFGABEN (statt Pause) */}
+                    <button 
+                      onTouchStart={giveUp}
+                      className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/50 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                    >
+                      <span className="text-white text-sm font-bold">🏆</span>
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-8 mt-1">
+                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">BEWEGEN</div>
+                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">DREHEN</div>
+                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">AUFGABEN</div>
+                  </div>
+                  
+                  <div className="text-[7px] text-[var(--text-secondary)] mt-0.5">TOUCH CONTROLS</div>
+                </div>
+              )}
 
-
-      
-           {!isPlaying && !gameOver && (
+              {!isPlaying && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
                     <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
@@ -783,7 +769,7 @@ export function ScndDropGame() {
                     <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
                     <div className="flex gap-3">
                       <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
-                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGEBEN</button>
+                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
                     </div>
                   </div>
                 </div>
@@ -861,7 +847,7 @@ export function ScndDropGame() {
                 </div>
                 <div className="flex justify-center gap-3 mt-1">
                   <kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd>
-                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGEBEN</span>
+                  <span className="text-[8px] text-[var(--text-secondary)]">AUFGABEN</span>
                 </div>
                 <div className="mt-2 flex flex-wrap justify-center gap-1">
                   <span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span>
