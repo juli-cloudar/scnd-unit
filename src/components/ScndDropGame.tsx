@@ -700,8 +700,7 @@ export function ScndDropGame() {
               </div>
             )}
           </div>
-
-          <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start">
+          <div className="relative flex flex-col items-center" style={{ width: '180px' }}>
             <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
