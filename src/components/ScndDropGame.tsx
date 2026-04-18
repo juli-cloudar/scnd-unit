@@ -695,71 +695,78 @@ export function ScndDropGame() {
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {/* TOUCH CONTROLLER für Handy - KEIN PAUSE MEHR, STATTDESSEN AUFGEBEN */}
-              {isPlaying && !gameOver && (
-                <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center gap-3 md:hidden z-50">
-                  <div className="flex items-center justify-center gap-8">
-                    {/* LINKS */}
-                    <button 
-                      onTouchStart={handleMoveLeft}
-                      className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                    >
-                      <span className="text-white text-3xl font-bold">◀</span>
-                    </button>
-                    
-                    {/* UNTEN */}
-                    <button 
-                      onTouchStart={handleMoveDown}
-                      className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                    >
-                      <span className="text-white text-3xl font-bold">▼</span>
-                    </button>
-                    
-                    {/* RECHTS */}
-                    <button 
-                      onTouchStart={handleMoveRight}
-                      className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                    >
-                      <span className="text-white text-3xl font-bold">▶</span>
-                    </button>
-                    
-                    {/* DREHEN (A) */}
-                    <button 
-                      onTouchStart={handleRotate}
-                      className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                    >
-                      <span className="text-white text-xl font-bold tracking-wider">A</span>
-                    </button>
-                    
-                    {/* AUFGEBEN (statt Pause) */}
-                    <button 
-                      onTouchStart={giveUp}
-                      className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border border-[#FF4400]/50 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                    >
-                      <span className="text-white text-sm font-bold">🏆</span>
-                    </button>
-                  </div>
-                  
-                  <div className="flex gap-8 mt-1">
-                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">BEWEGEN</div>
-                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">DREHEN</div>
-                    <div className="text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">AUFGEBEN</div>
-                  </div>
-                  
-                  <div className="text-[7px] text-[var(--text-secondary)] mt-0.5">TOUCH CONTROLS</div>
-                </div>
-              )}
 
-              {!isPlaying && !gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
-                  <div className="text-center">
-                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
-                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
-                      ▶ START GAME
-                    </button>
-                  </div>
-                </div>
-              )}
+
+{/* TOUCH CONTROLLER für Handy - asymmetrisches Dreieck + zwei rechte Tasten */}
+{isPlaying && !gameOver && (
+  <div 
+    className="fixed bottom-4 left-0 right-0 flex justify-center items-end md:hidden z-50"
+    style={{ touchAction: 'none', userSelect: 'none' }}
+  >
+    <div className="flex items-end gap-8">
+      {/* LINKER BEREICH: Dreieck (Links, Unten, Rechts) */}
+      <div className="relative flex flex-col items-center" style={{ width: '180px' }}>
+        {/* Obere Reihe: Links und Rechts */}
+        <div className="flex justify-between w-full mb-3">
+          {/* LINKS Taste */}
+          <button
+            onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }}
+            className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+            style={{ touchAction: 'none', userSelect: 'none' }}
+          >
+            <span className="text-white text-3xl font-bold">◀</span>
+          </button>
+          {/* RECHTS Taste */}
+          <button
+            onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }}
+            className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+            style={{ touchAction: 'none', userSelect: 'none' }}
+          >
+            <span className="text-white text-3xl font-bold">▶</span>
+          </button>
+        </div>
+        {/* UNTEN Taste – asymmetrisch (nach rechts versetzt) */}
+        <div className="flex justify-end w-full pr-4">
+          <button
+            onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }}
+            className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+            style={{ touchAction: 'none', userSelect: 'none' }}
+          >
+            <span className="text-white text-3xl font-bold">▼</span>
+          </button>
+        </div>
+      </div>
+
+      {/* RECHTE SEITE: zwei Tasten schräg übereinander */}
+      <div className="flex flex-col gap-4">
+        {/* DREHEN Taste (oben, leicht nach rechts versetzt) */}
+        <button
+          onTouchStart={(e) => { e.preventDefault(); handleRotate(); }}
+          className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all ml-4"
+          style={{ touchAction: 'none', userSelect: 'none' }}
+        >
+          <span className="text-white text-xl font-bold tracking-wider">A</span>
+        </button>
+        {/* AUFGABEN Taste (unten, weiter rechts) */}
+        <button
+          onTouchStart={(e) => { e.preventDefault(); giveUp(); }}
+          className="w-16 h-16 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all ml-8"
+          style={{ touchAction: 'none', userSelect: 'none' }}
+        >
+          <span className="text-white text-xl font-bold">🏆</span>
+        </button>
+      </div>
+    </div>
+
+    {/* Beschriftung (optional) */}
+    <div className="absolute -bottom-6 left-0 right-0 flex justify-center gap-12 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">
+      <span>BEWEGEN</span>
+      <span>DREHEN</span>
+      <span>AUFGABEN</span>
+    </div>
+  </div>
+)}
+              
               {gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
