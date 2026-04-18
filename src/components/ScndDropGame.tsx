@@ -7,7 +7,6 @@ const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 const getCellSize = () => {
   if (typeof window === 'undefined') return 28;
-  // Handy: kleinere Zellen, damit das gesamte Grid sichtbar ist
   if (window.innerWidth < 640) return 28;
   if (window.innerWidth < 768) return 30;
   return 32;
@@ -24,7 +23,7 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false, isPowerUp: false }
 ];
 
-// Power‑Up‑Tetrominos (gleiche Formen, andere Farben + Glow)
+// Power‑Up‑Tetrominos
 const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8888', borderColor: '#FF0000', name: '💣 BOMBE', isBrand: false, isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF4444' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF88FF', borderColor: '#FF00FF', name: '⚡ LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF00FF' },
@@ -71,12 +70,11 @@ export function ScndDropGame() {
   const [scndBonusActive, setScndBonusActive] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<string | null>(null);
   const gameLoopRef = useRef<number | null>(null);
-  const lastTimestampRef = useRef<number>(0);
-  const fallIntervalRef = useRef<number>(0);
+  const movePieceRef = useRef(movePiece);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
-  // Scroll-Schutz für Handy
+  // Scroll-Schutz
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       document.body.style.overflow = 'hidden';
@@ -406,6 +404,11 @@ export function ScndDropGame() {
     } else if (dy === 1) mergePiece();
   };
 
+  // Referenz aktuell halten
+  useEffect(() => {
+    movePieceRef.current = movePiece;
+  }, [movePiece]);
+
   const rotatePiece = () => {
     if (!currentPiece || gameOver || freezeMode || isPaused) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
@@ -438,31 +441,29 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
-
-
-  // ========== GAME LOOP mit requestAnimationFrame ==========
-useEffect(() => {
-  if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
-    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-    return;
-  }
-  let lastFall = performance.now();
-  const delay = getFallDelay();
-  if (delay === Infinity) return;
-
-  const step = (now: number) => {
-    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) return;
-    if (now - lastFall >= delay) {
-      movePiece(0, 1);
-      lastFall = now;
+  // ========== GAME LOOP (mit movePieceRef) ==========
+  useEffect(() => {
+    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      return;
     }
+    let lastFall = performance.now();
+    const delay = getFallDelay();
+    if (delay === Infinity) return;
+
+    const step = (now: number) => {
+      if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) return;
+      if (now - lastFall >= delay) {
+        movePieceRef.current(0, 1);
+        lastFall = now;
+      }
+      gameLoopRef.current = requestAnimationFrame(step);
+    };
     gameLoopRef.current = requestAnimationFrame(step);
-  };
-  gameLoopRef.current = requestAnimationFrame(step);
-  return () => {
-    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-  };
-}, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, currentPiece]); // ⬅️ currentPiece hinzugefügt
+    return () => {
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    };
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, currentPiece]);
 
   // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
@@ -724,7 +725,6 @@ useEffect(() => {
                     <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
                     <div className="flex gap-3">
                       <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
-                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
                     </div>
                   </div>
                 </div>
@@ -770,7 +770,7 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* ========== TOUCH CONTROLLER (eigene Leiste unter dem Canvas) ========== */}
+      {/* ========== TOUCH CONTROLLER ========== */}
       {isPlaying && !gameOver && (
         <div className="fixed bottom-0 left-0 right-0 md:hidden bg-black/80 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 z-50">
           <div className="flex justify-between items-center px-6 max-w-md mx-auto">
