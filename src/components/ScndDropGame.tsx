@@ -70,7 +70,7 @@ export function ScndDropGame() {
   const [scndBonusActive, setScndBonusActive] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<string | null>(null);
   const gameLoopRef = useRef<number | null>(null);
-  const movePieceRef = useRef(movePiece);
+  const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {}); // Platzhalter
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
@@ -404,7 +404,7 @@ export function ScndDropGame() {
     } else if (dy === 1) mergePiece();
   };
 
-  // Referenz aktuell halten
+  // Referenz nach Definition von movePiece aktualisieren
   useEffect(() => {
     movePieceRef.current = movePiece;
   }, [movePiece]);
