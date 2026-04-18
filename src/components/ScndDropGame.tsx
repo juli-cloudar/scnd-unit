@@ -6,13 +6,22 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Zellengröße: Auf Handys 28px
+// Dynamische Zellengröße - maximal mögliche Größe ohne Überlappung
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 28;
+  if (typeof window === 'undefined') return 32;
   const width = window.innerWidth;
-  if (width < 768) return 28;
+  const height = window.innerHeight;
+  
+  // Auf Handys: Maximale Zellengröße berechnen
+  if (width < 768) {
+    // Verfügbare Höhe: Bildschirmhöhe - Header (ca. 120px) - Controller (ca. 140px) - Padding
+    const availableHeight = height - 260;
+    let cell = Math.floor(availableHeight / BOARD_HEIGHT);
+    // Begrenzung auf sinnvolle Werte (min 20px, max 38px)
+    return Math.min(Math.max(cell, 20), 38);
+  }
   if (width < 1024) return 32;
-  return 32;
+  return 34;
 };
 
 // Normale Tetrominos
@@ -47,7 +56,7 @@ interface Highscore {
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cellSize, setCellSize] = useState(28);
+  const [cellSize, setCellSize] = useState(32);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -741,18 +750,18 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className={'min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all ' + (newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : 'shadow-[0_0_15px_rgba(0,0,0,0.5)]')}>
-      <div className="relative">
+    <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
+      <div className="relative flex-1">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl"></div>
-        <div className="p-4 md:p-6">
-          <div className="text-center mb-6">
+        <div className="p-4 md:p-6 pb-0">
+          <div className="text-center mb-4">
             <div className="inline-block">
               <h3 className={'text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
                 SCND DROP
               </h3>
               <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
             </div>
-            <div className="flex justify-center gap-3 mt-2">
+            <div className="flex justify-center gap-3 mt-2 flex-wrap">
               {slowMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full">🐌 TIME SLOW</span>}
               {freezeMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full animate-pulse">⏰ FREEZE</span>}
               {fastForwardActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[10px] rounded-full animate-pulse">⏩ FAST FORWARD</span>}
@@ -769,45 +778,49 @@ export function ScndDropGame() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            <div className="relative mb-52 md:mb-0">
-              <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
-              <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
+            {/* Canvas Container - zentriert mit maximaler Größe */}
+            <div className="flex justify-center items-center">
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
+                <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {isPaused && !gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
-                  <div className="text-center">
-                    <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSE</div>
-                    <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
-                    <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
-                    <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
-                    <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
-                  </div>
-                </div>
-              )}
-
-              {!isPlaying && !gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
-                  <div className="text-center">
-                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
-                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">▶ START GAME</button>
-                  </div>
-                </div>
-              )}
-              
-              {gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
-                  <div className="text-center">
-                    <div className="text-xl md:text-3xl font-black mb-1"><span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span></div>
-                    <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
-                    <div className="flex gap-3">
-                      <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
+                {isPaused && !gameOver && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
+                    <div className="text-center">
+                      <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSE</div>
+                      <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
+                      <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
+                      <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
+                      <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {!isPlaying && !gameOver && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
+                    <div className="text-center">
+                      <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
+                      <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">▶ START GAME</button>
+                    </div>
+                  </div>
+                )}
+                
+                {gameOver && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
+                    <div className="text-center">
+                      <div className="text-xl md:text-3xl font-black mb-1"><span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span></div>
+                      <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
+                      <div className="flex gap-3">
+                        <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
+            {/* Rechte Seitenleiste - auf Handy unter dem Canvas */}
+            <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl mt-4 md:mt-0">
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
                 <div className="text-3xl md:text-5xl font-black text-[#FF4400] drop-shadow-[0_0_10px_rgba(255,68,0,0.5)]">{gameOver ? finalScore : score}</div>
@@ -901,6 +914,9 @@ export function ScndDropGame() {
           </div>
         </div>
       )}
+
+      {/* Zusätzlicher Padding-Bottom auf Handy für den Controller */}
+      <div className="md:hidden h-32"></div>
 
       {showNameInput && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
