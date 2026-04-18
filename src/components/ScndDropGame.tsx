@@ -6,10 +6,10 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 36;
-  // Auf Handys größere Blöcke (36px statt 24)
-  if (window.innerWidth < 640) return 36;
-  if (window.innerWidth < 768) return 32;
+  if (typeof window === 'undefined') return 28;
+  // Handy: kleinere Zellen, damit das gesamte Grid sichtbar ist
+  if (window.innerWidth < 640) return 28;
+  if (window.innerWidth < 768) return 30;
   return 32;
 };
 
@@ -42,7 +42,7 @@ interface Highscore {
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cellSize, setCellSize] = useState(32);
+  const [cellSize, setCellSize] = useState(28);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -70,7 +70,9 @@ export function ScndDropGame() {
   const [freezeMode, setFreezeMode] = useState(false);
   const [scndBonusActive, setScndBonusActive] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<string | null>(null);
-  const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
+  const gameLoopRef = useRef<number | null>(null);
+  const lastTimestampRef = useRef<number>(0);
+  const fallIntervalRef = useRef<number>(0);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
@@ -152,7 +154,7 @@ export function ScndDropGame() {
       setFinalScore(score);
       setIsPlaying(false);
       setIsPaused(false);
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
         setShowNameInput(true);
@@ -264,7 +266,7 @@ export function ScndDropGame() {
     setFinalScore(score);
     setIsPlaying(false);
     setIsPaused(false);
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
     if (score > 0 && isHighscore) {
       setShowNameInput(true);
@@ -331,7 +333,6 @@ export function ScndDropGame() {
       } else row--;
     }
 
-    // Power‑Up‑Effekte für gelöschte Blöcke
     for (const block of powerUpBlocks) {
       if (clearedRows.includes(block.y)) {
         triggerPowerUpEffect(block.effect, block.x, block.y);
@@ -425,10 +426,10 @@ export function ScndDropGame() {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
       switch (e.key) {
-        case 'ArrowLeft': e.preventDefault(); movePiece(-1, 0); break;
-        case 'ArrowRight': e.preventDefault(); movePiece(1, 0); break;
-        case 'ArrowDown': e.preventDefault(); movePiece(0, 1); break;
-        case 'ArrowUp': e.preventDefault(); rotatePiece(); break;
+        case 'ArrowLeft': e.preventDefault(); handleMoveLeft(); break;
+        case 'ArrowRight': e.preventDefault(); handleMoveRight(); break;
+        case 'ArrowDown': e.preventDefault(); handleMoveDown(); break;
+        case 'ArrowUp': e.preventDefault(); handleRotate(); break;
         case 'Escape': e.preventDefault(); togglePause(); break;
         default: break;
       }
@@ -437,28 +438,30 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
- 
-// Automatischer Game Loop (robust, ohne currentPiece als Dependency)
-useEffect(() => {
-  if (isPlaying && !gameOver && !freezeMode && !isPaused) {
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-    const delay = getFallDelay();
-    if (delay !== Infinity) {
-      gameLoopRef.current = setInterval(() => {
-        // Nur bewegen, wenn ein aktuelles Piece existiert
-        if (currentPiece) {
-          movePiece(0, 1);
-        }
-      }, delay);
+  // ========== GAME LOOP mit requestAnimationFrame ==========
+  useEffect(() => {
+    if (!isPlaying || gameOver || freezeMode || isPaused) {
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      return;
     }
-  } else {
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-  }
-  return () => {
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-  };
-}, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode]); // WICHTIG: currentPiece NICHT in den Dependencies
-  
+    let lastFall = performance.now();
+    const delay = getFallDelay();
+    if (delay === Infinity) return;
+
+    const step = (now: number) => {
+      if (!isPlaying || gameOver || freezeMode || isPaused) return;
+      if (now - lastFall >= delay) {
+        movePiece(0, 1);
+        lastFall = now;
+      }
+      gameLoopRef.current = requestAnimationFrame(step);
+    };
+    gameLoopRef.current = requestAnimationFrame(step);
+    return () => {
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    };
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode]);
+
   // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -676,7 +679,7 @@ useEffect(() => {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            <div className="relative md:mb-0 mb-36">
+            <div className="relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
@@ -695,40 +698,6 @@ useEffect(() => {
                     <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">
                       ⚡ AUFGABEN
                     </button>
-                  </div>
-                </div>
-              )}
-
-              {/* TOUCH CONTROLLER */}
-              {isPlaying && !gameOver && (
-                <div className="fixed bottom-0 left-0 right-0 md:hidden z-50">
-                  <div className="flex justify-between items-end px-2 pb-3">
-                    <div className="relative flex flex-col items-center">
-                      <div className="flex gap-6 mb-2">
-                        <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                          <span className="text-white text-2xl font-bold">◀</span>
-                        </button>
-                        <button onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                          <span className="text-white text-2xl font-bold">▶</span>
-                        </button>
-                      </div>
-                      <div className="flex justify-center w-full">
-                        <button onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                          <span className="text-white text-2xl font-bold">▼</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                        <span className="text-white text-lg font-bold tracking-wider">A</span>
-                      </button>
-                      <button onTouchStart={(e) => { e.preventDefault(); togglePause(); }} className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                        <span className="text-white text-xl font-bold">⏸</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex justify-center gap-8 pb-1 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">
-                    <span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span>
                   </div>
                 </div>
               )}
@@ -798,6 +767,36 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {/* ========== TOUCH CONTROLLER (eigene Leiste unter dem Canvas) ========== */}
+      {isPlaying && !gameOver && (
+        <div className="fixed bottom-0 left-0 right-0 md:hidden bg-black/80 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 z-50">
+          <div className="flex justify-between items-center px-6 max-w-md mx-auto">
+            <div className="flex gap-6">
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
+                <span className="text-white text-2xl font-bold">◀</span>
+              </button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
+                <span className="text-white text-2xl font-bold">▼</span>
+              </button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
+                <span className="text-white text-2xl font-bold">▶</span>
+              </button>
+            </div>
+            <div className="flex gap-4">
+              <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
+                <span className="text-white text-lg font-bold tracking-wider">A</span>
+              </button>
+              <button onTouchStart={(e) => { e.preventDefault(); togglePause(); }} className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
+                <span className="text-white text-xl font-bold">⏸</span>
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-center gap-12 mt-1 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">
+            <span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span>
+          </div>
+        </div>
+      )}
 
       {showNameInput && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
