@@ -437,20 +437,28 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
-  // Automatischer Game Loop (neu starten bei level, freezeMode, isPaused oder neuem Piece)
-  useEffect(() => {
-    if (isPlaying && !gameOver && !freezeMode && !isPaused && currentPiece) {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      const delay = getFallDelay();
-      if (delay !== Infinity) {
-        gameLoopRef.current = setInterval(() => movePiece(0, 1), delay);
-      }
-    } else {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+ 
+// Automatischer Game Loop (robust, ohne currentPiece als Dependency)
+useEffect(() => {
+  if (isPlaying && !gameOver && !freezeMode && !isPaused) {
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    const delay = getFallDelay();
+    if (delay !== Infinity) {
+      gameLoopRef.current = setInterval(() => {
+        // Nur bewegen, wenn ein aktuelles Piece existiert
+        if (currentPiece) {
+          movePiece(0, 1);
+        }
+      }, delay);
     }
-    return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, currentPiece]);
-
+  } else {
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+  }
+  return () => {
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+  };
+}, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode]); // WICHTIG: currentPiece NICHT in den Dependencies
+  
   // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
