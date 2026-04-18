@@ -185,9 +185,81 @@ export function ScndDropGame() {
     giveUp();
   };
 
+  // ========== POWER‑UP EFFEKTE mit Animationen ==========
   const triggerPowerUpEffect = (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
+
+    // Visuelle Animation (Canvas-Overlay)
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx && canvas) {
+      // Temporären Overlay zeichnen
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      switch(effect) {
+        case 'bomb':
+          // Explosionspartikel bereits vorhanden
+          break;
+        case 'laser':
+          // Laser-Linie kurz anzeigen
+          ctx.fillStyle = '#FF00FF';
+          ctx.fillRect(0, y * cellSize, w, cellSize);
+          setTimeout(() => {}, 100);
+          break;
+        case 'colorBlast':
+          // Farben flackern
+          ctx.fillStyle = 'rgba(255,255,255,0.5)';
+          ctx.fillRect(0, 0, w, h);
+          setTimeout(() => {}, 100);
+          break;
+        case 'scndBonus':
+          // Goldener Glanz
+          ctx.fillStyle = 'rgba(255,215,0,0.4)';
+          ctx.fillRect(0, 0, w, h);
+          break;
+        case 'freeze':
+          // Bläulicher Einfriereffekt
+          ctx.fillStyle = 'rgba(0,150,255,0.5)';
+          ctx.fillRect(0, 0, w, h);
+          break;
+        case 'gravity':
+          // Wackeleffekt: Canvas kurz bewegen (über CSS)
+          if (canvas) {
+            canvas.style.transform = 'translate(3px, 3px)';
+            setTimeout(() => { if(canvas) canvas.style.transform = ''; }, 100);
+          }
+          break;
+        case 'swap':
+          // Weißer Blitz
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, w, h);
+          break;
+        case 'clearLine':
+          // Die betroffene Zeile aufblitzen lassen
+          ctx.fillStyle = 'rgba(255,255,255,0.8)';
+          ctx.fillRect(0, y * cellSize, w, cellSize);
+          break;
+        case 'fastForward':
+          // Geschwindigkeitsstreifen
+          for (let i = 0; i < 10; i++) {
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.fillRect(0, i * 30, w, 5);
+          }
+          break;
+        case 'randomize':
+          // Farbrauschen
+          for (let i = 0; i < 50; i++) {
+            ctx.fillStyle = `rgba(${Math.random()*255},${Math.random()*255},${Math.random()*255},0.3)`;
+            ctx.fillRect(Math.random()*w, Math.random()*h, 10, 10);
+          }
+          break;
+        default: break;
+      }
+      // Overlay nach kurzer Zeit automatisch verblassen (wird durch nächsten Redraw überschrieben)
+      setTimeout(() => {}, 200);
+    }
 
     switch(effect) {
       case 'bomb': {
@@ -330,8 +402,10 @@ export function ScndDropGame() {
     }
   };
 
+  // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
-    const isPowerUpSpawn = Math.random() < 0.25;
+    // Power‑Up‑Wahrscheinlichkeit auf 15% gesenkt
+    const isPowerUpSpawn = Math.random() < 0.15;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
@@ -547,7 +621,7 @@ export function ScndDropGame() {
     };
   }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece]);
 
-  // Canvas zeichnen
+  // ========== CANVAS ZEICHNEN (mit zentrierten Texten) ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -673,46 +747,50 @@ export function ScndDropGame() {
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
+
+    // Zentrierte Texte
+    ctx.textAlign = 'center';
     if (hotStreak) {
-      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(12, cellSize * 0.55) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText('🔥 HOT STREAK!', canvas.width - 85, 25);
+      ctx.fillText('🔥 HOT STREAK!', canvas.width / 2, 30);
     }
     if (scndMode) {
-      ctx.font = 'bold ' + Math.max(11, cellSize * 0.5) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(12, cellSize * 0.55) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText('⚡ SCND MODE!', canvas.width - 85, 50);
+      ctx.fillText('⚡ SCND MODE!', canvas.width / 2, 55);
     }
     if (scndBonusActive) {
-      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(12, cellSize * 0.55) + 'px monospace';
       ctx.fillStyle = '#FFD700';
-      ctx.fillText('⭐ 3x BONUS!', canvas.width - 85, 75);
+      ctx.fillText('⭐ 3x BONUS!', canvas.width / 2, 80);
     }
     if (freezeMode) {
-      ctx.font = 'bold ' + Math.max(12, cellSize * 0.5) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(14, cellSize * 0.6) + 'px monospace';
       ctx.fillStyle = '#00FFFF';
-      ctx.fillText('⏰ FREEZE!', canvas.width / 2 - 40, 30);
+      ctx.fillText('⏰ FREEZE!', canvas.width / 2, 105);
     }
     if (fastForwardActive) {
-      ctx.font = 'bold ' + Math.max(12, cellSize * 0.5) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(14, cellSize * 0.6) + 'px monospace';
       ctx.fillStyle = '#FF9966';
-      ctx.fillText('⏩ FAST FORWARD!', canvas.width / 2 - 60, 60);
+      ctx.fillText('⏩ FAST FORWARD!', canvas.width / 2, 130);
     }
     if (activePowerUp) {
-      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(12, cellSize * 0.55) + 'px monospace';
       ctx.fillStyle = '#00FF00';
-      ctx.fillText('✨ ' + activePowerUp + ' ✨', canvas.width - 85, 100);
+      ctx.fillText('✨ ' + activePowerUp + ' ✨', canvas.width / 2, 155);
     }
     if (combo > 0) {
-      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(14, cellSize * 0.6) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText(combo + 'x COMBO!', canvas.width - 70, 125);
+      ctx.fillText(combo + 'x COMBO!', canvas.width / 2, 180);
     }
     if (popupScore) {
-      ctx.font = 'bold ' + Math.max(14, cellSize * 0.65) + 'px monospace';
+      ctx.font = 'bold ' + Math.max(16, cellSize * 0.7) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText('+' + popupScore.score, popupScore.x - 20, popupScore.y);
+      ctx.fillText('+' + popupScore.score, popupScore.x, popupScore.y);
     }
+    ctx.textAlign = 'left';
     ctx.shadowBlur = 0;
   }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused]);
 
