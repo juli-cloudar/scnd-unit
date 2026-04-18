@@ -109,11 +109,12 @@ export function ScndDropGame() {
   }, []);
 
   const getFallDelay = () => {
-    if (freezeMode) return Infinity;
-    let delay = Math.max(80, 300 - (level - 1) * 25);
-    if (slowMode) delay *= 2;
-    return delay;
-  };
+  if (freezeMode) return Infinity;
+  // Start bei 1000ms (1 Sekunde), dann langsameres Level-Up
+  let delay = Math.max(150, 1000 - (level - 1) * 80);
+  if (slowMode) delay = delay * 2;
+  return delay;
+};
 
   useEffect(() => {
     if (isPlaying && !gameOver) {
