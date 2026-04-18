@@ -6,38 +6,38 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Zellengröße: Auf Handys größer (34px), auf Desktop 32px
+// Zellengröße: Auf Handys 34px für bessere Lesbarkeit
 const getCellSize = () => {
   if (typeof window === 'undefined') return 34;
   const width = window.innerWidth;
-  if (width < 768) return 34;   // Handy: 340x680 Pixel
+  if (width < 768) return 34;
   if (width < 1024) return 32;
   return 32;
 };
 
-// Normale Tetrominos
+// Normale Tetrominos – alle Farben heller/kontrastreicher
 const TETROMINOS = [
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I', isBrand: true, isPowerUp: false },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O', isBrand: false, isPowerUp: false },
-  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#CC0000', borderColor: '#990000', name: 'T', isBrand: false, isPowerUp: false },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#1A1A1A', borderColor: '#333333', name: 'S', isBrand: false, isPowerUp: false },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#F5F5F5', borderColor: '#CCCCCC', name: 'Z', isBrand: false, isPowerUp: false },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#0055A4', borderColor: '#004080', name: 'L', isBrand: false, isPowerUp: false },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false, isPowerUp: false }
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isBrand: true, isPowerUp: false },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isBrand: false, isPowerUp: false },
+  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FF6666', borderColor: '#CC3333', name: 'T', isBrand: false, isPowerUp: false },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#AAAAAA', borderColor: '#666666', name: 'S', isBrand: false, isPowerUp: false }, // helles Grau statt Schwarz
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#EEEEEE', borderColor: '#CCCCCC', name: 'Z', isBrand: false, isPowerUp: false },
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#5588FF', borderColor: '#2255AA', name: 'L', isBrand: false, isPowerUp: false },
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isBrand: false, isPowerUp: false }
 ];
 
-// 10 verschiedene Power‑Up‑Tetrominos
+// Power‑Up‑Tetrominos – ebenfalls heller
 const POWERUP_TETROMINOS = [
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8888', borderColor: '#FF0000', name: '💣 BOMBE', isBrand: false, isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF4444' },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF88FF', borderColor: '#FF00FF', name: '⚡ LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF00FF' },
-  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA00', name: '🎨 FARBE', isBrand: false, isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFD700' },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFCC66', borderColor: '#FFAA00', name: '⭐ 3x', isBrand: false, isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFAA00' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#88FFFF', borderColor: '#00FFFF', name: '⏰ FREEZE', isBrand: false, isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#00FFFF' },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#AAFFAA', borderColor: '#00FF00', name: '🌀 GRAVITY', isBrand: false, isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#00FF00' },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFAACC', borderColor: '#FF6699', name: '🔄 SWAP', isBrand: false, isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FF6699' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#CCCCFF', borderColor: '#9999FF', name: '🔍 CLEAR LINE', isBrand: false, isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#9999FF' },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFCC99', borderColor: '#FF9966', name: '⏩ FAST FORWARD', isBrand: false, isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FF9966' },
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF99FF', borderColor: '#FF33FF', name: '🎲 RANDOM', isBrand: false, isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FF33FF' }
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isBrand: false, isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
+  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFEECC', borderColor: '#FFCC66', name: '🎨 FARBE', isBrand: false, isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA44', name: '⭐ 3x', isBrand: false, isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFCC66' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#AAFFFF', borderColor: '#44FFFF', name: '⏰ FREEZE', isBrand: false, isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#66FFFF' },
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#CCFFCC', borderColor: '#66FF66', name: '🌀 GRAVITY', isBrand: false, isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#88FF88' },
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFCCDD', borderColor: '#FF88AA', name: '🔄 SWAP', isBrand: false, isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FF99BB' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#DDDDFF', borderColor: '#9999FF', name: '🔍 CLEAR LINE', isBrand: false, isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDDCC', borderColor: '#FFAA88', name: '⏩ FAST FORWARD', isBrand: false, isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FFBB99' },
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#FF88FF', name: '🎲 RANDOM', isBrand: false, isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
 ];
 
 interface Highscore {
@@ -81,7 +81,7 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
-  // Scroll-Schutz und Layout (kein Überlappen)
+  // Scroll-Schutz
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       document.body.style.overflow = 'hidden';
@@ -221,7 +221,7 @@ export function ScndDropGame() {
         break;
       }
       case 'colorBlast': {
-        const colors = ['#FF4400', '#FFD700', '#CC0000', '#0055A4', '#00A86B', '#1A1A1A', '#F5F5F5'];
+        const colors = TETROMINOS.map(t => t.color).concat(POWERUP_TETROMINOS.map(p => p.color));
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
         const colorBlastBoard = board.map(row => 
           row.map(cell => {
@@ -439,11 +439,11 @@ export function ScndDropGame() {
       addedScore = Math.floor(addedScore * multiplier);
 
       const hasScndColors = clearedRows.some(row => 
-        newBoard[row]?.some(cell => cell?.color === '#FF4400' || cell?.color === '#1A1A1A')
+        newBoard[row]?.some(cell => cell?.color === '#FF8844' || cell?.color === '#AAAAAA')
       );
       if (hasScndColors) {
         addedScore = Math.floor(addedScore * 2);
-        showBonus('🎨 ORANGE + SCHWARZ = 2x PUNKTE!');
+        showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       }
 
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
@@ -565,7 +565,7 @@ export function ScndDropGame() {
     ctx.strokeStyle = '#FF4400';
     ctx.lineWidth = 3;
     ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = 'var(--text-secondary)';
     ctx.lineWidth = 1;
     ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
     ctx.strokeStyle = '#FF44004D';
@@ -774,7 +774,7 @@ export function ScndDropGame() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            {/* Canvas-Container mit ausreichend Abstand nach unten für die Touch-Controls */}
+            {/* Canvas-Container mit ausreichend Abstand nach unten für Touch-Controls */}
             <div className="relative mb-28 md:mb-0">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
@@ -824,7 +824,7 @@ export function ScndDropGame() {
               )}
             </div>
 
-            {/* Rechte Seitenleiste */}
+            {/* Rechte Seitenleiste (verwendet CSS-Variablen für Light/Dark Mode) */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
@@ -856,7 +856,7 @@ export function ScndDropGame() {
                 <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
                 <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">← → ↓</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">↑</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[var(--text-secondary)]">DREHEN</kbd></div>
                 <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd><span className="text-[8px] text-[var(--text-secondary)]">PAUSE</span></div>
-                <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">10 POWER‑UP‑TETROMINOS</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+SCHWARZ = 2x</span></div>
+                <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">10 POWER‑UP‑TETROMINOS</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+GRAU = 2x</span></div>
               </div>
             </div>
           </div>
