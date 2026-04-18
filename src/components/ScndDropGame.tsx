@@ -6,21 +6,14 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Adaptive Zellengröße - optimal für jedes Handy
+// Adaptive Zellengröße – dynamisch an Bildschirmhöhe angepasst
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 34;
-  const width = window.innerWidth;
+  if (typeof window === 'undefined') return 28;
   const height = window.innerHeight;
-  
-  // Auf Handys: Zellengröße basierend auf Bildschirmbreite
-  if (width < 640) {
-    // Bei sehr schmalen Geräten etwas kleiner
-    if (width < 360) return 30;
-    return 34;
-  }
-  if (width < 768) return 36;
-  if (width < 1024) return 34;
-  return 36;
+  // Abzüge: Header (~80px), Touch-Controller (~100px), Padding & Abstände (~20px)
+  const availableHeight = height - 200;
+  let cell = Math.floor(availableHeight / BOARD_HEIGHT);
+  return Math.min(Math.max(cell, 18), 32);
 };
 
 // Normale Tetrominos
@@ -56,7 +49,7 @@ interface Highscore {
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameContainerRef = useRef<HTMLDivElement>(null);
-  const [cellSize, setCellSize] = useState(34);
+  const [cellSize, setCellSize] = useState(28);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -170,7 +163,6 @@ export function ScndDropGame() {
     setIsSaving(false);
     spawnNewPiece();
     setIsPlaying(true);
-    // Nach Spielstart zum Canvas scrollen
     setTimeout(() => scrollToGame(), 100);
   };
 
@@ -991,7 +983,7 @@ export function ScndDropGame() {
                   <div className="w-8 h-0.5 bg-[#FF4400]/50 mx-auto mb-2"></div>
                   <button onClick={handleResume} className="w-28 py-1 mb-1 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-[10px] hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
                   <button onClick={handleRestart} className="w-28 py-1 mb-1 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
-                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGEBEN</button>
+                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
                 </div>
               </div>
             )}
