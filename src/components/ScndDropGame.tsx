@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Zellengr枚脽e: Auf Handys kleiner (28px) f眉r besseren Platz
+// Zellengr枚脽e: Auf Handys 28px
 const getCellSize = () => {
   if (typeof window === 'undefined') return 28;
   const width = window.innerWidth;
@@ -81,7 +81,6 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
-  // Scroll-Schutz
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       document.body.style.overflow = 'hidden';
@@ -185,10 +184,9 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== POWER鈥慤P EFFEKTE ==========
   const triggerPowerUpEffect = (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
-    showBonus(`鉁� ${effect.toUpperCase()} AKTIVIERT! 鉁╜);
+    showBonus('鉁� ' + effect.toUpperCase() + ' AKTIVIERT! 鉁�');
 
     switch(effect) {
       case 'bomb': {
@@ -331,7 +329,6 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
     const isPowerUpSpawn = Math.random() < 0.25;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
@@ -510,7 +507,6 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
-  // Tastatursteuerung
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -527,7 +523,6 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
-  // ========== GAME LOOP ==========
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -551,7 +546,7 @@ export function ScndDropGame() {
     };
   }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece]);
 
-  // ========== CANVAS ZEICHNEN ==========
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -600,12 +595,12 @@ export function ScndDropGame() {
           ctx.fillRect(x * cellSize, y * cellSize, 2, cellSize - 1);
           if (cell.isBrand) {
             ctx.fillStyle = '#FFFFFF';
-            ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+            ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
             ctx.fillText('S', x * cellSize + cellSize * 0.35, y * cellSize + cellSize * 0.7);
           }
           if (cell.isPowerUp) {
             ctx.fillStyle = '#FFFFFF';
-            ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
+            ctx.font = 'bold ' + Math.max(12, cellSize * 0.4) + 'px monospace';
             ctx.fillText('鉁�', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
           }
           ctx.shadowBlur = 0;
@@ -651,7 +646,7 @@ export function ScndDropGame() {
               ctx.fillRect(boardX * cellSize, boardY * cellSize, 2, cellSize - 1);
               if (currentPiece.isPowerUp) {
                 ctx.fillStyle = '#FFFFFF';
-                ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
+                ctx.font = 'bold ' + Math.max(12, cellSize * 0.4) + 'px monospace';
                 ctx.fillText('鉁�', boardX * cellSize + cellSize * 0.65, boardY * cellSize + cellSize * 0.8);
               }
               ctx.shadowBlur = 0;
@@ -669,7 +664,7 @@ export function ScndDropGame() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     for (const p of particles) {
-      ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
+      ctx.fillStyle = 'rgba(255, 68, 0, ' + p.life + ')';
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
     const progress = ((linesCleared % 8) / 8) * canvas.width;
@@ -678,44 +673,44 @@ export function ScndDropGame() {
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
     if (hotStreak) {
-      ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
       ctx.fillStyle = '#FF4400';
       ctx.fillText('馃敟 HOT STREAK!', canvas.width - 85, 25);
     }
     if (scndMode) {
-      ctx.font = `bold ${Math.max(11, cellSize * 0.5)}px monospace`;
+      ctx.font = 'bold ' + Math.max(11, cellSize * 0.5) + 'px monospace';
       ctx.fillStyle = '#FF4400';
       ctx.fillText('鈿� SCND MODE!', canvas.width - 85, 50);
     }
     if (scndBonusActive) {
-      ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
       ctx.fillStyle = '#FFD700';
       ctx.fillText('猸� 3x BONUS!', canvas.width - 85, 75);
     }
     if (freezeMode) {
-      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
+      ctx.font = 'bold ' + Math.max(12, cellSize * 0.5) + 'px monospace';
       ctx.fillStyle = '#00FFFF';
       ctx.fillText('鈴� FREEZE!', canvas.width / 2 - 40, 30);
     }
     if (fastForwardActive) {
-      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
+      ctx.font = 'bold ' + Math.max(12, cellSize * 0.5) + 'px monospace';
       ctx.fillStyle = '#FF9966';
       ctx.fillText('鈴� FAST FORWARD!', canvas.width / 2 - 60, 60);
     }
     if (activePowerUp) {
-      ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
       ctx.fillStyle = '#00FF00';
-      ctx.fillText(`鉁� ${activePowerUp} 鉁╜, canvas.width - 85, 100);
+      ctx.fillText('鉁� ' + activePowerUp + ' 鉁�', canvas.width - 85, 100);
     }
     if (combo > 0) {
-      ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
+      ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText(`${combo}x COMBO!`, canvas.width - 70, 125);
+      ctx.fillText(combo + 'x COMBO!', canvas.width - 70, 125);
     }
     if (popupScore) {
-      ctx.font = `bold ${Math.max(14, cellSize * 0.65)}px monospace`;
+      ctx.font = 'bold ' + Math.max(14, cellSize * 0.65) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
+      ctx.fillText('+' + popupScore.score, popupScore.x - 20, popupScore.y);
     }
     ctx.shadowBlur = 0;
   }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused]);
@@ -746,13 +741,13 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className={`min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : 'shadow-[0_0_15px_rgba(0,0,0,0.5)]'}`}>
+    <div className={'min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all ' + (newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : 'shadow-[0_0_15px_rgba(0,0,0,0.5)]')}>
       <div className="relative">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl"></div>
         <div className="p-4 md:p-6">
           <div className="text-center mb-6">
             <div className="inline-block">
-              <h3 className={`text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110' : ''}`}>
+              <h3 className={'text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
                 SCND DROP
               </h3>
               <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
@@ -774,12 +769,10 @@ export function ScndDropGame() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            {/* Canvas-Container mit gro脽em Abstand nach unten */}
             <div className="relative mb-52 md:mb-0">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {/* PAUSE MEN脺 */}
               {isPaused && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
                   <div className="text-center">
@@ -814,7 +807,6 @@ export function ScndDropGame() {
               )}
             </div>
 
-            {/* Rechte Seitenleiste */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
@@ -853,7 +845,6 @@ export function ScndDropGame() {
         </div>
       </div>
 
-      {/* TOUCH CONTROLLER - absolute am Ende des Inhalts */}
       {isPlaying && !gameOver && (
         <div className="md:hidden bg-black/80 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 mt-4">
           <div className="flex justify-between items-center px-6 max-w-md mx-auto">
