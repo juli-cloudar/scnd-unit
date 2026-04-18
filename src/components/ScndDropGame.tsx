@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Zellengr枚脽e: Auf Handys 28px
+// Zellengröße: Auf Handys 28px
 const getCellSize = () => {
   if (typeof window === 'undefined') return 28;
   const width = window.innerWidth;
@@ -26,18 +26,18 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isBrand: false, isPowerUp: false }
 ];
 
-// Power鈥慤p鈥慣etrominos
+// Power‑Up‑Tetrominos
 const POWERUP_TETROMINOS = [
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '馃挘 BOMBE', isBrand: false, isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '鈿� LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
-  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFEECC', borderColor: '#FFCC66', name: '馃帹 FARBE', isBrand: false, isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA44', name: '猸� 3x', isBrand: false, isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFCC66' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#AAFFFF', borderColor: '#44FFFF', name: '鈴� FREEZE', isBrand: false, isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#66FFFF' },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#CCFFCC', borderColor: '#66FF66', name: '馃寑 GRAVITY', isBrand: false, isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#88FF88' },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFCCDD', borderColor: '#FF88AA', name: '馃攧 SWAP', isBrand: false, isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FF99BB' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#DDDDFF', borderColor: '#9999FF', name: '馃攳 CLEAR LINE', isBrand: false, isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDDCC', borderColor: '#FFAA88', name: '鈴� FAST FORWARD', isBrand: false, isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FFBB99' },
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#FF88FF', name: '馃幉 RANDOM', isBrand: false, isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isBrand: false, isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
+  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFEECC', borderColor: '#FFCC66', name: '🎨 FARBE', isBrand: false, isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA44', name: '⭐ 3x', isBrand: false, isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFCC66' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#AAFFFF', borderColor: '#44FFFF', name: '⏰ FREEZE', isBrand: false, isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#66FFFF' },
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#CCFFCC', borderColor: '#66FF66', name: '🌀 GRAVITY', isBrand: false, isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#88FF88' },
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFCCDD', borderColor: '#FF88AA', name: '🔄 SWAP', isBrand: false, isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FF99BB' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#DDDDFF', borderColor: '#9999FF', name: '🔍 CLEAR LINE', isBrand: false, isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDDCC', borderColor: '#FFAA88', name: '⏩ FAST FORWARD', isBrand: false, isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FFBB99' },
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#FF88FF', name: '🎲 RANDOM', isBrand: false, isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
 ];
 
 interface Highscore {
@@ -186,7 +186,7 @@ export function ScndDropGame() {
 
   const triggerPowerUpEffect = (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
-    showBonus('鉁� ' + effect.toUpperCase() + ' AKTIVIERT! 鉁�');
+    showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
 
     switch(effect) {
       case 'bomb': {
@@ -440,14 +440,14 @@ export function ScndDropGame() {
       );
       if (hasScndColors) {
         addedScore = Math.floor(addedScore * 2);
-        showBonus('馃帹 ORANGE + GRAU = 2x PUNKTE!');
+        showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       }
 
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
         setScndMode(true);
         setTimeout(() => setScndMode(false), 10000);
-        showBonus('鈿� SCND MODE AKTIVIERT! 10x COMBO!');
+        showBonus('⚡ SCND MODE AKTIVIERT! 10x COMBO!');
       }
     } else {
       setCombo(0);
@@ -601,7 +601,7 @@ export function ScndDropGame() {
           if (cell.isPowerUp) {
             ctx.fillStyle = '#FFFFFF';
             ctx.font = 'bold ' + Math.max(12, cellSize * 0.4) + 'px monospace';
-            ctx.fillText('鉁�', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
+            ctx.fillText('✨', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
           }
           ctx.shadowBlur = 0;
         }
@@ -647,7 +647,7 @@ export function ScndDropGame() {
               if (currentPiece.isPowerUp) {
                 ctx.fillStyle = '#FFFFFF';
                 ctx.font = 'bold ' + Math.max(12, cellSize * 0.4) + 'px monospace';
-                ctx.fillText('鉁�', boardX * cellSize + cellSize * 0.65, boardY * cellSize + cellSize * 0.8);
+                ctx.fillText('✨', boardX * cellSize + cellSize * 0.65, boardY * cellSize + cellSize * 0.8);
               }
               ctx.shadowBlur = 0;
             }
@@ -675,32 +675,32 @@ export function ScndDropGame() {
     if (hotStreak) {
       ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText('馃敟 HOT STREAK!', canvas.width - 85, 25);
+      ctx.fillText('🔥 HOT STREAK!', canvas.width - 85, 25);
     }
     if (scndMode) {
       ctx.font = 'bold ' + Math.max(11, cellSize * 0.5) + 'px monospace';
       ctx.fillStyle = '#FF4400';
-      ctx.fillText('鈿� SCND MODE!', canvas.width - 85, 50);
+      ctx.fillText('⚡ SCND MODE!', canvas.width - 85, 50);
     }
     if (scndBonusActive) {
       ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
       ctx.fillStyle = '#FFD700';
-      ctx.fillText('猸� 3x BONUS!', canvas.width - 85, 75);
+      ctx.fillText('⭐ 3x BONUS!', canvas.width - 85, 75);
     }
     if (freezeMode) {
       ctx.font = 'bold ' + Math.max(12, cellSize * 0.5) + 'px monospace';
       ctx.fillStyle = '#00FFFF';
-      ctx.fillText('鈴� FREEZE!', canvas.width / 2 - 40, 30);
+      ctx.fillText('⏰ FREEZE!', canvas.width / 2 - 40, 30);
     }
     if (fastForwardActive) {
       ctx.font = 'bold ' + Math.max(12, cellSize * 0.5) + 'px monospace';
       ctx.fillStyle = '#FF9966';
-      ctx.fillText('鈴� FAST FORWARD!', canvas.width / 2 - 60, 60);
+      ctx.fillText('⏩ FAST FORWARD!', canvas.width / 2 - 60, 60);
     }
     if (activePowerUp) {
       ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
       ctx.fillStyle = '#00FF00';
-      ctx.fillText('鉁� ' + activePowerUp + ' 鉁�', canvas.width - 85, 100);
+      ctx.fillText('✨ ' + activePowerUp + ' ✨', canvas.width - 85, 100);
     }
     if (combo > 0) {
       ctx.font = 'bold ' + Math.max(10, cellSize * 0.45) + 'px monospace';
@@ -735,9 +735,9 @@ export function ScndDropGame() {
   };
 
   const rankIcon = (idx: number) => {
-    if (idx === 0) return '馃';
-    if (idx === 1) return '馃';
-    return '馃';
+    if (idx === 0) return '🥇';
+    if (idx === 1) return '🥈';
+    return '🥉';
   };
 
   return (
@@ -753,11 +753,11 @@ export function ScndDropGame() {
               <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
             </div>
             <div className="flex justify-center gap-3 mt-2">
-              {slowMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full">馃悓 TIME SLOW</span>}
-              {freezeMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full animate-pulse">鈴� FREEZE</span>}
-              {fastForwardActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[10px] rounded-full animate-pulse">鈴� FAST FORWARD</span>}
-              {scndBonusActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[10px] rounded-full animate-pulse">猸� 3x BONUS</span>}
-              {activePowerUp && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[10px] rounded-full animate-pulse">鉁� {activePowerUp}</span>}
+              {slowMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full">🐌 TIME SLOW</span>}
+              {freezeMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full animate-pulse">⏰ FREEZE</span>}
+              {fastForwardActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[10px] rounded-full animate-pulse">⏩ FAST FORWARD</span>}
+              {scndBonusActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[10px] rounded-full animate-pulse">⭐ 3x BONUS</span>}
+              {activePowerUp && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[10px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
             </div>
             {bonusMessage.show && (
               <div className="mt-2 animate-bounce">
@@ -778,9 +778,9 @@ export function ScndDropGame() {
                   <div className="text-center">
                     <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSE</div>
                     <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
-                    <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">鈻� WEITER</button>
-                    <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">馃攧 NEUSTART</button>
-                    <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">鈿� AUFGABEN</button>
+                    <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
+                    <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
+                    <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
                   </div>
                 </div>
               )}
@@ -789,7 +789,7 @@ export function ScndDropGame() {
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
                     <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
-                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">鈻� START GAME</button>
+                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">▶ START GAME</button>
                   </div>
                 </div>
               )}
@@ -818,12 +818,12 @@ export function ScndDropGame() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mb-4">
-                {hotStreak && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]"><div className="text-[10px] text-[var(--text-secondary)]">馃敟 STREAK</div><div className="text-xs font-bold text-[#FF4400]">HOT STREAK!</div></div>}
-                {scndMode && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]"><div className="text-[10px] text-[var(--text-secondary)]">鈿� MODUS</div><div className="text-xs font-bold text-[#FF4400]">SCND MODE!</div></div>}
-                {scndBonusActive && <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FFD700]"><div className="text-[10px] text-[var(--text-secondary)]">猸� BONUS</div><div className="text-xs font-bold text-[#FFD700]">3x PUNKTE!</div></div>}
+                {hotStreak && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]"><div className="text-[10px] text-[var(--text-secondary)]">🔥 STREAK</div><div className="text-xs font-bold text-[#FF4400]">HOT STREAK!</div></div>}
+                {scndMode && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]"><div className="text-[10px] text-[var(--text-secondary)]">⚡ MODUS</div><div className="text-xs font-bold text-[#FF4400]">SCND MODE!</div></div>}
+                {scndBonusActive && <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FFD700]"><div className="text-[10px] text-[var(--text-secondary)]">⭐ BONUS</div><div className="text-xs font-bold text-[#FFD700]">3x PUNKTE!</div></div>}
               </div>
               <div className="bg-[var(--bg-secondary)]/50 rounded-xl p-3 mb-4">
-                <div className="flex items-center gap-2 mb-2"><div className="w-1 h-4 bg-[#FF4400] rounded-full"></div><h4 className="font-bold text-xs uppercase tracking-wider text-[#FF4400]">馃弳 BESTENLISTE TOP 3</h4></div>
+                <div className="flex items-center gap-2 mb-2"><div className="w-1 h-4 bg-[#FF4400] rounded-full"></div><h4 className="font-bold text-xs uppercase tracking-wider text-[#FF4400]">🏆 BESTENLISTE TOP 3</h4></div>
                 <ul className="space-y-1">
                   {highscores.map((hs, idx) => (
                     <li key={idx} className="flex justify-between items-center bg-[var(--bg-primary)]/50 rounded-lg px-3 py-1.5">
@@ -831,41 +831,81 @@ export function ScndDropGame() {
                       <span className="text-xs md:text-sm text-[#FF4400] font-bold">{hs.score}</span>
                     </li>
                   ))}
-                  {highscores.length === 0 && <li className="text-center text-[10px] md:text-xs text-[var(--text-secondary)] py-2 italic">鈥� noch keine Eintr盲ge 鈥�</li>}
+                  {highscores.length === 0 && <li className="text-center text-[10px] md:text-xs text-[var(--text-secondary)] py-2 italic">— noch keine Einträge —</li>}
                 </ul>
               </div>
               <div className="text-center pt-2 border-t border-[#FF4400]/20">
                 <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
-                <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">鈫� 鈫� 鈫�</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">鈫�</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[var(--text-secondary)]">DREHEN</kbd></div>
+                <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">← → ↓</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">↑</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[var(--text-secondary)]">DREHEN</kbd></div>
                 <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd><span className="text-[8px] text-[var(--text-secondary)]">PAUSE</span></div>
-                <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">10 POWER鈥慤P鈥慣ETROMINOS</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+GRAU = 2x</span></div>
+                <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">10 POWER‑UP‑TETROMINOS</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+GRAU = 2x</span></div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {isPlaying && !gameOver && (
-        <div className="md:hidden bg-black/80 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 mt-4">
-          <div className="flex justify-between items-center px-6 max-w-md mx-auto">
-            <div className="flex gap-6">
-              <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-2xl font-bold">鈼€</span></button>
-              <button onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-2xl font-bold">鈻�</span></button>
-              <button onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-2xl font-bold">鈻�</span></button>
+      {/* TOUCH CONTROLLER - fixed bottom für Handys */}
+      {isPlaying && !gameOver && !isPaused && (
+        <div className="md:hidden bg-black/90 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 fixed bottom-0 left-0 right-0 z-50">
+          <div className="flex justify-between items-center px-4 max-w-md mx-auto">
+            <div className="flex gap-4">
+              <button 
+                onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} 
+                onTouchMove={(e) => e.preventDefault()}
+                className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                style={{ touchAction: 'none', userSelect: 'none' }}
+              >
+                <span className="text-white text-3xl font-bold">◀</span>
+              </button>
+              <button 
+                onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} 
+                onTouchMove={(e) => e.preventDefault()}
+                className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                style={{ touchAction: 'none', userSelect: 'none' }}
+              >
+                <span className="text-white text-3xl font-bold">▼</span>
+              </button>
+              <button 
+                onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} 
+                onTouchMove={(e) => e.preventDefault()}
+                className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                style={{ touchAction: 'none', userSelect: 'none' }}
+              >
+                <span className="text-white text-3xl font-bold">▶</span>
+              </button>
             </div>
             <div className="flex gap-4">
-              <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-lg font-bold tracking-wider">A</span></button>
-              <button onTouchStart={(e) => { e.preventDefault(); togglePause(); }} className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-xl font-bold">鈴�</span></button>
+              <button 
+                onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} 
+                onTouchMove={(e) => e.preventDefault()}
+                className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                style={{ touchAction: 'none', userSelect: 'none' }}
+              >
+                <span className="text-white text-xl font-bold tracking-wider">A</span>
+              </button>
+              <button 
+                onTouchStart={(e) => { e.preventDefault(); togglePause(); }} 
+                onTouchMove={(e) => e.preventDefault()}
+                className="w-16 h-16 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                style={{ touchAction: 'none', userSelect: 'none' }}
+              >
+                <span className="text-white text-xl font-bold">⏸</span>
+              </button>
             </div>
           </div>
-          <div className="flex justify-center gap-12 mt-1 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider"><span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span></div>
+          <div className="flex justify-center gap-12 mt-2 text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold">
+            <span>BEWEGEN</span>
+            <span>DREHEN</span>
+            <span>PAUSE</span>
+          </div>
         </div>
       )}
 
       {showNameInput && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--bg-secondary)] p-4 md:p-6 rounded-lg border-2 border-[#FF4400] max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2"><span className="text-[#FF4400]">鉁� NEW</span>_<span className="text-[var(--text-primary)]">HIGHSCORE</span></h3>
+            <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2"><span className="text-[#FF4400]">✨ NEW</span>_<span className="text-[var(--text-primary)]">HIGHSCORE</span></h3>
             <p className="text-xs md:text-sm text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-lg md:text-xl">{finalScore}</span></p>
             <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} maxLength={15} className="w-full p-2 md:p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-sm md:text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider" placeholder="DEIN SPITZNAME" autoFocus />
             <div className="flex gap-3"><button onClick={saveHighscore} className="flex-1 px-3 md:px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded text-sm md:text-base hover:bg-[#FF4400]/80 transition">SPEICHERN</button><button onClick={() => setShowNameInput(false)} className="flex-1 px-3 md:px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition text-sm md:text-base">ABBRECHEN</button></div>
