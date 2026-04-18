@@ -10,10 +10,9 @@ const BOARD_HEIGHT = 20;
 const getCellSize = () => {
   if (typeof window === 'undefined') return 26;
   const height = window.innerHeight;
-  // Reserve: Header (~80px), Touch-Controller (~120px), Abstände (~20px)
   const availableHeight = height - 220;
   let cell = Math.floor(availableHeight / BOARD_HEIGHT);
-  return Math.min(Math.max(cell, 18), 28); // max 28px (etwas kleiner)
+  return Math.min(Math.max(cell, 18), 28);
 };
 
 // Normale Tetrominos
@@ -27,7 +26,7 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isBrand: false, isPowerUp: false }
 ];
 
-// Power‑Up‑Tetrominos
+// Power‑Up‑Tetrominos (10 bestehende)
 const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isBrand: false, isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
@@ -85,12 +84,11 @@ export function ScndDropGame() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
 
-  // Verbesserte Scroll-Funktion: Canvas wird 15% vom oberen Rand positioniert
+  // Scroll-Funktion (unverändert)
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
       const scrollTop = window.scrollY;
-      // Ziel: 15% der Bildschirmhöhe vom oberen Rand entfernt
       const offset = window.innerHeight * 0.15;
       const targetTop = rect.top + scrollTop - offset;
       window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
@@ -98,9 +96,7 @@ export function ScndDropGame() {
     }
   };
 
-  const scrollToGame = () => {
-    centerCanvasInView();
-  };
+  const scrollToGame = () => centerCanvasInView();
 
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused && !hasScrolled) {
@@ -141,9 +137,11 @@ export function ScndDropGame() {
     loadHighscores();
   }, []);
 
+  // ANGEPASSTE FALLGESCHWINDIGKEIT (schneller)
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
-    let delay = Math.max(150, 1000 - (level - 1) * 80);
+    // Basis 800ms, pro Level 50ms weniger, minimal 150ms
+    let delay = Math.max(150, 800 - (level - 1) * 50);
     if (slowMode) delay = delay * 2;
     if (fastForwardActive) delay = delay / 2;
     return delay;
@@ -217,7 +215,6 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== HILFSFUNKTION FÜR PARTIKEL ==========
   const burstParticles = (cx: number, cy: number, count: number) => {
     for (let i = 0; i < count; i++) {
       const offX = (Math.random() - 0.5) * cellSize * 3;
@@ -226,7 +223,7 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== POWER‑UP EFFEKTE ==========
+  // ========== POWER‑UP EFFEKTE (alle korrekt) ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
@@ -353,12 +350,7 @@ export function ScndDropGame() {
         break;
       }
       case 'freeze': {
-        // FREEZE verlangsamt nur das Fallen (bisher: setFreezeMode(true) stoppt komplett)
-        // Jetzt: setSlowMode(true) statt freezeMode? Wir wollen langsameres Fallen.
-        // Bisher blockiert freezeMode die Bewegung komplett. Ändern wir:
-        // Wir setzen slowMode = true, nicht freezeMode.
         setSlowMode(true);
-        // Animation: Eisblauer Schleier
         for (let i = 0; i < 3; i++) {
           ctx.fillStyle = 'rgba(0, 150, 255, 0.3)';
           ctx.fillRect(0, 0, w, h);
@@ -373,7 +365,6 @@ export function ScndDropGame() {
           }
           await new Promise(r => setTimeout(r, 150));
         }
-        // Nach 5 Sekunden den Effekt beenden
         setTimeout(() => {
           setSlowMode(false);
           setActivePowerUp(null);
@@ -381,6 +372,7 @@ export function ScndDropGame() {
         break;
       }
       case 'gravity': {
+        // Gravity: Alle Blöcke nach unten fallen lassen (komprimieren)
         canvas.style.transform = 'translate(3px, 3px)';
         await new Promise(r => setTimeout(r, 50));
         canvas.style.transform = 'translate(-3px, -3px)';
@@ -875,6 +867,7 @@ export function ScndDropGame() {
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
 
+    // Zentrierte Texte – kein Einfluss auf Layout
     ctx.textAlign = 'center';
     if (hotStreak) {
       ctx.font = 'bold ' + Math.max(12, cellSize * 0.55) + 'px monospace';
