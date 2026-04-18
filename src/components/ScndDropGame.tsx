@@ -303,33 +303,32 @@ export function ScndDropGame() {
         }, 10000);
         break;
       }
-      case 'randomize': {
-        const randomBoard = board.map(row => [...row]);
-        const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
-        let changed = 0;
-        for (let attempt = 0; attempt < 100 && changed < 3; attempt++) {
-          const randX = Math.floor(Math.random() * BOARD_WIDTH);
-          const randY = Math.floor(Math.random() * BOARD_HEIGHT);
-          if (randomBoard[randY][randX] !== null) {
-            const newPiece = allPieces[Math.floor(Math.random() * allPieces.length)];
-            randomBoard[randY][randX] = {
-              color: newPiece.color,
-              borderColor: newPiece.borderColor,
-              isBrand: newPiece.isBrand,
-              isPowerUp: newPiece.isPowerUp || false,
-              powerUpEffect: newPiece.powerUpEffect,
-              glowColor: newPiece.glowColor
-            };
-            changed++;
-          }
-        }
-        setBoard(randomBoard);
-        setTimeout(() => setActivePowerUp(null), 2000);
-        break;
-      }
-      default: break;
+
+case 'randomize': {
+  const randomBoard = board.map(row => [...row]);
+  const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
+  let changed = 0;
+  for (let attempt = 0; attempt < 100 && changed < 3; attempt++) {
+    const randX = Math.floor(Math.random() * BOARD_WIDTH);
+    const randY = Math.floor(Math.random() * BOARD_HEIGHT);
+    if (randomBoard[randY][randX] !== null) {
+      const newPiece = allPieces[Math.floor(Math.random() * allPieces.length)];
+      randomBoard[randY][randX] = {
+        color: newPiece.color,
+        borderColor: newPiece.borderColor,
+        isBrand: newPiece.isBrand || false,
+        isPowerUp: newPiece.isPowerUp || false,
+        powerUpEffect: (newPiece as any).powerUpEffect || null,
+        glowColor: (newPiece as any).glowColor || null
+      };
+      changed++;
     }
-  };
+  }
+  setBoard(randomBoard);
+  setTimeout(() => setActivePowerUp(null), 2000);
+  break;
+}
+        
 
   // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
