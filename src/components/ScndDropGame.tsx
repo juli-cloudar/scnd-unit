@@ -52,6 +52,7 @@ export function ScndDropGame() {
   const [showNameInput, setShowNameInput] = useState(false);
   const [playerName, setPlayerName] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false); // NEU
   const [linesCleared, setLinesCleared] = useState(0);
   const [flashRow, setFlashRow] = useState<number | null>(null);
   const [popupScore, setPopupScore] = useState<{ score: number; x: number; y: number } | null>(null);
@@ -72,8 +73,9 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
+  // Scroll-Schutz für Handy
   useEffect(() => {
-    if (isPlaying && !gameOver) {
+    if (isPlaying && !gameOver && !isPaused) {
       document.body.style.overflow = 'hidden';
       document.body.style.touchAction = 'none';
       return () => {
@@ -81,7 +83,7 @@ export function ScndDropGame() {
         document.body.style.touchAction = '';
       };
     }
-  }, [isPlaying, gameOver]);
+  }, [isPlaying, gameOver, isPaused]);
 
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
@@ -141,6 +143,7 @@ export function ScndDropGame() {
     setPowerUp(null);
     setPowerUpY(0);
     setPowerUpX(0);
+    setIsPaused(false);
     spawnNewPiece();
     setIsPlaying(true);
   };
@@ -150,6 +153,7 @@ export function ScndDropGame() {
       setGameOver(true);
       setFinalScore(score);
       setIsPlaying(false);
+      setIsPaused(false);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
@@ -159,6 +163,21 @@ export function ScndDropGame() {
         setTimeout(() => setNewHighscoreGlow(false), 2000);
       }
     }
+  };
+
+  // Pause-Funktionen
+  const togglePause = () => {
+    if (!isPlaying || gameOver) return;
+    setIsPaused(!isPaused);
+  };
+  const handleResume = () => setIsPaused(false);
+  const handleRestart = () => {
+    setIsPaused(false);
+    startGame();
+  };
+  const handleGiveUp = () => {
+    setIsPaused(false);
+    giveUp();
   };
 
   useEffect(() => {
@@ -297,6 +316,7 @@ export function ScndDropGame() {
     setGameOver(true);
     setFinalScore(score);
     setIsPlaying(false);
+    setIsPaused(false);
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
     const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
@@ -408,7 +428,7 @@ export function ScndDropGame() {
   }, [particles]);
 
   const movePiece = (dx: number, dy: number) => {
-    if (!currentPiece || gameOver || freezeMode) return;
+    if (!currentPiece || gameOver || freezeMode || isPaused) return;
     if (!collision(currentPiece.shape, pieceX + dx, pieceY + dy)) {
       setPieceX(pieceX + dx);
       setPieceY(pieceY + dy);
@@ -416,7 +436,7 @@ export function ScndDropGame() {
   };
 
   const rotatePiece = () => {
-    if (!currentPiece || gameOver || freezeMode) return;
+    if (!currentPiece || gameOver || freezeMode || isPaused) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
@@ -430,6 +450,7 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
+  // Tastatursteuerung
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -438,23 +459,26 @@ export function ScndDropGame() {
         case 'ArrowRight': e.preventDefault(); movePiece(1, 0); break;
         case 'ArrowDown': e.preventDefault(); movePiece(0, 1); break;
         case 'ArrowUp': e.preventDefault(); rotatePiece(); break;
-        case 'Escape': e.preventDefault(); giveUp(); break;
+        case 'Escape': e.preventDefault(); togglePause(); break; // geändert: Pause statt sofort Aufgeben
         default: break;
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
+  // Automatischer Game Loop (beachtet Pause)
   useEffect(() => {
-    if (isPlaying && !gameOver && !freezeMode) {
+    if (isPlaying && !gameOver && !freezeMode && !isPaused) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
+    } else {
+      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     }
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode, freezeMode]);
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode]);
 
-  // Canvas zeichnen
+  // Canvas zeichnen (unverändert, bis auf die zusätzliche Pause-Überlagerung)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -522,7 +546,7 @@ export function ScndDropGame() {
       ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 10);
       ctx.shadowBlur = 0;
     }
-    if (currentPiece && !gameOver && !freezeMode) {
+    if (currentPiece && !gameOver && !freezeMode && !isPaused) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
       if (ghostY > pieceY) {
@@ -607,7 +631,7 @@ export function ScndDropGame() {
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
     }
     ctx.shadowBlur = 0;
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, powerUp, powerUpX, powerUpY, linesCleared, activePowerUp]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, powerUp, powerUpX, powerUpY, linesCleared, activePowerUp, isPaused]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -635,7 +659,7 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className={`my-6 md:my-12 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : 'shadow-[0_0_15px_rgba(0,0,0,0.5)]'}`}>
+    <div className={`min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all ${newHighscoreGlow ? 'shadow-[0_0_30px_#FF4400]' : 'shadow-[0_0_15px_rgba(0,0,0,0.5)]'}`}>
       <div className="relative">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl"></div>
         <div className="p-4 md:p-6">
@@ -666,6 +690,26 @@ export function ScndDropGame() {
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
+              {/* PAUSE MENÜ */}
+              {isPaused && !gameOver && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
+                  <div className="text-center">
+                    <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSE</div>
+                    <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
+                    <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">
+                      ▶ WEITER
+                    </button>
+                    <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">
+                      🔄 NEUSTART
+                    </button>
+                    <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">
+                      ⚡ AUFGABEN
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TOUCH CONTROLLER (geändert: 🏆 öffnet Pause-Menü) */}
               {isPlaying && !gameOver && (
                 <div className="fixed bottom-0 left-0 right-0 md:hidden z-50">
                   <div className="flex justify-between items-end px-2 pb-3">
@@ -688,13 +732,13 @@ export function ScndDropGame() {
                       <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
                         <span className="text-white text-lg font-bold tracking-wider">A</span>
                       </button>
-                      <button onTouchStart={(e) => { e.preventDefault(); giveUp(); }} className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                        <span className="text-white text-xl font-bold">🏆</span>
+                      <button onTouchStart={(e) => { e.preventDefault(); togglePause(); }} className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
+                        <span className="text-white text-xl font-bold">⏸</span>
                       </button>
                     </div>
                   </div>
                   <div className="flex justify-center gap-8 pb-1 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">
-                    <span>BEWEGEN</span><span>DREHEN</span><span>AUFGABEN</span>
+                    <span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span>
                   </div>
                 </div>
               )}
@@ -726,8 +770,8 @@ export function ScndDropGame() {
               )}
             </div>
 
+            {/* Rechte Seitenleiste (unverändert) */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
-              {/* Seitenleiste Inhalt – unverändert, hier aus Platzgründen ausgelassen, aber in deinem Original enthalten */}
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
                 <div className="text-3xl md:text-5xl font-black text-[#FF4400] drop-shadow-[0_0_10px_rgba(255,68,0,0.5)]">{gameOver ? finalScore : score}</div>
@@ -757,7 +801,7 @@ export function ScndDropGame() {
               <div className="text-center pt-2 border-t border-[#FF4400]/20">
                 <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
                 <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">← → ↓</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">↑</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[var(--text-secondary)]">DREHEN</kbd></div>
-                <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd><span className="text-[8px] text-[var(--text-secondary)]">AUFGABEN</span></div>
+                <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd><span className="text-[8px] text-[var(--text-secondary)]">PAUSE</span></div>
                 <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">POWER-UPS alle 8 Sek.</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+SCHWARZ = 2x</span></div>
               </div>
             </div>
