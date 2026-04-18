@@ -708,10 +708,7 @@ export function ScndDropGame() {
 
               {/* TOUCH CONTROLLER für Handy - asymmetrisches Dreieck + zwei rechte Tasten */}
               {isPlaying && !gameOver && (
-                <div 
-                  className="fixed bottom-4 left-0 right-0 flex justify-center items-end md:hidden z-50"
-                  style={{ touchAction: 'none', userSelect: 'none' }}
-                >
+             <div className="flex justify-center w-full">  
                   <div className="flex items-end gap-8">
                     {/* Linker Bereich: Dreieck */}
                     <div className="relative flex flex-col items-center" style={{ width: '180px' }}>
