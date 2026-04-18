@@ -6,19 +6,17 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Dynamische Zellengröße - maximal mögliche Größe ohne Überlappung
+// Dynamische Zellengröße - maximal mögliche Größe
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 32;
+  if (typeof window === 'undefined') return 34;
   const width = window.innerWidth;
   const height = window.innerHeight;
   
-  // Auf Handys: Maximale Zellengröße berechnen
   if (width < 768) {
-    // Verfügbare Höhe: Bildschirmhöhe - Header (ca. 120px) - Controller (ca. 140px) - Padding
-    const availableHeight = height - 260;
+    // Verfügbare Höhe: Bildschirmhöhe - Header (ca. 80px) - Controller (ca. 120px) - Padding
+    const availableHeight = height - 200;
     let cell = Math.floor(availableHeight / BOARD_HEIGHT);
-    // Begrenzung auf sinnvolle Werte (min 20px, max 38px)
-    return Math.min(Math.max(cell, 20), 38);
+    return Math.min(Math.max(cell, 28), 38);
   }
   if (width < 1024) return 32;
   return 34;
@@ -56,7 +54,7 @@ interface Highscore {
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cellSize, setCellSize] = useState(32);
+  const [cellSize, setCellSize] = useState(34);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -750,173 +748,172 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
-      <div className="relative flex-1">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl"></div>
-        <div className="p-4 md:p-6 pb-0">
-          <div className="text-center mb-4">
-            <div className="inline-block">
-              <h3 className={'text-2xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
-                SCND DROP
-              </h3>
-              <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
+    <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all">
+      <div className="relative h-full flex flex-col">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl z-10"></div>
+        
+        {/* Header - kompakt gehalten */}
+        <div className="p-3 md:p-6 text-center">
+          <div className="inline-block">
+            <h3 className={'text-xl md:text-4xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
+              SCND DROP
+            </h3>
+            <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#FF4400] to-transparent mt-1"></div>
+          </div>
+          <div className="flex justify-center gap-2 mt-1 flex-wrap">
+            {slowMode && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[8px] rounded-full">🐌 SLOW</span>}
+            {freezeMode && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[8px] rounded-full animate-pulse">⏰ FREEZE</span>}
+            {fastForwardActive && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[8px] rounded-full animate-pulse">⏩ FAST</span>}
+            {scndBonusActive && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[8px] rounded-full animate-pulse">⭐ 3x</span>}
+            {activePowerUp && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[8px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
+          </div>
+          {bonusMessage.show && (
+            <div className="mt-1 animate-bounce">
+              <span className="inline-block px-2 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[8px] md:text-xs rounded-full border border-[#FFD700]/30">
+                {bonusMessage.text}
+              </span>
             </div>
-            <div className="flex justify-center gap-3 mt-2 flex-wrap">
-              {slowMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full">🐌 TIME SLOW</span>}
-              {freezeMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full animate-pulse">⏰ FREEZE</span>}
-              {fastForwardActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[10px] rounded-full animate-pulse">⏩ FAST FORWARD</span>}
-              {scndBonusActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[10px] rounded-full animate-pulse">⭐ 3x BONUS</span>}
-              {activePowerUp && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[10px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
+          )}
+        </div>
+
+        {/* Hauptinhalt - Canvas und Sidebar nebeneinander, Canvas zentriert */}
+        <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 justify-center items-center md:items-start px-3 pb-3">
+          {/* Canvas Container - zentriert und so groß wie möglich */}
+          <div className="flex justify-center items-center">
+            <div className="relative">
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
+              <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
+
+              {isPaused && !gameOver && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/85 backdrop-blur-md rounded-lg z-40">
+                  <div className="text-center">
+                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2 tracking-tighter">PAUSE</div>
+                    <div className="w-12 h-0.5 bg-[#FF4400]/50 mx-auto mb-4"></div>
+                    <button onClick={handleResume} className="w-40 py-2 mb-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
+                    <button onClick={handleRestart} className="w-40 py-2 mb-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-sm hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
+                    <button onClick={handleGiveUp} className="w-40 py-2 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-sm hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
+                  </div>
+                </div>
+              )}
+
+              {!isPlaying && !gameOver && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 backdrop-blur-sm rounded-lg">
+                  <div className="text-center">
+                    <div className="text-xl md:text-2xl font-black text-[#FF4400] mb-2">SCND DROP</div>
+                    <button onClick={startGame} className="px-5 py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm hover:scale-105 transition-all shadow-lg">▶ START GAME</button>
+                  </div>
+                </div>
+              )}
+              
+              {gameOver && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 backdrop-blur-sm rounded-lg">
+                  <div className="text-center">
+                    <div className="text-lg md:text-2xl font-black mb-1"><span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span></div>
+                    <div className="text-base md:text-xl text-[#FF4400] font-bold mb-2">{finalScore} Punkte</div>
+                    <button onClick={startGame} className="px-4 py-1 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs hover:scale-105 transition-all">NEUSTART</button>
+                  </div>
+                </div>
+              )}
             </div>
-            {bonusMessage.show && (
-              <div className="mt-2 animate-bounce">
-                <span className="inline-block px-3 py-1 bg-[#FFD700]/20 text-[#FFD700] text-[10px] md:text-xs rounded-full border border-[#FFD700]/30">
-                  {bonusMessage.text}
-                </span>
-              </div>
-            )}
           </div>
 
-          <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            {/* Canvas Container - zentriert mit maximaler Größe */}
-            <div className="flex justify-center items-center">
-              <div className="relative">
-                <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
-                <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
-
-                {isPaused && !gameOver && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
-                    <div className="text-center">
-                      <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSE</div>
-                      <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
-                      <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
-                      <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
-                      <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
-                    </div>
-                  </div>
-                )}
-
-                {!isPlaying && !gameOver && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
-                    <div className="text-center">
-                      <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
-                      <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">▶ START GAME</button>
-                    </div>
-                  </div>
-                )}
-                
-                {gameOver && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
-                    <div className="text-center">
-                      <div className="text-xl md:text-3xl font-black mb-1"><span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span></div>
-                      <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
-                      <div className="flex gap-3">
-                        <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          {/* Rechte Seitenleiste - auf Handy unter dem Canvas, kleiner */}
+          <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-3 md:p-4 min-w-[180px] md:min-w-[220px] w-full md:w-auto shadow-xl">
+            <div className="text-center mb-3 pb-2 border-b border-[#FF4400]/20">
+              <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
+              <div className="text-2xl md:text-4xl font-black text-[#FF4400] drop-shadow-[0_0_8px_rgba(255,68,0,0.5)]">{gameOver ? finalScore : score}</div>
+              <div className="flex justify-center gap-3 mt-1">
+                <div className="text-center"><div className="text-[6px] md:text-[8px] text-[var(--text-secondary)]">LVL</div><div className="text-xs md:text-sm font-bold text-[#FF4400]">{level}</div></div>
+                <div className="text-center"><div className="text-[6px] md:text-[8px] text-[var(--text-secondary)]">LINIEN</div><div className="text-xs md:text-sm font-bold text-[var(--text-primary)]">{linesCleared}</div></div>
+                <div className="text-center"><div className="text-[6px] md:text-[8px] text-[var(--text-secondary)]">COMBO</div><div className="text-xs md:text-sm font-bold text-[#FF4400]">{combo}x</div></div>
               </div>
             </div>
-
-            {/* Rechte Seitenleiste - auf Handy unter dem Canvas */}
-            <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl mt-4 md:mt-0">
-              <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
-                <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
-                <div className="text-3xl md:text-5xl font-black text-[#FF4400] drop-shadow-[0_0_10px_rgba(255,68,0,0.5)]">{gameOver ? finalScore : score}</div>
-                <div className="flex justify-center gap-4 mt-2">
-                  <div className="text-center"><div className="text-[8px] md:text-[10px] text-[var(--text-secondary)]">LEVEL</div><div className="text-sm md:text-base font-bold text-[#FF4400]">{level}</div></div>
-                  <div className="text-center"><div className="text-[8px] md:text-[10px] text-[var(--text-secondary)]">LINIEN</div><div className="text-sm md:text-base font-bold text-[var(--text-primary)]">{linesCleared}</div></div>
-                  <div className="text-center"><div className="text-[8px] md:text-[10px] text-[var(--text-secondary)]">COMBO</div><div className="text-sm md:text-base font-bold text-[#FF4400]">{combo}x</div></div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {hotStreak && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]"><div className="text-[10px] text-[var(--text-secondary)]">🔥 STREAK</div><div className="text-xs font-bold text-[#FF4400]">HOT STREAK!</div></div>}
-                {scndMode && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FF4400]"><div className="text-[10px] text-[var(--text-secondary)]">⚡ MODUS</div><div className="text-xs font-bold text-[#FF4400]">SCND MODE!</div></div>}
-                {scndBonusActive && <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent p-2 rounded-lg border-l-4 border-[#FFD700]"><div className="text-[10px] text-[var(--text-secondary)]">⭐ BONUS</div><div className="text-xs font-bold text-[#FFD700]">3x PUNKTE!</div></div>}
-              </div>
-              <div className="bg-[var(--bg-secondary)]/50 rounded-xl p-3 mb-4">
-                <div className="flex items-center gap-2 mb-2"><div className="w-1 h-4 bg-[#FF4400] rounded-full"></div><h4 className="font-bold text-xs uppercase tracking-wider text-[#FF4400]">🏆 BESTENLISTE TOP 3</h4></div>
-                <ul className="space-y-1">
-                  {highscores.map((hs, idx) => (
-                    <li key={idx} className="flex justify-between items-center bg-[var(--bg-primary)]/50 rounded-lg px-3 py-1.5">
-                      <span className="flex items-center gap-2"><span className="text-base md:text-lg">{rankIcon(idx)}</span><span className="text-xs md:text-sm font-medium truncate max-w-[80px] md:max-w-[100px]">{hs.player_name}</span></span>
-                      <span className="text-xs md:text-sm text-[#FF4400] font-bold">{hs.score}</span>
-                    </li>
-                  ))}
-                  {highscores.length === 0 && <li className="text-center text-[10px] md:text-xs text-[var(--text-secondary)] py-2 italic">— noch keine Einträge —</li>}
-                </ul>
-              </div>
-              <div className="text-center pt-2 border-t border-[#FF4400]/20">
-                <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
-                <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">← → ↓</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">↑</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[var(--text-secondary)]">DREHEN</kbd></div>
-                <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd><span className="text-[8px] text-[var(--text-secondary)]">PAUSE</span></div>
-                <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">10 POWER‑UP‑TETROMINOS</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+GRAU = 2x</span></div>
-              </div>
+            <div className="grid grid-cols-2 gap-1 mb-3">
+              {hotStreak && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-1 rounded border-l-2 border-[#FF4400]"><div className="text-[8px] text-[var(--text-secondary)]">🔥 STREAK</div><div className="text-[10px] font-bold text-[#FF4400]">HOT!</div></div>}
+              {scndMode && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent p-1 rounded border-l-2 border-[#FF4400]"><div className="text-[8px] text-[var(--text-secondary)]">⚡ MODUS</div><div className="text-[10px] font-bold text-[#FF4400]">SCND!</div></div>}
+              {scndBonusActive && <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent p-1 rounded border-l-2 border-[#FFD700]"><div className="text-[8px] text-[var(--text-secondary)]">⭐ BONUS</div><div className="text-[10px] font-bold text-[#FFD700]">3x</div></div>}
+            </div>
+            <div className="bg-[var(--bg-secondary)]/50 rounded-lg p-2 mb-3">
+              <div className="flex items-center gap-1 mb-1"><div className="w-1 h-3 bg-[#FF4400] rounded-full"></div><h4 className="font-bold text-[9px] uppercase tracking-wider text-[#FF4400]">🏆 TOP 3</h4></div>
+              <ul className="space-y-0.5">
+                {highscores.map((hs, idx) => (
+                  <li key={idx} className="flex justify-between items-center bg-[var(--bg-primary)]/50 rounded px-2 py-0.5">
+                    <span className="flex items-center gap-1"><span className="text-sm">{rankIcon(idx)}</span><span className="text-[10px] font-medium truncate max-w-[70px]">{hs.player_name}</span></span>
+                    <span className="text-[10px] text-[#FF4400] font-bold">{hs.score}</span>
+                  </li>
+                ))}
+                {highscores.length === 0 && <li className="text-center text-[8px] text-[var(--text-secondary)] py-1 italic">— keine Einträge —</li>}
+              </ul>
+            </div>
+            <div className="text-center pt-1 border-t border-[#FF4400]/20">
+              <div className="text-[7px] md:text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
+              <div className="flex justify-center gap-2 mt-1"><kbd className="px-1 py-0.5 bg-black/50 rounded text-[9px] font-mono text-[#FF4400]">← → ↓</kbd><kbd className="px-1 py-0.5 bg-black/50 rounded text-[9px] font-mono text-[#FF4400]">↑</kbd></div>
+              <div className="flex justify-center gap-2 mt-0.5"><kbd className="px-1 py-0.5 bg-black/50 rounded text-[7px] font-mono text-[var(--text-secondary)]">ESC</kbd><span className="text-[7px] text-[var(--text-secondary)]">PAUSE</span></div>
+              <div className="mt-1 flex flex-wrap justify-center gap-1"><span className="inline-block w-1.5 h-1.5 rounded-full bg-[#FF4400]"></span><span className="text-[6px] text-[var(--text-secondary)]">10 POWER-UPS</span></div>
             </div>
           </div>
         </div>
+
+        {/* Platzhalter für den fixierten Controller (unsichtbar, gleiche Höhe) */}
+        <div className="md:hidden" style={{ height: '120px' }}></div>
       </div>
 
       {/* TOUCH CONTROLLER - fixed bottom für Handys */}
       {isPlaying && !gameOver && !isPaused && (
-        <div className="md:hidden bg-black/90 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 fixed bottom-0 left-0 right-0 z-50">
-          <div className="flex justify-between items-center px-4 max-w-md mx-auto">
-            <div className="flex gap-4">
+        <div className="md:hidden bg-black/90 backdrop-blur-sm border-t border-[#FF4400]/30 py-2 fixed bottom-0 left-0 right-0 z-50">
+          <div className="flex justify-between items-center px-3 max-w-md mx-auto">
+            <div className="flex gap-3">
               <button 
                 onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} 
                 onTouchMove={(e) => e.preventDefault()}
-                className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
                 style={{ touchAction: 'none', userSelect: 'none' }}
               >
-                <span className="text-white text-3xl font-bold">◀</span>
+                <span className="text-white text-2xl font-bold">◀</span>
               </button>
               <button 
                 onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} 
                 onTouchMove={(e) => e.preventDefault()}
-                className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
                 style={{ touchAction: 'none', userSelect: 'none' }}
               >
-                <span className="text-white text-3xl font-bold">▼</span>
+                <span className="text-white text-2xl font-bold">▼</span>
               </button>
               <button 
                 onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} 
                 onTouchMove={(e) => e.preventDefault()}
-                className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
                 style={{ touchAction: 'none', userSelect: 'none' }}
               >
-                <span className="text-white text-3xl font-bold">▶</span>
+                <span className="text-white text-2xl font-bold">▶</span>
               </button>
             </div>
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button 
                 onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} 
                 onTouchMove={(e) => e.preventDefault()}
-                className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
                 style={{ touchAction: 'none', userSelect: 'none' }}
               >
-                <span className="text-white text-xl font-bold tracking-wider">A</span>
+                <span className="text-white text-lg font-bold tracking-wider">A</span>
               </button>
               <button 
                 onTouchStart={(e) => { e.preventDefault(); togglePause(); }} 
                 onTouchMove={(e) => e.preventDefault()}
-                className="w-16 h-16 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
                 style={{ touchAction: 'none', userSelect: 'none' }}
               >
                 <span className="text-white text-xl font-bold">⏸</span>
               </button>
             </div>
           </div>
-          <div className="flex justify-center gap-12 mt-2 text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold">
+          <div className="flex justify-center gap-10 mt-1 text-[7px] text-[var(--text-secondary)] uppercase tracking-wider font-bold">
             <span>BEWEGEN</span>
             <span>DREHEN</span>
             <span>PAUSE</span>
           </div>
         </div>
       )}
-
-      {/* Zusätzlicher Padding-Bottom auf Handy für den Controller */}
-      <div className="md:hidden h-32"></div>
 
       {showNameInput && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
