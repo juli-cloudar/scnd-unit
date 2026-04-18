@@ -517,7 +517,7 @@ export function ScndDropGame() {
 
   // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
-    const isPowerUpSpawn = Math.random() < 0.15;
+    const isPowerUpSpawn = Math.random() < 0.25;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
