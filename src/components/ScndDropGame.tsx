@@ -20,7 +20,7 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isBrand: true, isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isBrand: false, isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FF6666', borderColor: '#CC3333', name: 'T', isBrand: false, isPowerUp: false },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#AAAAAA', borderColor: '#666666', name: 'S', isBrand: false, isPowerUp: false }, // helles Grau statt Schwarz
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#AAAAAA', borderColor: '#666666', name: 'S', isBrand: false, isPowerUp: false },
   { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#EEEEEE', borderColor: '#CCCCCC', name: 'Z', isBrand: false, isPowerUp: false },
   { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#5588FF', borderColor: '#2255AA', name: 'L', isBrand: false, isPowerUp: false },
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isBrand: false, isPowerUp: false }
@@ -303,32 +303,33 @@ export function ScndDropGame() {
         }, 10000);
         break;
       }
-
-case 'randomize': {
-  const randomBoard = board.map(row => [...row]);
-  const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
-  let changed = 0;
-  for (let attempt = 0; attempt < 100 && changed < 3; attempt++) {
-    const randX = Math.floor(Math.random() * BOARD_WIDTH);
-    const randY = Math.floor(Math.random() * BOARD_HEIGHT);
-    if (randomBoard[randY][randX] !== null) {
-      const newPiece = allPieces[Math.floor(Math.random() * allPieces.length)];
-      randomBoard[randY][randX] = {
-        color: newPiece.color,
-        borderColor: newPiece.borderColor,
-        isBrand: newPiece.isBrand || false,
-        isPowerUp: newPiece.isPowerUp || false,
-        powerUpEffect: (newPiece as any).powerUpEffect || null,
-        glowColor: (newPiece as any).glowColor || null
-      };
-      changed++;
+      case 'randomize': {
+        const randomBoard = board.map(row => [...row]);
+        const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
+        let changed = 0;
+        for (let attempt = 0; attempt < 100 && changed < 3; attempt++) {
+          const randX = Math.floor(Math.random() * BOARD_WIDTH);
+          const randY = Math.floor(Math.random() * BOARD_HEIGHT);
+          if (randomBoard[randY][randX] !== null) {
+            const newPiece = allPieces[Math.floor(Math.random() * allPieces.length)];
+            randomBoard[randY][randX] = {
+              color: newPiece.color,
+              borderColor: newPiece.borderColor,
+              isBrand: newPiece.isBrand || false,
+              isPowerUp: newPiece.isPowerUp || false,
+              powerUpEffect: (newPiece as any).powerUpEffect || null,
+              glowColor: (newPiece as any).glowColor || null
+            };
+            changed++;
+          }
+        }
+        setBoard(randomBoard);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
+      default: break;
     }
-  }
-  setBoard(randomBoard);
-  setTimeout(() => setActivePowerUp(null), 2000);
-  break;
-}
-        
+  };
 
   // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
@@ -773,26 +774,18 @@ case 'randomize': {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            {/* Canvas-Container mit ausreichend Abstand nach unten für Touch-Controls */}
             <div className="relative mb-28 md:mb-0">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {/* PAUSE MENÜ */}
               {isPaused && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
                   <div className="text-center">
                     <div className="text-3xl md:text-4xl font-black text-[#FF4400] mb-3 tracking-tighter">PAUSE</div>
                     <div className="w-16 h-0.5 bg-[#FF4400]/50 mx-auto mb-6"></div>
-                    <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">
-                      ▶ WEITER
-                    </button>
-                    <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">
-                      🔄 NEUSTART
-                    </button>
-                    <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">
-                      ⚡ AUFGABEN
-                    </button>
+                    <button onClick={handleResume} className="w-48 py-3 mb-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-base hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
+                    <button onClick={handleRestart} className="w-48 py-3 mb-3 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-base hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
+                    <button onClick={handleGiveUp} className="w-48 py-3 border-2 border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-base hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
                   </div>
                 </div>
               )}
@@ -801,9 +794,7 @@ case 'randomize': {
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
                     <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
-                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
-                      ▶ START GAME
-                    </button>
+                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">▶ START GAME</button>
                   </div>
                 </div>
               )}
@@ -811,9 +802,7 @@ case 'randomize': {
               {gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
                   <div className="text-center">
-                    <div className="text-xl md:text-3xl font-black mb-1">
-                      <span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span>
-                    </div>
+                    <div className="text-xl md:text-3xl font-black mb-1"><span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span></div>
                     <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
                     <div className="flex gap-3">
                       <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
@@ -823,7 +812,6 @@ case 'randomize': {
               )}
             </div>
 
-            {/* Rechte Seitenleiste (verwendet CSS-Variablen für Light/Dark Mode) */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
@@ -862,33 +850,20 @@ case 'randomize': {
         </div>
       </div>
 
-      {/* ========== TOUCH CONTROLLER (fixed bottom) ========== */}
       {isPlaying && !gameOver && (
         <div className="fixed bottom-0 left-0 right-0 md:hidden bg-black/80 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 z-50">
           <div className="flex justify-between items-center px-6 max-w-md mx-auto">
             <div className="flex gap-6">
-              <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                <span className="text-white text-2xl font-bold">◀</span>
-              </button>
-              <button onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                <span className="text-white text-2xl font-bold">▼</span>
-              </button>
-              <button onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                <span className="text-white text-2xl font-bold">▶</span>
-              </button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-2xl font-bold">◀</span></button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-2xl font-bold">▼</span></button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-2xl font-bold">▶</span></button>
             </div>
             <div className="flex gap-4">
-              <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                <span className="text-white text-lg font-bold tracking-wider">A</span>
-              </button>
-              <button onTouchStart={(e) => { e.preventDefault(); togglePause(); }} className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                <span className="text-white text-xl font-bold">⏸</span>
-              </button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-lg font-bold tracking-wider">A</span></button>
+              <button onTouchStart={(e) => { e.preventDefault(); togglePause(); }} className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-xl font-bold">⏸</span></button>
             </div>
           </div>
-          <div className="flex justify-center gap-12 mt-1 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">
-            <span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span>
-          </div>
+          <div className="flex justify-center gap-12 mt-1 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider"><span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span></div>
         </div>
       )}
 
