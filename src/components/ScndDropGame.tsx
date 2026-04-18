@@ -6,11 +6,11 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Adaptive Zellengröße – dynamisch an Bildschirmhöhe angepasst
+// Adaptive Zellengröße – basierend auf verfügbarer Bildschirmhöhe
 const getCellSize = () => {
   if (typeof window === 'undefined') return 28;
   const height = window.innerHeight;
-  // Abzüge: Header (~80px), Touch-Controller (~100px), Padding & Abstände (~20px)
+  // Reserve: Header (ca. 80px), Touch-Controller (ca. 100px), Padding (20px)
   const availableHeight = height - 200;
   let cell = Math.floor(availableHeight / BOARD_HEIGHT);
   return Math.min(Math.max(cell, 18), 32);
@@ -83,13 +83,32 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false); // Verhindert mehrfaches Scrollen
+
+  // Zentriert das Canvas im Viewport
+  const centerCanvasInView = () => {
+    if (gameContainerRef.current) {
+      const rect = gameContainerRef.current.getBoundingClientRect();
+      const scrollTop = window.scrollY;
+      const targetTop = rect.top + scrollTop - (window.innerHeight / 2) + (rect.height / 2);
+      window.scrollTo({ top: targetTop, behavior: 'smooth' });
+      setHasScrolled(true);
+    }
+  };
 
   // Scroll zum Spielbereich beim Klick auf den Header
   const scrollToGame = () => {
-    if (gameContainerRef.current) {
-      gameContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    centerCanvasInView();
   };
+
+  useEffect(() => {
+    if (isPlaying && !gameOver && !isPaused && !hasScrolled) {
+      // Nur einmal nach Spielstart zentrieren
+      const timer = setTimeout(() => centerCanvasInView(), 200);
+      return () => clearTimeout(timer);
+    }
+    if (!isPlaying) setHasScrolled(false);
+  }, [isPlaying, gameOver, isPaused]);
 
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
@@ -161,9 +180,9 @@ export function ScndDropGame() {
     setParticles([]);
     setIsPaused(false);
     setIsSaving(false);
+    setHasScrolled(false);
     spawnNewPiece();
     setIsPlaying(true);
-    setTimeout(() => scrollToGame(), 100);
   };
 
   const giveUp = () => {
@@ -517,7 +536,7 @@ export function ScndDropGame() {
 
   // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
-    const isPowerUpSpawn = Math.random() < 0.25;
+    const isPowerUpSpawn = Math.random() < 0.15;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
