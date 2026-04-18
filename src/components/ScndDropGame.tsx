@@ -438,29 +438,30 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
-  // ========== GAME LOOP mit requestAnimationFrame ==========
-  useEffect(() => {
-    if (!isPlaying || gameOver || freezeMode || isPaused) {
-      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      return;
-    }
-    let lastFall = performance.now();
-    const delay = getFallDelay();
-    if (delay === Infinity) return;
+// ========== GAME LOOP mit requestAnimationFrame (korrigiert) ==========
+useEffect(() => {
+  if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    return;
+  }
+  let lastFall = performance.now();
+  const delay = getFallDelay();
+  if (delay === Infinity) return;
 
-    const step = (now: number) => {
-      if (!isPlaying || gameOver || freezeMode || isPaused) return;
-      if (now - lastFall >= delay) {
-        movePiece(0, 1);
-        lastFall = now;
-      }
-      gameLoopRef.current = requestAnimationFrame(step);
-    };
+  const step = (now: number) => {
+    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) return;
+    if (now - lastFall >= delay) {
+      movePiece(0, 1);
+      lastFall = now;
+    }
     gameLoopRef.current = requestAnimationFrame(step);
-    return () => {
-      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-    };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode]);
+  };
+  gameLoopRef.current = requestAnimationFrame(step);
+  return () => {
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+  };
+}, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, currentPiece]); // ⬅️ currentPiece hinzugefügt
+  
 
   // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
