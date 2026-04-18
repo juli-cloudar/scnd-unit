@@ -991,7 +991,7 @@ export function ScndDropGame() {
                   <div className="w-8 h-0.5 bg-[#FF4400]/50 mx-auto mb-2"></div>
                   <button onClick={handleResume} className="w-28 py-1 mb-1 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-[10px] hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
                   <button onClick={handleRestart} className="w-28 py-1 mb-1 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
-                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
+                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGEBEN</button>
                 </div>
               </div>
             )}
