@@ -6,11 +6,11 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Zellengröße: Auf Handys 34px für bessere Lesbarkeit
+// Zellengröße: Auf Handys 30px (besserer Platz), auf Desktop 32px
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 34;
+  if (typeof window === 'undefined') return 30;
   const width = window.innerWidth;
-  if (width < 768) return 34;
+  if (width < 768) return 30;
   if (width < 1024) return 32;
   return 32;
 };
@@ -47,7 +47,7 @@ interface Highscore {
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cellSize, setCellSize] = useState(34);
+  const [cellSize, setCellSize] = useState(30);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -774,10 +774,12 @@ export function ScndDropGame() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            <div className="relative mb-28 md:mb-0">
+            {/* Canvas-Container mit ausreichend Abstand nach unten (mb-44) für Touch-Controls */}
+            <div className="relative mb-44 md:mb-0">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
+              {/* PAUSE MENÜ */}
               {isPaused && !gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/85 backdrop-blur-md rounded-lg z-40">
                   <div className="text-center">
@@ -812,6 +814,7 @@ export function ScndDropGame() {
               )}
             </div>
 
+            {/* Rechte Seitenleiste */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
@@ -850,6 +853,7 @@ export function ScndDropGame() {
         </div>
       </div>
 
+      {/* TOUCH CONTROLLER - fixed bottom */}
       {isPlaying && !gameOver && (
         <div className="fixed bottom-0 left-0 right-0 md:hidden bg-black/80 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 z-50">
           <div className="flex justify-between items-center px-6 max-w-md mx-auto">
