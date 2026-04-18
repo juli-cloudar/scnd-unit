@@ -438,7 +438,9 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
-// ========== GAME LOOP mit requestAnimationFrame (korrigiert) ==========
+
+
+  // ========== GAME LOOP mit requestAnimationFrame ==========
 useEffect(() => {
   if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -461,7 +463,6 @@ useEffect(() => {
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
   };
 }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, currentPiece]); // ⬅️ currentPiece hinzugefügt
-  
 
   // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
