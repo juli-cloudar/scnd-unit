@@ -3,7 +3,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-// SPIELFELD 10x20
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 const getCellSize = () => {
@@ -13,7 +12,6 @@ const getCellSize = () => {
   return 32;
 };
 
-// TETROMINOS
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4400', borderColor: '#CC3300', name: 'I', isBrand: true },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#CCAA00', name: 'O', isBrand: false },
@@ -24,7 +22,6 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false }
 ];
 
-// POWER-UPS
 const POWERUPS = [
   { name: '💣', fullName: 'BOMBE', color: '#FF4444', bgColor: '#FF4444', effect: 'bomb', chance: 30, retroIcon: '💣' },
   { name: '⚡', fullName: 'LASER', color: '#FF00FF', bgColor: '#FF00FF', effect: 'laser', chance: 25, retroIcon: '⚡' },
@@ -75,7 +72,6 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
-  // Scroll-Schutz für Handy
   useEffect(() => {
     if (isPlaying && !gameOver) {
       document.body.style.overflow = 'hidden';
@@ -94,7 +90,6 @@ export function ScndDropGame() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Highscores laden
   useEffect(() => {
     const loadHighscores = async () => {
       try {
@@ -109,12 +104,11 @@ export function ScndDropGame() {
   }, []);
 
   const getFallDelay = () => {
-  if (freezeMode) return Infinity;
-  // Start bei 1000ms (1 Sekunde), dann langsameres Level-Up
-  let delay = Math.max(150, 1000 - (level - 1) * 80);
-  if (slowMode) delay = delay * 2;
-  return delay;
-};
+    if (freezeMode) return Infinity;
+    let delay = Math.max(150, 1000 - (level - 1) * 80);
+    if (slowMode) delay = delay * 2;
+    return delay;
+  };
 
   useEffect(() => {
     if (isPlaying && !gameOver) {
@@ -128,7 +122,6 @@ export function ScndDropGame() {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
-  // ========== SPIELSTART (ohne manuelles Power‑Up‑Intervall) ==========
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
@@ -159,7 +152,6 @@ export function ScndDropGame() {
       setIsPlaying(false);
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
       if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-      
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
         setShowNameInput(true);
@@ -169,7 +161,6 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== POWER‑UP SPAWNER (automatisch) ==========
   useEffect(() => {
     if (isPlaying && !gameOver) {
       if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
@@ -187,7 +178,6 @@ export function ScndDropGame() {
   const spawnPowerUp = () => {
     if (!isPlaying || gameOver) return;
     if (powerUp) return;
-    
     const random = Math.random() * 100;
     let cumulative = 0;
     for (const pu of POWERUPS) {
@@ -201,7 +191,6 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== POWER‑UP BEWEGUNG (separater Effekt) ==========
   useEffect(() => {
     if (!powerUp) return;
     const moveInterval = setInterval(() => {
@@ -229,7 +218,6 @@ export function ScndDropGame() {
   const applyPowerUp = (effect: string, powerItem: any) => {
     setActivePowerUp(powerItem.fullName);
     showBonus(`✨ ${powerItem.fullName} AKTIVIERT! ✨`);
-    
     switch(effect) {
       case 'bomb': {
         const bombBoard = board.map(row => [...row]);
@@ -294,7 +282,6 @@ export function ScndDropGame() {
     setPowerUp(null);
   };
 
-  // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
     const random = Math.floor(Math.random() * TETROMINOS.length);
     const piece = JSON.parse(JSON.stringify(TETROMINOS[random]));
@@ -312,7 +299,6 @@ export function ScndDropGame() {
     setIsPlaying(false);
     if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     if (powerUpLoopRef.current) clearInterval(powerUpLoopRef.current);
-    
     const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
     if (score > 0 && isHighscore) {
       setShowNameInput(true);
@@ -351,7 +337,6 @@ export function ScndDropGame() {
         }
       }
     }
-    
     let rowsCleared = 0;
     const clearedRows: number[] = [];
     for (let row = BOARD_HEIGHT - 1; row >= 0; ) {
@@ -369,21 +354,18 @@ export function ScndDropGame() {
         rowsCleared++;
       } else row--;
     }
-    
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[rowsCleared];
     let hasBrandBlock = false;
     for (const row of clearedRows) {
       if (newBoard[row]?.some(cell => cell?.isBrand)) hasBrandBlock = true;
     }
-    
     if (rowsCleared > 0) {
       const newCombo = combo + 1;
       setCombo(newCombo);
       let multiplier = 1 + newCombo * 0.15;
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
-      
       const hasScndColors = clearedRows.some(row => 
         newBoard[row]?.some(cell => cell?.color === '#FF4400' || cell?.color === '#1A1A1A')
       );
@@ -391,7 +373,6 @@ export function ScndDropGame() {
         addedScore = Math.floor(addedScore * 2);
         showBonus('🎨 ORANGE + SCHWARZ = 2x PUNKTE!');
       }
-      
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
         setScndMode(true);
@@ -402,7 +383,6 @@ export function ScndDropGame() {
       setCombo(0);
       setHotStreak(false);
     }
-    
     if (hasBrandBlock) addedScore = Math.floor(addedScore * 1.5);
     const newScore = score + addedScore;
     setScore(newScore);
@@ -410,12 +390,10 @@ export function ScndDropGame() {
     setLinesCleared(newLines);
     const newLevel = Math.floor(newLines / 8) + 1;
     if (newLevel !== level) setLevel(newLevel);
-    
     if (addedScore > 0) {
       setPopupScore({ score: addedScore, x: BOARD_WIDTH * cellSize / 2, y: BOARD_HEIGHT * cellSize / 2 - 50 });
       setTimeout(() => setPopupScore(null), 500);
     }
-    
     setBoard(newBoard);
     spawnNewPiece();
   };
@@ -452,7 +430,6 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
-  // Tastatursteuerung
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -469,7 +446,6 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode]);
 
-  // Automatischer Game Loop
   useEffect(() => {
     if (isPlaying && !gameOver && !freezeMode) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
@@ -478,7 +454,7 @@ export function ScndDropGame() {
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
   }, [isPlaying, gameOver, currentPiece, pieceX, pieceY, board, level, slowMode, freezeMode]);
 
-  // ========== CANVAS ZEICHNEN ==========
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -487,17 +463,14 @@ export function ScndDropGame() {
     canvas.width = BOARD_WIDTH * cellSize;
     canvas.height = BOARD_HEIGHT * cellSize;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
     ctx.fillStyle = 'var(--bg-secondary)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     ctx.strokeStyle = '#FF4400';
     ctx.lineWidth = 3;
     ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 1;
     ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
-    
     ctx.strokeStyle = '#FF44004D';
     ctx.lineWidth = 1;
     for (let x = 0; x <= BOARD_WIDTH; x++) {
@@ -512,7 +485,6 @@ export function ScndDropGame() {
       ctx.lineTo(canvas.width, y * cellSize);
       ctx.stroke();
     }
-    
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
@@ -534,8 +506,6 @@ export function ScndDropGame() {
         }
       }
     }
-    
-    // Power-Up zeichnen (nur Zeichnung)
     if (powerUp && powerUpY < BOARD_HEIGHT) {
       const w = cellSize;
       const x = powerUpX * w;
@@ -552,7 +522,6 @@ export function ScndDropGame() {
       ctx.fillText(powerUp.fullName, x + w * 0.1, y + w + 10);
       ctx.shadowBlur = 0;
     }
-    
     if (currentPiece && !gameOver && !freezeMode) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
@@ -586,7 +555,6 @@ export function ScndDropGame() {
         }
       }
     }
-    
     ctx.fillStyle = 'rgba(0,0,0,0.06)';
     for (let i = 0; i < canvas.height; i += 2) ctx.fillRect(0, i, canvas.width, 1);
     const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width/2);
@@ -594,18 +562,15 @@ export function ScndDropGame() {
     gradient.addColorStop(1, 'rgba(0,0,0,0.35)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
-    
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
-    
     if (hotStreak) {
       ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
       ctx.fillStyle = '#FF4400';
@@ -701,11 +666,9 @@ export function ScndDropGame() {
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {/* TOUCH CONTROLLER für Handy - an den Rändern, zentrierte Unten-Taste */}
               {isPlaying && !gameOver && (
                 <div className="fixed bottom-0 left-0 right-0 md:hidden z-50">
                   <div className="flex justify-between items-end px-2 pb-3">
-                    {/* LINKE GRUPPE: Dreieck (◀, ▶, ▼) */}
                     <div className="relative flex flex-col items-center">
                       <div className="flex gap-6 mb-2">
                         <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
@@ -721,7 +684,6 @@ export function ScndDropGame() {
                         </button>
                       </div>
                     </div>
-                    {/* RECHTE GRUPPE: zwei Tasten übereinander */}
                     <div className="flex flex-col gap-3">
                       <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
                         <span className="text-white text-lg font-bold tracking-wider">A</span>
@@ -764,8 +726,8 @@ export function ScndDropGame() {
               )}
             </div>
 
-            {/* Rechte Seitenleiste */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
+              {/* Seitenleiste Inhalt – unverändert, hier aus Platzgründen ausgelassen, aber in deinem Original enthalten */}
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
                 <div className="text-3xl md:text-5xl font-black text-[#FF4400] drop-shadow-[0_0_10px_rgba(255,68,0,0.5)]">{gameOver ? finalScore : score}</div>
