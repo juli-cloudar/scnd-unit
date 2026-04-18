@@ -705,69 +705,73 @@ export function ScndDropGame() {
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
-              {/* TOUCH CONTROLLER für Handy - asymmetrisches Dreieck + zwei rechte Tasten */}
-              {isPlaying && !gameOver && (
-             <div className="flex justify-center w-full">  
-                  <div className="flex items-end gap-8">
-                    {/* Linker Bereich: Dreieck */}
-                    <div className="relative flex flex-col items-center" style={{ width: '180px' }}>
-                      <div className="flex justify-between w-full mb-3">
-                        <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                          <span className="text-white text-3xl font-bold">◀</span>
-                        </button>
-                        <button onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                          <span className="text-white text-3xl font-bold">▶</span>
-                        </button>
-                      </div>
-                      <div className="flex justify-end w-full pr-4">
-                        <button onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} className="w-16 h-16 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}>
-                          <span className="text-white text-3xl font-bold">▼</span>
-                        </button>
-                      </div>
-                    </div>
-                    {/* Rechte Seite: zwei Tasten schräg übereinander */}
-                    <div className="flex flex-col gap-4">
-                      <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} className="w-16 h-16 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all ml-4" style={{ touchAction: 'none', userSelect: 'none' }}>
-                        <span className="text-white text-xl font-bold tracking-wider">A</span>
-                      </button>
-                      <button onTouchStart={(e) => { e.preventDefault(); giveUp(); }} className="w-16 h-16 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all ml-8" style={{ touchAction: 'none', userSelect: 'none' }}>
-                        <span className="text-white text-xl font-bold">🏆</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="absolute -bottom-6 left-0 right-0 flex justify-center gap-12 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">
-                    <span>BEWEGEN</span><span>DREHEN</span><span>AUFGABEN</span>
-                  </div>
-                </div>
-              )}
+{/* TOUCH CONTROLLER für Handy - an den Rändern, zentrierte Unten-Taste */}
+{isPlaying && !gameOver && (
+  <div className="fixed bottom-0 left-0 right-0 md:hidden z-50">
+    {/* Hauptcontainer mit Abstand zu den Rändern (nur horizontaler Padding) */}
+    <div className="flex justify-between items-end px-2 pb-3">
+      
+      {/* LINKE GRUPPE: Dreieck (◀, ▶, ▼) - ganz links */}
+      <div className="relative flex flex-col items-center">
+        {/* Obere Reihe: ◀ und ▶ */}
+        <div className="flex gap-6 mb-2">
+          <button
+            onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }}
+            className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+            style={{ touchAction: 'none', userSelect: 'none' }}
+          >
+            <span className="text-white text-2xl font-bold">◀</span>
+          </button>
+          <button
+            onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }}
+            className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+            style={{ touchAction: 'none', userSelect: 'none' }}
+          >
+            <span className="text-white text-2xl font-bold">▶</span>
+          </button>
+        </div>
+        {/* Untere Reihe: ▼ (zentriert) */}
+        <div className="flex justify-center w-full">
+          <button
+            onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }}
+            className="w-14 h-14 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+            style={{ touchAction: 'none', userSelect: 'none' }}
+          >
+            <span className="text-white text-2xl font-bold">▼</span>
+          </button>
+        </div>
+      </div>
 
-              {!isPlaying && !gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
-                  <div className="text-center">
-                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
-                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
-                      ▶ START GAME
-                    </button>
-                  </div>
-                </div>
-              )}
+      {/* RECHTE GRUPPE: zwei Tasten übereinander - ganz rechts */}
+      <div className="flex flex-col gap-3">
+        <button
+          onTouchStart={(e) => { e.preventDefault(); handleRotate(); }}
+          className="w-14 h-14 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+          style={{ touchAction: 'none', userSelect: 'none' }}
+        >
+          <span className="text-white text-lg font-bold tracking-wider">A</span>
+        </button>
+        <button
+          onTouchStart={(e) => { e.preventDefault(); giveUp(); }}
+          className="w-14 h-14 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
+          style={{ touchAction: 'none', userSelect: 'none' }}
+        >
+          <span className="text-white text-xl font-bold">🏆</span>
+        </button>
+      </div>
+    </div>
+
+    {/* Kleine Beschriftung (optional) */}
+    <div className="flex justify-center gap-8 pb-1 text-[8px] text-[var(--text-secondary)] uppercase tracking-wider">
+      <span>BEWEGEN</span>
+      <span>DREHEN</span>
+      <span>AUFGABEN</span>
+    </div>
+  </div>
+)}
+
+
               
-              {gameOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
-                  <div className="text-center">
-                    <div className="text-xl md:text-3xl font-black mb-1">
-                      <span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span>
-                    </div>
-                    <div className="text-lg md:text-2xl text-[#FF4400] font-bold mb-3">{finalScore} Punkte</div>
-                    <div className="flex gap-3">
-                      <button onClick={startGame} className="px-4 md:px-6 py-1 md:py-2 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:scale-105 transition-all">NEUSTART</button>
-                      <button onClick={giveUp} className="px-4 md:px-6 py-1 md:py-2 border-2 border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-xs md:text-sm hover:bg-[#FF4400]/10 transition-all">AUFGABEN</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Rechte Seitenleiste – bleibt unverändert */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
