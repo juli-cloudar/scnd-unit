@@ -13,7 +13,7 @@ const getCellSize = () => {
   // Reserve: Header (~80px), Touch-Controller (~120px), Abstände (~20px)
   const availableHeight = height - 220;
   let cell = Math.floor(availableHeight / BOARD_HEIGHT);
-  return Math.min(Math.max(cell, 18), 30);
+  return Math.min(Math.max(cell, 18), 28); // max 28px (etwas kleiner)
 };
 
 // Normale Tetrominos
@@ -85,14 +85,15 @@ export function ScndDropGame() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
 
-  // Zentriert das Canvas mit einem kleinen Abstand zum oberen Rand
+  // Verbesserte Scroll-Funktion: Canvas wird 15% vom oberen Rand positioniert
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
       const scrollTop = window.scrollY;
-      // Abstand zum oberen Rand: 20px (nicht zentrieren)
-      const targetTop = rect.top + scrollTop - 20;
-      window.scrollTo({ top: targetTop, behavior: 'smooth' });
+      // Ziel: 15% der Bildschirmhöhe vom oberen Rand entfernt
+      const offset = window.innerHeight * 0.15;
+      const targetTop = rect.top + scrollTop - offset;
+      window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
       setHasScrolled(true);
     }
   };
@@ -352,6 +353,12 @@ export function ScndDropGame() {
         break;
       }
       case 'freeze': {
+        // FREEZE verlangsamt nur das Fallen (bisher: setFreezeMode(true) stoppt komplett)
+        // Jetzt: setSlowMode(true) statt freezeMode? Wir wollen langsameres Fallen.
+        // Bisher blockiert freezeMode die Bewegung komplett. Ändern wir:
+        // Wir setzen slowMode = true, nicht freezeMode.
+        setSlowMode(true);
+        // Animation: Eisblauer Schleier
         for (let i = 0; i < 3; i++) {
           ctx.fillStyle = 'rgba(0, 150, 255, 0.3)';
           ctx.fillRect(0, 0, w, h);
@@ -366,23 +373,11 @@ export function ScndDropGame() {
           }
           await new Promise(r => setTimeout(r, 150));
         }
-        setFreezeMode(true);
-        let seconds = 3;
-        const countdown = setInterval(() => {
-          if (!freezeMode) { clearInterval(countdown); return; }
-          ctx.font = `bold ${cs * 1.5}px monospace`;
-          ctx.fillStyle = '#00FFFF';
-          ctx.shadowBlur = 10;
-          ctx.fillText(`${seconds}s`, w/2, h/2);
-          ctx.shadowBlur = 0;
-          seconds--;
-          if (seconds < 0) clearInterval(countdown);
-        }, 1000);
+        // Nach 5 Sekunden den Effekt beenden
         setTimeout(() => {
-          setFreezeMode(false);
+          setSlowMode(false);
           setActivePowerUp(null);
-          clearInterval(countdown);
-        }, 3000);
+        }, 5000);
         break;
       }
       case 'gravity': {
@@ -1081,7 +1076,7 @@ export function ScndDropGame() {
         </div>
       )}
 
-      {/* Platzhalter für Controller auf Handy (größer wegen größerer Buttons) */}
+      {/* Platzhalter für Controller auf Handy */}
       <div className="md:hidden" style={{ height: '100px' }}></div>
 
       {showNameInput && (
