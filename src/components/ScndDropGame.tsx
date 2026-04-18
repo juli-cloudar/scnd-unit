@@ -3,16 +3,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const BOARD_WIDTH = 10;
+const BOARD_WIDTH = 20;
 const BOARD_HEIGHT = 20;
 
-// Adaptive Zellengröße – basierend auf verfügbarer Bildschirmhöhe
+type GravityDirection = 'down' | 'up' | 'left' | 'right';
+
+// Adaptive Zellengröße – basierend auf verfügbarer Bildschirmhöhe (20 Reihen)
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 26;
+  if (typeof window === 'undefined') return 24;
   const height = window.innerHeight;
+  // Reserve: Header (~80px), Touch-Controller (~120px), Abstände (~20px)
   const availableHeight = height - 220;
   let cell = Math.floor(availableHeight / BOARD_HEIGHT);
-  return Math.min(Math.max(cell, 18), 28);
+  return Math.min(Math.max(cell, 16), 28);
 };
 
 // Normale Tetrominos
@@ -40,6 +43,17 @@ const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#FF88FF', name: '🎲 RANDOM', isBrand: false, isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
 ];
 
+// Neue Gravitations‑Power‑Ups (5)
+const GRAVITY_POWERUPS = [
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#88AAFF', borderColor: '#4466CC', name: '🌀 SHIELD', isBrand: false, isPowerUp: true, powerUpEffect: 'gravityShield', glowColor: '#88AAFF' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAA88', borderColor: '#CC6644', name: '⚡ INSTANT', isBrand: false, isPowerUp: true, powerUpEffect: 'instantShift', glowColor: '#FFAA88' },
+  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#AAFFAA', borderColor: '#66CC66', name: '🎲 RANDOM G', isBrand: false, isPowerUp: true, powerUpEffect: 'randomGravity', glowColor: '#AAFFAA' },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFCCAA', borderColor: '#CCAA66', name: '🔒 LOCK', isBrand: false, isPowerUp: true, powerUpEffect: 'lockGravity', glowColor: '#FFCCAA' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#FFAACC', borderColor: '#CC6688', name: '🔄 REVERSE', isBrand: false, isPowerUp: true, powerUpEffect: 'reverseNow', glowColor: '#FFAACC' }
+];
+
+const ALL_POWERUP_TETROMINOS = [...POWERUP_TETROMINOS, ...GRAVITY_POWERUPS];
+
 interface Highscore {
   player_name: string;
   score: number;
@@ -48,7 +62,7 @@ interface Highscore {
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameContainerRef = useRef<HTMLDivElement>(null);
-  const [cellSize, setCellSize] = useState(26);
+  const [cellSize, setCellSize] = useState(24);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -84,7 +98,130 @@ export function ScndDropGame() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
 
-  // Scroll-Funktion (unverändert)
+  // ========== GRAVITATIONS-RELATED STATES ==========
+  const [gravity, setGravity] = useState<GravityDirection>('down');
+  const [gravityShieldActive, setGravityShieldActive] = useState(false);
+  const [gravityLockActive, setGravityLockActive] = useState(false);
+  const [nextGravityTimer, setNextGravityTimer] = useState<NodeJS.Timeout | null>(null);
+  const [gravityCountdown, setGravityCountdown] = useState(45);
+
+  // Hilfsfunktionen für Gravitation
+  const getRotationAngle = (dir: GravityDirection) => {
+    switch(dir) {
+      case 'down': return 0;
+      case 'up': return 180;
+      case 'left': return 90;
+      case 'right': return 270;
+    }
+  };
+
+  const getGravityName = (dir: GravityDirection) => {
+    switch(dir) {
+      case 'down': return '⬇️ UNTEN';
+      case 'up': return '⬆️ OBEN';
+      case 'left': return '⬅️ LINKS';
+      case 'right': return '➡️ RECHTS';
+    }
+  };
+
+  // Spawn-Position abhängig von Gravitation
+  const getSpawnPosition = (pieceShape: number[][]) => {
+    const pieceWidth = pieceShape[0].length;
+    const pieceHeight = pieceShape.length;
+    switch(gravity) {
+      case 'down':
+        return { x: Math.floor((BOARD_WIDTH - pieceWidth) / 2), y: 0 };
+      case 'up':
+        return { x: Math.floor((BOARD_WIDTH - pieceWidth) / 2), y: BOARD_HEIGHT - pieceHeight };
+      case 'left':
+        return { x: BOARD_WIDTH - pieceWidth, y: Math.floor((BOARD_HEIGHT - pieceHeight) / 2) };
+      case 'right':
+        return { x: 0, y: Math.floor((BOARD_HEIGHT - pieceHeight) / 2) };
+    }
+  };
+
+  // Übersetzt eine Bewegung (dx, dy) in der aktuellen Ansicht in interne Koordinaten
+  const translateMove = (dx: number, dy: number) => {
+    switch(gravity) {
+      case 'down': return { dx, dy };
+      case 'up': return { dx: -dx, dy: -dy };
+      case 'left': return { dx: dy, dy: -dx };
+      case 'right': return { dx: -dy, dy: dx };
+    }
+  };
+
+  // Prüft, ob eine Bewegung in der aktuellen Gravitation die "Fall"-Richtung ist
+  const isFallMove = (dx: number, dy: number) => {
+    switch(gravity) {
+      case 'down': return dy === 1;
+      case 'up': return dy === -1;
+      case 'left': return dx === -1;
+      case 'right': return dx === 1;
+    }
+  };
+
+  // Richtungsabhängige Linienlöschung (gibt gelöschte Indizes zurück)
+  const clearLinesDirectional = (newBoard: any[][]): { count: number; indices: number[] } => {
+    let clearedIndices: number[] = [];
+    if (gravity === 'down' || gravity === 'up') {
+      // Horizontale Linien
+      for (let row = 0; row < BOARD_HEIGHT; row++) {
+        if (newBoard[row].every(cell => cell !== null)) {
+          clearedIndices.push(row);
+        }
+      }
+      for (const row of clearedIndices.sort((a,b) => b-a)) {
+        newBoard.splice(row, 1);
+        newBoard.unshift(Array(BOARD_WIDTH).fill(null));
+      }
+    } else {
+      // Vertikale Linien (bei left/right)
+      for (let col = 0; col < BOARD_WIDTH; col++) {
+        let isFull = true;
+        for (let row = 0; row < BOARD_HEIGHT; row++) {
+          if (newBoard[row][col] === null) {
+            isFull = false;
+            break;
+          }
+        }
+        if (isFull) clearedIndices.push(col);
+      }
+      // Vertikale Linien löschen: Spalte nach links verschieben
+      for (const col of clearedIndices.sort((a,b) => b-a)) {
+        for (let row = 0; row < BOARD_HEIGHT; row++) {
+          for (let r = row; r < BOARD_HEIGHT - 1; r++) {
+            newBoard[r][col] = newBoard[r + 1][col];
+          }
+          newBoard[BOARD_HEIGHT - 1][col] = null;
+        }
+      }
+    }
+    return { count: clearedIndices.length, indices: clearedIndices };
+  };
+
+  // Ghost-Position (Fallrichtung)
+  const getGhostPosition = () => {
+    let steps = 0;
+    let currentX = pieceX;
+    let currentY = pieceY;
+    while (true) {
+      let nextX = currentX;
+      let nextY = currentY;
+      switch(gravity) {
+        case 'down': nextY++; break;
+        case 'up': nextY--; break;
+        case 'left': nextX--; break;
+        case 'right': nextX++; break;
+      }
+      if (collision(currentPiece.shape, nextX, nextY)) break;
+      steps++;
+      currentX = nextX;
+      currentY = nextY;
+    }
+    return { x: currentX, y: currentY };
+  };
+
+  // ========== SCROLL & LAYOUT ==========
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
@@ -137,11 +274,9 @@ export function ScndDropGame() {
     loadHighscores();
   }, []);
 
-  // ANGEPASSTE FALLGESCHWINDIGKEIT (schneller)
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
-    // Basis 800ms, pro Level 50ms weniger, minimal 150ms
-    let delay = Math.max(150, 800 - (level - 1) * 50);
+    let delay = Math.max(150, 1000 - (level - 1) * 80);
     if (slowMode) delay = delay * 2;
     if (fastForwardActive) delay = delay / 2;
     return delay;
@@ -159,6 +294,49 @@ export function ScndDropGame() {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
+  // ========== GRAVITATION WECHSEL (automatisch) ==========
+  const changeGravity = (newGravity: GravityDirection, force = false) => {
+    if (!force && (gravityShieldActive || gravityLockActive)) return;
+    if (newGravity === gravity) return;
+    setGravity(newGravity);
+    showBonus(`🌀 GRAVITATION: ${getGravityName(newGravity)}`);
+    if (canvasRef.current) {
+      canvasRef.current.style.transform = `rotate(${getRotationAngle(newGravity)}deg)`;
+      canvasRef.current.style.transition = 'transform 0.5s ease';
+    }
+    if (window.navigator.vibrate) window.navigator.vibrate(100);
+  };
+
+  const startGravityTimer = () => {
+    if (nextGravityTimer) clearInterval(nextGravityTimer);
+    setGravityCountdown(45);
+    const timer = setInterval(() => {
+      setGravityCountdown(prev => {
+        if (prev <= 1) {
+          if (!gravityShieldActive && !gravityLockActive) {
+            const directions: GravityDirection[] = ['down', 'up', 'left', 'right'];
+            let newDir = directions[Math.floor(Math.random() * directions.length)];
+            while (newDir === gravity) newDir = directions[Math.floor(Math.random() * directions.length)];
+            changeGravity(newDir, true);
+          }
+          return 45;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    setNextGravityTimer(timer);
+  };
+
+  useEffect(() => {
+    if (isPlaying && !gameOver && !isPaused) {
+      startGravityTimer();
+    }
+    return () => {
+      if (nextGravityTimer) clearInterval(nextGravityTimer);
+    };
+  }, [isPlaying, gameOver, isPaused, gravity]);
+
+  // ========== SPIELSTART ==========
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
@@ -179,6 +357,13 @@ export function ScndDropGame() {
     setIsPaused(false);
     setIsSaving(false);
     setHasScrolled(false);
+    setGravityShieldActive(false);
+    setGravityLockActive(false);
+    // Zufällige Startgravitation
+    const dirs: GravityDirection[] = ['down', 'up', 'left', 'right'];
+    const randomGrav = dirs[Math.floor(Math.random() * dirs.length)];
+    setGravity(randomGrav);
+    if (canvasRef.current) canvasRef.current.style.transform = `rotate(${getRotationAngle(randomGrav)}deg)`;
     spawnNewPiece();
     setIsPlaying(true);
   };
@@ -215,6 +400,7 @@ export function ScndDropGame() {
     giveUp();
   };
 
+  // ========== PARTIKEL & POWER‑UP EFFEKTE ==========
   const burstParticles = (cx: number, cy: number, count: number) => {
     for (let i = 0; i < count; i++) {
       const offX = (Math.random() - 0.5) * cellSize * 3;
@@ -223,7 +409,6 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== POWER‑UP EFFEKTE (alle korrekt) ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
@@ -275,23 +460,48 @@ export function ScndDropGame() {
         break;
       }
       case 'laser': {
-        const rowsToClear = [y, y - 1].filter(ry => ry >= 0 && ry < BOARD_HEIGHT);
+        // Laser löscht zwei Reihen/Spalten in Fallrichtung
+        let rowsToClear: number[] = [];
+        if (gravity === 'down' || gravity === 'up') {
+          rowsToClear = [y, y - 1].filter(ry => ry >= 0 && ry < BOARD_HEIGHT);
+        } else {
+          rowsToClear = [x, x - 1].filter(rx => rx >= 0 && rx < BOARD_WIDTH);
+        }
         for (let i = 1; i <= 5; i++) {
           ctx.fillStyle = `rgba(255, 0, 255, ${0.3 + i * 0.1})`;
-          ctx.fillRect(0, y * cs, w, cs);
-          if (rowsToClear[1] !== undefined) ctx.fillRect(0, (y-1) * cs, w, cs);
+          if (gravity === 'down' || gravity === 'up') {
+            ctx.fillRect(0, y * cs, w, cs);
+            if (rowsToClear[1] !== undefined) ctx.fillRect(0, (y-1) * cs, w, cs);
+          } else {
+            ctx.fillRect(x * cs, 0, cs, h);
+            if (rowsToClear[1] !== undefined) ctx.fillRect((x-1) * cs, 0, cs, h);
+          }
           await new Promise(r => setTimeout(r, 50));
         }
         ctx.fillStyle = 'white';
-        ctx.fillRect(0, y * cs, w, cs);
-        if (rowsToClear[1] !== undefined) ctx.fillRect(0, (y-1) * cs, w, cs);
+        if (gravity === 'down' || gravity === 'up') {
+          ctx.fillRect(0, y * cs, w, cs);
+          if (rowsToClear[1] !== undefined) ctx.fillRect(0, (y-1) * cs, w, cs);
+        } else {
+          ctx.fillRect(x * cs, 0, cs, h);
+          if (rowsToClear[1] !== undefined) ctx.fillRect((x-1) * cs, 0, cs, h);
+        }
         await new Promise(r => setTimeout(r, 150));
         const laserBoard = board.map(row => [...row]);
-        for (const ry of rowsToClear) {
-          for (let cx = 0; cx < BOARD_WIDTH; cx++) {
-            if (laserBoard[ry][cx]) {
-              laserBoard[ry][cx] = null;
-              burstParticles(cx * cs + cs/2, ry * cs + cs/2, 5);
+        for (const idx of rowsToClear) {
+          if (gravity === 'down' || gravity === 'up') {
+            for (let cx = 0; cx < BOARD_WIDTH; cx++) {
+              if (laserBoard[idx][cx]) {
+                laserBoard[idx][cx] = null;
+                burstParticles(cx * cs + cs/2, idx * cs + cs/2, 5);
+              }
+            }
+          } else {
+            for (let cy = 0; cy < BOARD_HEIGHT; cy++) {
+              if (laserBoard[cy][idx]) {
+                laserBoard[cy][idx] = null;
+                burstParticles(idx * cs + cs/2, cy * cs + cs/2, 5);
+              }
             }
           }
         }
@@ -372,7 +582,6 @@ export function ScndDropGame() {
         break;
       }
       case 'gravity': {
-        // Gravity: Alle Blöcke nach unten fallen lassen (komprimieren)
         canvas.style.transform = 'translate(3px, 3px)';
         await new Promise(r => setTimeout(r, 50));
         canvas.style.transform = 'translate(-3px, -3px)';
@@ -411,38 +620,71 @@ export function ScndDropGame() {
         ctx.arc(pieceX * cs + cs/2, pieceY * cs + cs/2, cs, 0, Math.PI*2);
         ctx.fill();
         await new Promise(r => setTimeout(r, 150));
-        const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
+        const allPieces = [...TETROMINOS, ...ALL_POWERUP_TETROMINOS];
         const randomPiece = JSON.parse(JSON.stringify(allPieces[Math.floor(Math.random() * allPieces.length)]));
         setCurrentPiece(randomPiece);
-        setPieceX(Math.floor((BOARD_WIDTH - randomPiece.shape[0].length) / 2));
-        setPieceY(0);
+        const spawnPos = getSpawnPosition(randomPiece.shape);
+        setPieceX(spawnPos.x);
+        setPieceY(spawnPos.y);
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
       case 'clearLine': {
-        if (y >= 0 && y < BOARD_HEIGHT) {
-          for (let i = 0; i < 3; i++) {
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, y * cs, w, cs);
-            await new Promise(r => setTimeout(r, 100));
-            ctx.clearRect(0, y * cs, w, cs);
-            await new Promise(r => setTimeout(r, 50));
+        if (gravity === 'down' || gravity === 'up') {
+          if (y >= 0 && y < BOARD_HEIGHT) {
+            for (let i = 0; i < 3; i++) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(0, y * cs, w, cs);
+              await new Promise(r => setTimeout(r, 100));
+              ctx.clearRect(0, y * cs, w, cs);
+              await new Promise(r => setTimeout(r, 50));
+            }
+            for (let rx = 0; rx < BOARD_WIDTH; rx++) {
+              burstParticles(rx * cs + cs/2, y * cs + cs/2, 4);
+            }
+            const clearBoard = board.map(row => [...row]);
+            clearBoard[y] = Array(BOARD_WIDTH).fill(null);
+            for (let row = y; row > 0; row--) {
+              clearBoard[row] = [...clearBoard[row - 1]];
+            }
+            clearBoard[0] = Array(BOARD_WIDTH).fill(null);
+            setBoard(clearBoard);
+            const newScore = score + 40;
+            setScore(newScore);
+            setLinesCleared(linesCleared + 1);
+            const newLevel = Math.floor((linesCleared + 1) / 8) + 1;
+            if (newLevel !== level) setLevel(newLevel);
           }
-          for (let rx = 0; rx < BOARD_WIDTH; rx++) {
-            burstParticles(rx * cs + cs/2, y * cs + cs/2, 4);
+        } else {
+          // Vertikale Linie löschen
+          if (x >= 0 && x < BOARD_WIDTH) {
+            for (let i = 0; i < 3; i++) {
+              ctx.fillStyle = 'white';
+              ctx.fillRect(x * cs, 0, cs, h);
+              await new Promise(r => setTimeout(r, 100));
+              ctx.clearRect(x * cs, 0, cs, h);
+              await new Promise(r => setTimeout(r, 50));
+            }
+            for (let cy = 0; cy < BOARD_HEIGHT; cy++) {
+              burstParticles(x * cs + cs/2, cy * cs + cs/2, 4);
+            }
+            const clearBoard = board.map(row => [...row]);
+            for (let row = 0; row < BOARD_HEIGHT; row++) {
+              clearBoard[row][x] = null;
+            }
+            for (let row = 0; row < BOARD_HEIGHT; row++) {
+              for (let r = row; r < BOARD_HEIGHT - 1; r++) {
+                clearBoard[r][x] = clearBoard[r + 1][x];
+              }
+              clearBoard[BOARD_HEIGHT - 1][x] = null;
+            }
+            setBoard(clearBoard);
+            const newScore = score + 40;
+            setScore(newScore);
+            setLinesCleared(linesCleared + 1);
+            const newLevel = Math.floor((linesCleared + 1) / 8) + 1;
+            if (newLevel !== level) setLevel(newLevel);
           }
-          const clearBoard = board.map(row => [...row]);
-          clearBoard[y] = Array(BOARD_WIDTH).fill(null);
-          for (let row = y; row > 0; row--) {
-            clearBoard[row] = [...clearBoard[row - 1]];
-          }
-          clearBoard[0] = Array(BOARD_WIDTH).fill(null);
-          setBoard(clearBoard);
-          const newScore = score + 40;
-          setScore(newScore);
-          setLinesCleared(linesCleared + 1);
-          const newLevel = Math.floor((linesCleared + 1) / 8) + 1;
-          if (newLevel !== level) setLevel(newLevel);
         }
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
@@ -488,7 +730,7 @@ export function ScndDropGame() {
           await new Promise(r => setTimeout(r, 30));
         }
         const randomBoard = board.map(row => [...row]);
-        const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
+        const allPieces = [...TETROMINOS, ...ALL_POWERUP_TETROMINOS];
         let changed = 0;
         for (let attempt = 0; attempt < 100 && changed < 3; attempt++) {
           const randX = Math.floor(Math.random() * BOARD_WIDTH);
@@ -516,23 +758,63 @@ export function ScndDropGame() {
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
+      // Gravitations‑Power‑Ups
+      case 'gravityShield':
+        setGravityShieldActive(true);
+        showBonus('🛡️ GRAVITY SHIELD AKTIV (15s)');
+        setTimeout(() => setGravityShieldActive(false), 15000);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      case 'instantShift': {
+        const dirs: GravityDirection[] = ['down', 'up', 'left', 'right'];
+        let newDir = dirs[Math.floor(Math.random() * dirs.length)];
+        while (newDir === gravity) newDir = dirs[Math.floor(Math.random() * dirs.length)];
+        changeGravity(newDir, true);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
+      case 'randomGravity': {
+        for (let i = 0; i < 3; i++) {
+          const dirs: GravityDirection[] = ['down', 'up', 'left', 'right'];
+          const randomDir = dirs[Math.floor(Math.random() * dirs.length)];
+          changeGravity(randomDir, true);
+          await new Promise(r => setTimeout(r, 3000));
+        }
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
+      case 'lockGravity':
+        setGravityLockActive(true);
+        showBonus('🔒 GRAVITY LOCK (20s)');
+        setTimeout(() => setGravityLockActive(false), 20000);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      case 'reverseNow': {
+        const reverseMap: Record<GravityDirection, GravityDirection> = {
+          down: 'up',
+          up: 'down',
+          left: 'right',
+          right: 'left'
+        };
+        changeGravity(reverseMap[gravity], true);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
       default: break;
     }
   };
 
-  // ========== TETROMINO LOGIK ==========
+  // ========== TETROMINO LOGIK (angepasst an Gravitation) ==========
   const spawnNewPiece = () => {
     const isPowerUpSpawn = Math.random() < 0.15;
-    const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
+    const pool = isPowerUpSpawn ? ALL_POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const startX = Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2);
-    setPieceX(startX);
-    setPieceY(0);
-    if (collision(piece.shape, startX, 0)) {
-      endGame();
-    }
+    const { x, y } = getSpawnPosition(piece.shape);
+    setPieceX(x);
+    setPieceY(y);
+    if (collision(piece.shape, x, y)) endGame();
   };
 
   const endGame = () => {
@@ -583,43 +865,35 @@ export function ScndDropGame() {
               glowColor: currentPiece.glowColor
             };
             newBoard[boardY][boardX] = block;
-            if (block.isPowerUp) {
-              powerUpBlocks.push({ x: boardX, y: boardY, effect: block.powerUpEffect });
-            }
+            if (block.isPowerUp) powerUpBlocks.push({ x: boardX, y: boardY, effect: block.powerUpEffect });
           }
         }
       }
     }
 
-    let rowsCleared = 0;
-    const clearedRows: number[] = [];
-    for (let row = BOARD_HEIGHT - 1; row >= 0; ) {
-      if (newBoard[row].every(cell => cell !== null)) {
-        clearedRows.push(row);
-        setFlashRow(row);
-        setTimeout(() => setFlashRow(null), 200);
-        for (let x = 0; x < BOARD_WIDTH; x++) {
-          for (let i = 0; i < 3; i++) {
-            setParticles(prev => [...prev, { x: x * cellSize + cellSize/2, y: row * cellSize + cellSize/2, life: 1 }]);
-          }
-        }
-        newBoard.splice(row, 1);
-        newBoard.unshift(Array(BOARD_WIDTH).fill(null));
-        rowsCleared++;
-      } else row--;
-    }
+    // Linien löschen (richtungsabhängig)
+    const { count: rowsCleared, indices: clearedIndices } = clearLinesDirectional(newBoard);
 
+    // Power‑Up‑Effekte auslösen (nur für Blöcke, die in gelöschten Linien liegen)
     for (const block of powerUpBlocks) {
-      if (clearedRows.includes(block.y)) {
-        triggerPowerUpEffect(block.effect, block.x, block.y);
+      let isCleared = false;
+      if (gravity === 'down' || gravity === 'up') {
+        isCleared = clearedIndices.includes(block.y);
+      } else {
+        isCleared = clearedIndices.includes(block.x);
       }
+      if (isCleared) triggerPowerUpEffect(block.effect, block.x, block.y);
     }
 
+    // Punkteberechnung (wie bisher, aber rowsCleared ist korrekt)
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[rowsCleared];
     let hasBrandBlock = false;
-    for (const row of clearedRows) {
-      if (newBoard[row]?.some(cell => cell?.isBrand)) hasBrandBlock = true;
+    // Brand-Blöcke erkennen (für 1.5x Bonus)
+    for (let row = 0; row < BOARD_HEIGHT; row++) {
+      for (let col = 0; col < BOARD_WIDTH; col++) {
+        if (newBoard[row][col]?.isBrand) hasBrandBlock = true;
+      }
     }
 
     if (rowsCleared > 0) {
@@ -629,9 +903,19 @@ export function ScndDropGame() {
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
 
-      const hasScndColors = clearedRows.some(row => 
-        newBoard[row]?.some(cell => cell?.color === '#FF8844' || cell?.color === '#AAAAAA')
-      );
+      // Orange + Grau = 2x (angepasst an neue Farben)
+      const hasScndColors = (() => {
+        for (const idx of clearedIndices) {
+          if (gravity === 'down' || gravity === 'up') {
+            if (newBoard[idx]?.some(cell => cell?.color === '#FF8844' || cell?.color === '#AAAAAA')) return true;
+          } else {
+            for (let row = 0; row < BOARD_HEIGHT; row++) {
+              if (newBoard[row][idx]?.color === '#FF8844' || newBoard[row][idx]?.color === '#AAAAAA') return true;
+            }
+          }
+        }
+        return false;
+      })();
       if (hasScndColors) {
         addedScore = Math.floor(addedScore * 2);
         showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
@@ -676,15 +960,16 @@ export function ScndDropGame() {
 
   const movePiece = (dx: number, dy: number) => {
     if (!currentPiece || gameOver || freezeMode || isPaused) return;
-    if (!collision(currentPiece.shape, pieceX + dx, pieceY + dy)) {
-      setPieceX(pieceX + dx);
-      setPieceY(pieceY + dy);
-    } else if (dy === 1) mergePiece();
+    const { dx: actualDx, dy: actualDy } = translateMove(dx, dy);
+    const newX = pieceX + actualDx;
+    const newY = pieceY + actualDy;
+    if (!collision(currentPiece.shape, newX, newY)) {
+      setPieceX(newX);
+      setPieceY(newY);
+    } else if (isFallMove(dx, dy)) {
+      mergePiece();
+    }
   };
-
-  useEffect(() => {
-    movePieceRef.current = movePiece;
-  }, [movePiece]);
 
   const rotatePiece = () => {
     if (!currentPiece || gameOver || freezeMode || isPaused) return;
@@ -739,6 +1024,10 @@ export function ScndDropGame() {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
   }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece]);
+
+  useEffect(() => {
+    movePieceRef.current = movePiece;
+  }, [movePiece]);
 
   // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
@@ -806,15 +1095,16 @@ export function ScndDropGame() {
       }
     }
 
+    // Ghost & aktuelles Piece (unverändert, aber mit Gravitation)
     if (currentPiece && !gameOver && !freezeMode && !isPaused) {
-      let ghostY = pieceY;
-      while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
-      if (ghostY > pieceY) {
+      const ghost = getGhostPosition();
+      if ((gravity === 'down' && ghost.y > pieceY) || (gravity === 'up' && ghost.y < pieceY) ||
+          (gravity === 'left' && ghost.x < pieceX) || (gravity === 'right' && ghost.x > pieceX)) {
         ctx.globalAlpha = 0.3;
         for (let y = 0; y < currentPiece.shape.length; y++) {
           for (let x = 0; x < currentPiece.shape[y].length; x++) {
             if (currentPiece.shape[y][x] !== 0) {
-              const boardX = pieceX + x, boardY = ghostY + y;
+              const boardX = ghost.x + x, boardY = ghost.y + y;
               if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >=0 && boardX < BOARD_WIDTH) {
                 ctx.fillStyle = currentPiece.color;
                 ctx.fillRect(boardX * cellSize, boardY * cellSize, cellSize - 1, cellSize - 1);
@@ -867,7 +1157,6 @@ export function ScndDropGame() {
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
 
-    // Zentrierte Texte – kein Einfluss auf Layout
     ctx.textAlign = 'center';
     if (hotStreak) {
       ctx.font = 'bold ' + Math.max(12, cellSize * 0.55) + 'px monospace';
@@ -951,13 +1240,20 @@ export function ScndDropGame() {
     <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl z-10"></div>
       
-      {/* Header - kompakt, mit Klick zum Scrollen */}
+      {/* Header mit Gravitations‑Kompass */}
       <div className="pt-2 pb-1 px-2 text-center">
         <button onClick={scrollToGame} className="cursor-pointer">
           <h3 className={'text-xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 hover:scale-105 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
             SCND DROP
           </h3>
         </button>
+        <div className="flex justify-center items-center gap-2 mt-1 text-[10px] font-mono">
+          <span className="text-[var(--text-secondary)]">🌍</span>
+          <span className="text-[#FF4400]">{getGravityName(gravity)}</span>
+          <span className="text-[var(--text-secondary)]">⏱️ {gravityCountdown}s</span>
+          {gravityShieldActive && <span className="text-[#88AAFF]">🛡️ SHIELD</span>}
+          {gravityLockActive && <span className="text-[#FFCCAA]">🔒 LOCK</span>}
+        </div>
         <div className="flex justify-center gap-1 mt-1 flex-wrap">
           {slowMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full">🐌 SLOW</span>}
           {freezeMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full animate-pulse">⏰ FREEZE</span>}
@@ -974,13 +1270,21 @@ export function ScndDropGame() {
         )}
       </div>
 
-      {/* Hauptinhalt - mit ref für Scroll-Ziel */}
+      {/* Hauptinhalt */}
       <div ref={gameContainerRef} className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 justify-center items-center md:items-start px-2 py-1">
-        {/* Canvas Container */}
         <div className="flex justify-center items-center">
           <div className="relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
-            <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
+            <canvas
+              ref={canvasRef}
+              className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl"
+              style={{
+                width: BOARD_WIDTH * cellSize,
+                height: BOARD_HEIGHT * cellSize,
+                transform: `rotate(${getRotationAngle(gravity)}deg)`,
+                transition: 'transform 0.3s ease'
+              }}
+            />
 
             {isPaused && !gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/85 backdrop-blur-md rounded-lg z-40">
@@ -989,7 +1293,7 @@ export function ScndDropGame() {
                   <div className="w-8 h-0.5 bg-[#FF4400]/50 mx-auto mb-2"></div>
                   <button onClick={handleResume} className="w-28 py-1 mb-1 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-[10px] hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
                   <button onClick={handleRestart} className="w-28 py-1 mb-1 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
-                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGEBEN</button>
+                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
                 </div>
               </div>
             )}
@@ -1015,7 +1319,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste */}
+        {/* Rechte Seitenleiste (wie im alten Code) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
@@ -1051,7 +1355,7 @@ export function ScndDropGame() {
         </div>
       </div>
 
-      {/* TOUCH CONTROLLER - größere Buttons (w-16 h-16) */}
+      {/* TOUCH CONTROLLER */}
       {isPlaying && !gameOver && !isPaused && (
         <div className="md:hidden bg-black/90 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 fixed bottom-0 left-0 right-0 z-50">
           <div className="flex justify-between items-center px-4 max-w-md mx-auto">
@@ -1069,7 +1373,6 @@ export function ScndDropGame() {
         </div>
       )}
 
-      {/* Platzhalter für Controller auf Handy */}
       <div className="md:hidden" style={{ height: '100px' }}></div>
 
       {showNameInput && (
