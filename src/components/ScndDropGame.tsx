@@ -81,6 +81,7 @@ export function ScndDropGame() {
   const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {});
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
+  const [isSaving, setIsSaving] = useState(false); // Verhindert doppelte Speicherversuche
 
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
@@ -151,6 +152,7 @@ export function ScndDropGame() {
     setShowNameInput(false);
     setParticles([]);
     setIsPaused(false);
+    setIsSaving(false);
     spawnNewPiece();
     setIsPlaying(true);
   };
@@ -162,11 +164,14 @@ export function ScndDropGame() {
       setIsPlaying(false);
       setIsPaused(false);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
-      if (score > 0 && isHighscore) {
-        setShowNameInput(true);
-        setNewHighscoreGlow(true);
-        setTimeout(() => setNewHighscoreGlow(false), 2000);
+      // Highscore prüfen, wenn noch kein Dialog offen ist
+      if (!showNameInput && !isSaving) {
+        const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
+        if (score > 0 && isHighscore) {
+          setShowNameInput(true);
+          setNewHighscoreGlow(true);
+          setTimeout(() => setNewHighscoreGlow(false), 2000);
+        }
       }
     }
   };
@@ -194,62 +199,51 @@ export function ScndDropGame() {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (ctx && canvas) {
-      // Temporären Overlay zeichnen
       const w = canvas.width;
       const h = canvas.height;
       
       switch(effect) {
         case 'bomb':
-          // Explosionspartikel bereits vorhanden
           break;
         case 'laser':
-          // Laser-Linie kurz anzeigen
           ctx.fillStyle = '#FF00FF';
           ctx.fillRect(0, y * cellSize, w, cellSize);
           setTimeout(() => {}, 100);
           break;
         case 'colorBlast':
-          // Farben flackern
           ctx.fillStyle = 'rgba(255,255,255,0.5)';
           ctx.fillRect(0, 0, w, h);
           setTimeout(() => {}, 100);
           break;
         case 'scndBonus':
-          // Goldener Glanz
           ctx.fillStyle = 'rgba(255,215,0,0.4)';
           ctx.fillRect(0, 0, w, h);
           break;
         case 'freeze':
-          // Bläulicher Einfriereffekt
           ctx.fillStyle = 'rgba(0,150,255,0.5)';
           ctx.fillRect(0, 0, w, h);
           break;
         case 'gravity':
-          // Wackeleffekt: Canvas kurz bewegen (über CSS)
           if (canvas) {
             canvas.style.transform = 'translate(3px, 3px)';
             setTimeout(() => { if(canvas) canvas.style.transform = ''; }, 100);
           }
           break;
         case 'swap':
-          // Weißer Blitz
           ctx.fillStyle = 'white';
           ctx.fillRect(0, 0, w, h);
           break;
         case 'clearLine':
-          // Die betroffene Zeile aufblitzen lassen
           ctx.fillStyle = 'rgba(255,255,255,0.8)';
           ctx.fillRect(0, y * cellSize, w, cellSize);
           break;
         case 'fastForward':
-          // Geschwindigkeitsstreifen
           for (let i = 0; i < 10; i++) {
             ctx.fillStyle = 'rgba(255,255,255,0.3)';
             ctx.fillRect(0, i * 30, w, 5);
           }
           break;
         case 'randomize':
-          // Farbrauschen
           for (let i = 0; i < 50; i++) {
             ctx.fillStyle = `rgba(${Math.random()*255},${Math.random()*255},${Math.random()*255},0.3)`;
             ctx.fillRect(Math.random()*w, Math.random()*h, 10, 10);
@@ -257,7 +251,6 @@ export function ScndDropGame() {
           break;
         default: break;
       }
-      // Overlay nach kurzer Zeit automatisch verblassen (wird durch nächsten Redraw überschrieben)
       setTimeout(() => {}, 200);
     }
 
@@ -404,7 +397,6 @@ export function ScndDropGame() {
 
   // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
-    // Power‑Up‑Wahrscheinlichkeit auf 15% gesenkt
     const isPowerUpSpawn = Math.random() < 0.15;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
@@ -424,11 +416,14 @@ export function ScndDropGame() {
     setIsPlaying(false);
     setIsPaused(false);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-    const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
-    if (score > 0 && isHighscore) {
-      setShowNameInput(true);
-      setNewHighscoreGlow(true);
-      setTimeout(() => setNewHighscoreGlow(false), 2000);
+    // Highscore prüfen, wenn noch kein Dialog offen ist
+    if (!showNameInput && !isSaving) {
+      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
+      if (score > 0 && isHighscore) {
+        setShowNameInput(true);
+        setNewHighscoreGlow(true);
+        setTimeout(() => setNewHighscoreGlow(false), 2000);
+      }
     }
   };
 
@@ -748,7 +743,6 @@ export function ScndDropGame() {
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
 
-    // Zentrierte Texte
     ctx.textAlign = 'center';
     if (hotStreak) {
       ctx.font = 'bold ' + Math.max(12, cellSize * 0.55) + 'px monospace';
@@ -796,21 +790,32 @@ export function ScndDropGame() {
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
+    if (isSaving) return;
+    setIsSaving(true);
     try {
-      await fetch('/api/game-highscores', {
+      console.log('Sending highscore:', { playerName, score: finalScore });
+      const res = await fetch('/api/game-highscores', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerName, score: finalScore })
       });
-      const res = await fetch('/api/game-highscores');
       const data = await res.json();
-      if (Array.isArray(data)) setHighscores(data);
+      console.log('Response:', data);
+      if (!res.ok) throw new Error(data.error || 'Fehler beim Speichern');
+      
+      // Highscores neu laden
+      const reloadRes = await fetch('/api/game-highscores');
+      const reloadData = await reloadRes.json();
+      if (Array.isArray(reloadData)) setHighscores(reloadData);
     } catch (error) {
       console.error('Fehler beim Speichern des Highscores:', error);
+      alert('Highscore konnte nicht gespeichert werden. Bitte später erneut versuchen.');
+    } finally {
+      setIsSaving(false);
+      setShowNameInput(false);
+      setPlayerName('');
+      setNewHighscoreGlow(false);
     }
-    setShowNameInput(false);
-    setPlayerName('');
-    setNewHighscoreGlow(false);
   };
 
   const rankIcon = (idx: number) => {
@@ -986,8 +991,19 @@ export function ScndDropGame() {
           <div className="bg-[var(--bg-secondary)] p-4 md:p-6 rounded-lg border-2 border-[#FF4400] max-w-sm w-full mx-4 shadow-2xl">
             <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2"><span className="text-[#FF4400]">✨ NEW</span>_<span className="text-[var(--text-primary)]">HIGHSCORE</span></h3>
             <p className="text-xs md:text-sm text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-lg md:text-xl">{finalScore}</span></p>
-            <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} maxLength={15} className="w-full p-2 md:p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-sm md:text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider" placeholder="DEIN SPITZNAME" autoFocus />
-            <div className="flex gap-3"><button onClick={saveHighscore} className="flex-1 px-3 md:px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded text-sm md:text-base hover:bg-[#FF4400]/80 transition">SPEICHERN</button><button onClick={() => setShowNameInput(false)} className="flex-1 px-3 md:px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition text-sm md:text-base">ABBRECHEN</button></div>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              maxLength={15}
+              className="w-full p-2 md:p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-sm md:text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider"
+              placeholder="DEIN SPITZNAME"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button onClick={saveHighscore} className="flex-1 px-3 md:px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded text-sm md:text-base hover:bg-[#FF4400]/80 transition">SPEICHERN</button>
+              <button onClick={() => setShowNameInput(false)} className="flex-1 px-3 md:px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition text-sm md:text-base">ABBRECHEN</button>
+            </div>
           </div>
         </div>
       )}
