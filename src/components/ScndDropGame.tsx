@@ -766,6 +766,16 @@ export function ScndDropGame() {
     </div>
   </div>
 )}
+            {!isPlaying && !gameOver && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
+                  <div className="text-center">
+                    <div className="text-2xl md:text-3xl font-black text-[#FF4400] mb-2">SCND DROP</div>
+                    <button onClick={startGame} className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-sm md:text-base hover:scale-105 transition-all shadow-lg">
+                      ▶ START GAME
+                    </button>
+                  </div>
+                </div>
+              )}   
               
               {gameOver && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 backdrop-blur-sm rounded-lg">
