@@ -6,9 +6,10 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 32;
-  if (window.innerWidth < 640) return 24;
-  if (window.innerWidth < 768) return 28;
+  if (typeof window === 'undefined') return 36;
+  // Auf Handys größere Blöcke (36px statt 24)
+  if (window.innerWidth < 640) return 36;
+  if (window.innerWidth < 768) return 32;
   return 32;
 };
 
@@ -124,7 +125,6 @@ export function ScndDropGame() {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
-  // ========== SPIELSTART ==========
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
@@ -162,7 +162,6 @@ export function ScndDropGame() {
     }
   };
 
-  // Pause-Funktionen
   const togglePause = () => {
     if (!isPlaying || gameOver) return;
     setIsPaused(!isPaused);
@@ -177,7 +176,7 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== POWER‑UP EFFEKTE (basierend auf Block-Koordinaten) ==========
+  // ========== POWER‑UP EFFEKTE ==========
   const triggerPowerUpEffect = (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
@@ -247,15 +246,15 @@ export function ScndDropGame() {
 
   // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
-    // 25% Chance für ein Power‑Up‑Tetromino
     const isPowerUpSpawn = Math.random() < 0.25;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    setPieceX(Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2));
+    const startX = Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2);
+    setPieceX(startX);
     setPieceY(0);
-    if (collision(piece.shape, Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2), 0)) {
+    if (collision(piece.shape, startX, 0)) {
       endGame();
     }
   };
@@ -314,7 +313,6 @@ export function ScndDropGame() {
       }
     }
 
-    // Linien löschen
     let rowsCleared = 0;
     const clearedRows: number[] = [];
     for (let row = BOARD_HEIGHT - 1; row >= 0; ) {
@@ -333,16 +331,13 @@ export function ScndDropGame() {
       } else row--;
     }
 
-    // Power‑Up‑Effekte auslösen (für gelöschte Blöcke, die Power‑Up waren)
-    // Wir müssen prüfen, ob in den gelöschten Reihen Power‑Up‑Blöcke lagen.
-    // Dazu durchsuchen wir die ursprünglichen `powerUpBlocks` und schauen, ob deren y in clearedRows ist.
+    // Power‑Up‑Effekte für gelöschte Blöcke
     for (const block of powerUpBlocks) {
       if (clearedRows.includes(block.y)) {
         triggerPowerUpEffect(block.effect, block.x, block.y);
       }
     }
 
-    // Punkteberechnung (wie bisher)
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[rowsCleared];
     let hasBrandBlock = false;
@@ -442,18 +437,21 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
-  // Automatischer Game Loop
+  // Automatischer Game Loop (neu starten bei level, freezeMode, isPaused oder neuem Piece)
   useEffect(() => {
-    if (isPlaying && !gameOver && !freezeMode && !isPaused) {
+    if (isPlaying && !gameOver && !freezeMode && !isPaused && currentPiece) {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      gameLoopRef.current = setInterval(() => movePiece(0, 1), getFallDelay());
+      const delay = getFallDelay();
+      if (delay !== Infinity) {
+        gameLoopRef.current = setInterval(() => movePiece(0, 1), delay);
+      }
     } else {
       if (gameLoopRef.current) clearInterval(gameLoopRef.current);
     }
     return () => { if (gameLoopRef.current) clearInterval(gameLoopRef.current); };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode]);
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, currentPiece]);
 
-  // ========== CANVAS ZEICHNEN (mit Glow für Power‑Up‑Blöcke) ==========
+  // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -489,7 +487,6 @@ export function ScndDropGame() {
       for (let x = 0; x < BOARD_WIDTH; x++) {
         const cell = board[y][x];
         if (cell) {
-          // Power‑Up‑Block: zusätzlicher Glow
           if (cell.isPowerUp) {
             ctx.shadowBlur = 12;
             ctx.shadowColor = cell.glowColor || '#FFFFFF';
@@ -507,7 +504,6 @@ export function ScndDropGame() {
             ctx.fillText('S', x * cellSize + cellSize * 0.35, y * cellSize + cellSize * 0.7);
           }
           if (cell.isPowerUp) {
-            // Kleines Symbol oder Stern zur Erkennung
             ctx.fillStyle = '#FFFFFF';
             ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
             ctx.fillText('✨', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
@@ -521,7 +517,6 @@ export function ScndDropGame() {
       }
     }
 
-    // Ghost & aktuelles Tetromino
     if (currentPiece && !gameOver && !freezeMode && !isPaused) {
       let ghostY = pieceY;
       while (!collision(currentPiece.shape, pieceX, ghostY + 1)) ghostY++;
@@ -566,7 +561,6 @@ export function ScndDropGame() {
       }
     }
 
-    // Effekte
     ctx.fillStyle = 'rgba(0,0,0,0.06)';
     for (let i = 0; i < canvas.height; i += 2) ctx.fillRect(0, i, canvas.width, 1);
     const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width/2);
@@ -758,7 +752,7 @@ export function ScndDropGame() {
               )}
             </div>
 
-            {/* Rechte Seitenleiste (unverändert) */}
+            {/* Rechte Seitenleiste */}
             <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-4 md:p-5 min-w-[200px] md:min-w-[240px] w-full md:w-auto shadow-xl">
               <div className="text-center mb-4 pb-3 border-b border-[#FF4400]/20">
                 <div className="text-[10px] md:text-xs text-[var(--text-secondary)] uppercase tracking-wider">AKTUELLE PUNKTE</div>
