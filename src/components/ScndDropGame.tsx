@@ -5,10 +5,21 @@ import { useEffect, useRef, useState } from 'react';
 
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
+
+// Dynamische Zellengröße: Auf Handys wird sie an die verfügbare Höhe angepasst
 const getCellSize = () => {
   if (typeof window === 'undefined') return 28;
-  if (window.innerWidth < 640) return 28;
-  if (window.innerWidth < 768) return 30;
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  
+  // Auf mobilen Geräten: maximale Höhe des Grids auf ~60% der Bildschirmhöhe begrenzen
+  if (width < 768) {
+    const maxGridHeight = height * 0.6; // 60% für Grid, Rest für Header und Touch-Controls
+    let cell = Math.floor(maxGridHeight / BOARD_HEIGHT);
+    // Begrenzung auf sinnvolle Werte (min 18px, max 32px)
+    return Math.min(Math.max(cell, 18), 32);
+  }
+  if (width < 1024) return 30;
   return 32;
 };
 
@@ -70,11 +81,11 @@ export function ScndDropGame() {
   const [scndBonusActive, setScndBonusActive] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<string | null>(null);
   const gameLoopRef = useRef<number | null>(null);
-  const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {}); // Platzhalter
+  const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {});
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
-  // Scroll-Schutz
+  // Scroll-Schutz und dynamische Zellengröße bei Resize
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       document.body.style.overflow = 'hidden';
@@ -404,7 +415,7 @@ export function ScndDropGame() {
     } else if (dy === 1) mergePiece();
   };
 
-  // Referenz nach Definition von movePiece aktualisieren
+  // Referenz aktuell halten
   useEffect(() => {
     movePieceRef.current = movePiece;
   }, [movePiece]);
