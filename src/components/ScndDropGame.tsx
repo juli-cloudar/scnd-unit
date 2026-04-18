@@ -81,7 +81,7 @@ export function ScndDropGame() {
   const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {});
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
-  const [isSaving, setIsSaving] = useState(false); // Verhindert doppelte Speicherversuche
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
@@ -164,7 +164,6 @@ export function ScndDropGame() {
       setIsPlaying(false);
       setIsPaused(false);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      // Highscore prüfen, wenn noch kein Dialog offen ist
       if (!showNameInput && !isSaving) {
         const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
         if (score > 0 && isHighscore) {
@@ -190,81 +189,64 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== POWER‑UP EFFEKTE mit Animationen ==========
-  const triggerPowerUpEffect = (effect: string, x: number, y: number) => {
+  // ========== HILFSFUNKTION FÜR PARTIKEL ==========
+  const burstParticles = (cx: number, cy: number, count: number) => {
+    for (let i = 0; i < count; i++) {
+      const offX = (Math.random() - 0.5) * cellSize * 3;
+      const offY = (Math.random() - 0.5) * cellSize * 3;
+      setParticles(prev => [...prev, { x: cx + offX, y: cy + offY, life: 1 }]);
+    }
+  };
+
+  // ========== POWER‑UP EFFEKTE mit überladenen, detailreichen Animationen ==========
+  const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
 
-    // Visuelle Animation (Canvas-Overlay)
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (ctx && canvas) {
-      const w = canvas.width;
-      const h = canvas.height;
-      
-      switch(effect) {
-        case 'bomb':
-          break;
-        case 'laser':
-          ctx.fillStyle = '#FF00FF';
-          ctx.fillRect(0, y * cellSize, w, cellSize);
-          setTimeout(() => {}, 100);
-          break;
-        case 'colorBlast':
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          ctx.fillRect(0, 0, w, h);
-          setTimeout(() => {}, 100);
-          break;
-        case 'scndBonus':
-          ctx.fillStyle = 'rgba(255,215,0,0.4)';
-          ctx.fillRect(0, 0, w, h);
-          break;
-        case 'freeze':
-          ctx.fillStyle = 'rgba(0,150,255,0.5)';
-          ctx.fillRect(0, 0, w, h);
-          break;
-        case 'gravity':
-          if (canvas) {
-            canvas.style.transform = 'translate(3px, 3px)';
-            setTimeout(() => { if(canvas) canvas.style.transform = ''; }, 100);
-          }
-          break;
-        case 'swap':
-          ctx.fillStyle = 'white';
-          ctx.fillRect(0, 0, w, h);
-          break;
-        case 'clearLine':
-          ctx.fillStyle = 'rgba(255,255,255,0.8)';
-          ctx.fillRect(0, y * cellSize, w, cellSize);
-          break;
-        case 'fastForward':
-          for (let i = 0; i < 10; i++) {
-            ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.fillRect(0, i * 30, w, 5);
-          }
-          break;
-        case 'randomize':
-          for (let i = 0; i < 50; i++) {
-            ctx.fillStyle = `rgba(${Math.random()*255},${Math.random()*255},${Math.random()*255},0.3)`;
-            ctx.fillRect(Math.random()*w, Math.random()*h, 10, 10);
-          }
-          break;
-        default: break;
-      }
-      setTimeout(() => {}, 200);
-    }
+    if (!ctx || !canvas) return;
 
-    switch(effect) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const cs = cellSize;
+
+    switch (effect) {
+      // ----------------------------- 💣 BOMBE ---------------------------------
       case 'bomb': {
+        // 1. Block blinkt rot/weiß
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = i % 2 === 0 ? '#FF0000' : '#FFFFFF';
+          ctx.fillRect(x * cs, y * cs, cs, cs);
+          await new Promise(r => setTimeout(r, 80));
+        }
+        // 2. Zwei rote Ringe expandieren von der Mitte
+        for (let r = 1; r <= 3; r++) {
+          ctx.fillStyle = `rgba(255, 0, 0, ${1 - r / 4})`;
+          ctx.beginPath();
+          ctx.arc(x * cs + cs/2, y * cs + cs/2, r * cs/2, 0, Math.PI * 2);
+          ctx.fill();
+          await new Promise(r => setTimeout(r, 60));
+        }
+        // 3. Weißer Blitz über den Explosionsbereich (5x5)
+        ctx.fillStyle = 'white';
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
+              ctx.fillRect(nx * cs, ny * cs, cs, cs);
+            }
+          }
+        }
+        await new Promise(r => setTimeout(r, 100));
+        // 4. Board modifizieren
         const bombBoard = board.map(row => [...row]);
         for (let dy = -2; dy <= 2; dy++) {
           for (let dx = -2; dx <= 2; dx++) {
             const nx = x + dx, ny = y + dy;
             if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT && bombBoard[ny]?.[nx]) {
               bombBoard[ny][nx] = null;
-              for (let i = 0; i < 5; i++) {
-                setParticles(prev => [...prev, { x: nx * cellSize + cellSize/2, y: ny * cellSize + cellSize/2, life: 1 }]);
-              }
+              burstParticles(nx * cs + cs/2, ny * cs + cs/2, 8);
             }
           }
         }
@@ -272,49 +254,149 @@ export function ScndDropGame() {
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
+
+      // ----------------------------- ⚡ LASER (löscht 2 Reihen) ----------------
       case 'laser': {
+        const rowsToClear = [y, y - 1].filter(ry => ry >= 0 && ry < BOARD_HEIGHT);
+        // 1. Voranimation: dünne Laserlinie zeichnen, dann dicker werden
+        for (let i = 1; i <= 5; i++) {
+          ctx.fillStyle = `rgba(255, 0, 255, ${0.3 + i * 0.1})`;
+          ctx.fillRect(0, y * cs, w, cs);
+          if (rowsToClear[1] !== undefined) ctx.fillRect(0, (y-1) * cs, w, cs);
+          await new Promise(r => setTimeout(r, 50));
+        }
+        // 2. Weißer Blitz auf beiden Reihen
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, y * cs, w, cs);
+        if (rowsToClear[1] !== undefined) ctx.fillRect(0, (y-1) * cs, w, cs);
+        await new Promise(r => setTimeout(r, 150));
+        // 3. Board aktualisieren
         const laserBoard = board.map(row => [...row]);
-        for (let nx = 0; nx < BOARD_WIDTH; nx++) {
-          if (laserBoard[y]?.[nx]) {
-            laserBoard[y][nx] = null;
-            setParticles(prev => [...prev, { x: nx * cellSize + cellSize/2, y: y * cellSize + cellSize/2, life: 1 }]);
+        for (const ry of rowsToClear) {
+          for (let cx = 0; cx < BOARD_WIDTH; cx++) {
+            if (laserBoard[ry][cx]) {
+              laserBoard[ry][cx] = null;
+              burstParticles(cx * cs + cs/2, ry * cs + cs/2, 5);
+            }
           }
         }
         setBoard(laserBoard);
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
+
+      // ----------------------------- 🎨 FARBE (Color Blast) -------------------
       case 'colorBlast': {
         const colors = TETROMINOS.map(t => t.color).concat(POWERUP_TETROMINOS.map(p => p.color));
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        const colorBlastBoard = board.map(row => 
-          row.map(cell => {
+        // 1. Ganzes Board flackert in der Zielfarbe
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = `rgba(${parseInt(randomColor.slice(1,3),16)}, ${parseInt(randomColor.slice(3,5),16)}, ${parseInt(randomColor.slice(5,7),16)}, 0.4)`;
+          ctx.fillRect(0, 0, w, h);
+          await new Promise(r => setTimeout(r, 100));
+          ctx.clearRect(0, 0, w, h);
+          await new Promise(r => setTimeout(r, 50));
+        }
+        // 2. Alle Blöcke dieser Farbe explodieren in Partikel
+        const colorBoard = board.map(row => [...row]);
+        for (let ry = 0; ry < BOARD_HEIGHT; ry++) {
+          for (let rx = 0; rx < BOARD_WIDTH; rx++) {
+            const cell = colorBoard[ry][rx];
             if (cell && cell.color === randomColor) {
-              setParticles(prev => [...prev, { x: Math.random() * BOARD_WIDTH * cellSize, y: Math.random() * BOARD_HEIGHT * cellSize, life: 1 }]);
-              return null;
+              colorBoard[ry][rx] = null;
+              burstParticles(rx * cs + cs/2, ry * cs + cs/2, 10);
             }
-            return cell;
-          })
-        );
-        setBoard(colorBlastBoard);
+          }
+        }
+        setBoard(colorBoard);
+        // 3. Konfetti-Effekt
+        for (let i = 0; i < 30; i++) {
+          setTimeout(() => {
+            setParticles(prev => [...prev, { x: Math.random() * w, y: Math.random() * h, life: 0.8 }]);
+          }, i * 20);
+        }
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
-      case 'scndBonus':
+
+      // ----------------------------- ⭐ 3x BONUS ------------------------------
+      case 'scndBonus': {
+        // 1. Goldener Glanz mit Sternen
+        for (let i = 0; i < 5; i++) {
+          ctx.fillStyle = `rgba(255, 215, 0, ${0.2 + i * 0.1})`;
+          ctx.fillRect(0, 0, w, h);
+          await new Promise(r => setTimeout(r, 80));
+        }
+        // 2. Sternenregen (Canvas‑Overlay)
+        for (let s = 0; s < 20; s++) {
+          const sx = Math.random() * w;
+          const sy = Math.random() * h;
+          ctx.fillStyle = 'gold';
+          ctx.font = `${cs * 0.8}px monospace`;
+          ctx.fillText('⭐', sx, sy);
+          await new Promise(r => setTimeout(r, 30));
+        }
         setScndBonusActive(true);
         setTimeout(() => {
           setScndBonusActive(false);
           setActivePowerUp(null);
         }, 30000);
         break;
-      case 'freeze':
+      }
+
+      // ----------------------------- ⏰ FREEZE ---------------------------------
+      case 'freeze': {
+        // 1. Eisblauer Schleier + Eiszapfen an jedem Block
+        for (let i = 0; i < 3; i++) {
+          ctx.fillStyle = 'rgba(0, 150, 255, 0.3)';
+          ctx.fillRect(0, 0, w, h);
+          for (let ry = 0; ry < BOARD_HEIGHT; ry++) {
+            for (let rx = 0; rx < BOARD_WIDTH; rx++) {
+              if (board[ry][rx]) {
+                ctx.fillStyle = '#88FFFF';
+                ctx.fillRect(rx * cs, ry * cs, cs, cs/4); // Eiszapfen oben
+                ctx.fillRect(rx * cs, ry * cs + cs - cs/4, cs, cs/4); // unten
+              }
+            }
+          }
+          await new Promise(r => setTimeout(r, 150));
+        }
         setFreezeMode(true);
+        // 3. Countdown-Text im Canvas
+        let seconds = 3;
+        const countdown = setInterval(() => {
+          if (!freezeMode) { clearInterval(countdown); return; }
+          ctx.font = `bold ${cs * 1.5}px monospace`;
+          ctx.fillStyle = '#00FFFF';
+          ctx.shadowBlur = 10;
+          ctx.fillText(`${seconds}s`, w/2, h/2);
+          ctx.shadowBlur = 0;
+          seconds--;
+          if (seconds < 0) clearInterval(countdown);
+        }, 1000);
         setTimeout(() => {
           setFreezeMode(false);
           setActivePowerUp(null);
+          clearInterval(countdown);
         }, 3000);
         break;
+      }
+
+      // ----------------------------- 🌀 GRAVITY -------------------------------
       case 'gravity': {
+        // 1. Ruckeln: Canvas kurz bewegen
+        canvas.style.transform = 'translate(3px, 3px)';
+        await new Promise(r => setTimeout(r, 50));
+        canvas.style.transform = 'translate(-3px, -3px)';
+        await new Promise(r => setTimeout(r, 50));
+        canvas.style.transform = 'translate(0,0)';
+        // 2. Fallstreifen über jede Spalte
+        for (let col = 0; col < BOARD_WIDTH; col++) {
+          ctx.fillStyle = `rgba(0, 255, 0, 0.3)`;
+          ctx.fillRect(col * cs, 0, cs, h);
+          await new Promise(r => setTimeout(r, 30));
+        }
+        // 3. Board komprimieren
         const gravityBoard = board.map(row => [...row]);
         for (let col = 0; col < BOARD_WIDTH; col++) {
           const columnBlocks = [];
@@ -332,7 +414,22 @@ export function ScndDropGame() {
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
+
+      // ----------------------------- 🔄 SWAP -----------------------------------
       case 'swap': {
+        // 1. Block blinkt 5x schnell
+        for (let i = 0; i < 5; i++) {
+          ctx.fillStyle = i % 2 === 0 ? 'white' : 'black';
+          ctx.fillRect(pieceX * cs, pieceY * cs, cs * (currentPiece?.shape[0].length || 4), cs * (currentPiece?.shape.length || 4));
+          await new Promise(r => setTimeout(r, 60));
+        }
+        // 2. Poof-Wolke
+        ctx.fillStyle = 'rgba(200,200,200,0.8)';
+        ctx.beginPath();
+        ctx.arc(pieceX * cs + cs/2, pieceY * cs + cs/2, cs, 0, Math.PI*2);
+        ctx.fill();
+        await new Promise(r => setTimeout(r, 150));
+        // 3. Neuen Block erzeugen
         const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
         const randomPiece = JSON.parse(JSON.stringify(allPieces[Math.floor(Math.random() * allPieces.length)]));
         setCurrentPiece(randomPiece);
@@ -341,8 +438,23 @@ export function ScndDropGame() {
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
+
+      // ----------------------------- 🔍 CLEAR LINE ----------------------------
       case 'clearLine': {
         if (y >= 0 && y < BOARD_HEIGHT) {
+          // 1. Zeile weiß aufleuchten
+          for (let i = 0; i < 3; i++) {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, y * cs, w, cs);
+            await new Promise(r => setTimeout(r, 100));
+            ctx.clearRect(0, y * cs, w, cs);
+            await new Promise(r => setTimeout(r, 50));
+          }
+          // 2. Zeile zersplittern (Partikel)
+          for (let rx = 0; rx < BOARD_WIDTH; rx++) {
+            burstParticles(rx * cs + cs/2, y * cs + cs/2, 4);
+          }
+          // 3. Board modifizieren
           const clearBoard = board.map(row => [...row]);
           clearBoard[y] = Array(BOARD_WIDTH).fill(null);
           for (let row = y; row > 0; row--) {
@@ -359,15 +471,54 @@ export function ScndDropGame() {
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
+
+      // ----------------------------- ⏩ FAST FORWARD --------------------------
       case 'fastForward': {
+        // 1. Geschwindigkeitsstreifen animiert (bewegen sich nach unten)
+        for (let i = 0; i < 10; i++) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${0.2 + i * 0.05})`;
+          for (let line = 0; line < 20; line++) {
+            ctx.fillRect(0, (line * 30 + i * 10) % h, w, 5);
+          }
+          await new Promise(r => setTimeout(r, 40));
+        }
         setFastForwardActive(true);
+        let seconds = 10;
+        const countdown = setInterval(() => {
+          if (!fastForwardActive) { clearInterval(countdown); return; }
+          ctx.font = `bold ${cs * 1.2}px monospace`;
+          ctx.fillStyle = '#FF9966';
+          ctx.shadowBlur = 8;
+          ctx.fillText(`⏩ ${seconds}s`, w - 80, 40);
+          ctx.shadowBlur = 0;
+          seconds--;
+          if (seconds < 0) clearInterval(countdown);
+        }, 1000);
         setTimeout(() => {
           setFastForwardActive(false);
           setActivePowerUp(null);
+          clearInterval(countdown);
         }, 10000);
         break;
       }
+
+      // ----------------------------- 🎲 RANDOM --------------------------------
       case 'randomize': {
+        // 1. Würfel dreht sich (mehrere Frames)
+        const diceFrames = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+        for (let f = 0; f < 12; f++) {
+          ctx.font = `${cs * 2}px monospace`;
+          ctx.fillStyle = 'black';
+          ctx.fillText(diceFrames[f % 6], w/2 - cs, h/2 - cs);
+          await new Promise(r => setTimeout(r, 50));
+        }
+        // 2. Farbrauschen
+        for (let noise = 0; noise < 20; noise++) {
+          ctx.fillStyle = `rgba(${Math.random()*255},${Math.random()*255},${Math.random()*255},0.5)`;
+          ctx.fillRect(0, 0, w, h);
+          await new Promise(r => setTimeout(r, 30));
+        }
+        // 3. Board modifizieren (3 zufällige Blöcke ersetzen)
         const randomBoard = board.map(row => [...row]);
         const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
         let changed = 0;
@@ -385,19 +536,27 @@ export function ScndDropGame() {
               glowColor: (newPiece as any).glowColor || null
             };
             changed++;
+            burstParticles(randX * cs + cs/2, randY * cs + cs/2, 15);
           }
         }
         setBoard(randomBoard);
+        // 4. Konfetti
+        for (let i = 0; i < 50; i++) {
+          setTimeout(() => {
+            setParticles(prev => [...prev, { x: Math.random() * w, y: Math.random() * h, life: 0.9 }]);
+          }, i * 20);
+        }
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
+
       default: break;
     }
   };
 
   // ========== TETROMINO LOGIK ==========
   const spawnNewPiece = () => {
-    const isPowerUpSpawn = Math.random() < 0.20;
+    const isPowerUpSpawn = Math.random() < 0.15;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
@@ -416,7 +575,6 @@ export function ScndDropGame() {
     setIsPlaying(false);
     setIsPaused(false);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-    // Highscore prüfen, wenn noch kein Dialog offen ist
     if (!showNameInput && !isSaving) {
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
@@ -802,8 +960,6 @@ export function ScndDropGame() {
       const data = await res.json();
       console.log('Response:', data);
       if (!res.ok) throw new Error(data.error || 'Fehler beim Speichern');
-      
-      // Highscores neu laden
       const reloadRes = await fetch('/api/game-highscores');
       const reloadData = await reloadRes.json();
       if (Array.isArray(reloadData)) setHighscores(reloadData);
@@ -849,9 +1005,9 @@ export function ScndDropGame() {
         )}
       </div>
 
-      {/* Hauptinhalt - Canvas und Sidebar nebeneinander auf Desktop, untereinander auf Handy */}
+      {/* Hauptinhalt - Canvas und Sidebar */}
       <div className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 justify-center items-center md:items-start px-2 py-1">
-        {/* Canvas Container - zentriert */}
+        {/* Canvas Container */}
         <div className="flex justify-center items-center">
           <div className="relative">
             <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
@@ -890,7 +1046,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste - kompakt, unter Canvas auf Handy */}
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
@@ -926,64 +1082,25 @@ export function ScndDropGame() {
         </div>
       </div>
 
-      {/* TOUCH CONTROLLER - fixed bottom mit minimalem Padding */}
+      {/* TOUCH CONTROLLER - fixed bottom */}
       {isPlaying && !gameOver && !isPaused && (
         <div className="md:hidden bg-black/90 backdrop-blur-sm border-t border-[#FF4400]/30 py-2 fixed bottom-0 left-0 right-0 z-50">
           <div className="flex justify-between items-center px-4 max-w-md mx-auto">
             <div className="flex gap-4">
-              <button 
-                onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} 
-                onTouchMove={(e) => e.preventDefault()}
-                className="w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                style={{ touchAction: 'none', userSelect: 'none' }}
-              >
-                <span className="text-white text-xl font-bold">◀</span>
-              </button>
-              <button 
-                onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} 
-                onTouchMove={(e) => e.preventDefault()}
-                className="w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                style={{ touchAction: 'none', userSelect: 'none' }}
-              >
-                <span className="text-white text-xl font-bold">▼</span>
-              </button>
-              <button 
-                onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} 
-                onTouchMove={(e) => e.preventDefault()}
-                className="w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                style={{ touchAction: 'none', userSelect: 'none' }}
-              >
-                <span className="text-white text-xl font-bold">▶</span>
-              </button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveLeft(); }} onTouchMove={(e) => e.preventDefault()} className="w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-xl font-bold">◀</span></button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveDown(); }} onTouchMove={(e) => e.preventDefault()} className="w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-xl font-bold">▼</span></button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleMoveRight(); }} onTouchMove={(e) => e.preventDefault()} className="w-12 h-12 bg-gradient-to-b from-[#1A1A1A] to-[#0A0A0A] border-2 border-[#FF4400] rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-xl font-bold">▶</span></button>
             </div>
             <div className="flex gap-4">
-              <button 
-                onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} 
-                onTouchMove={(e) => e.preventDefault()}
-                className="w-12 h-12 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                style={{ touchAction: 'none', userSelect: 'none' }}
-              >
-                <span className="text-white text-base font-bold tracking-wider">A</span>
-              </button>
-              <button 
-                onTouchStart={(e) => { e.preventDefault(); togglePause(); }} 
-                onTouchMove={(e) => e.preventDefault()}
-                className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                style={{ touchAction: 'none', userSelect: 'none' }}
-              >
-                <span className="text-white text-lg font-bold">⏸</span>
-              </button>
+              <button onTouchStart={(e) => { e.preventDefault(); handleRotate(); }} onTouchMove={(e) => e.preventDefault()} className="w-12 h-12 bg-gradient-to-br from-[#FF4400] to-[#CC3300] border-2 border-white/30 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-base font-bold tracking-wider">A</span></button>
+              <button onTouchStart={(e) => { e.preventDefault(); togglePause(); }} onTouchMove={(e) => e.preventDefault()} className="w-12 h-12 bg-gradient-to-b from-[#333] to-[#1A1A1A] border-2 border-[#FF4400]/70 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all" style={{ touchAction: 'none', userSelect: 'none' }}><span className="text-white text-lg font-bold">⏸</span></button>
             </div>
           </div>
-          <div className="flex justify-center gap-8 mt-1 text-[6px] text-[var(--text-secondary)] uppercase tracking-wider font-bold">
-            <span>BEWEGEN</span>
-            <span>DREHEN</span>
-            <span>PAUSE</span>
-          </div>
+          <div className="flex justify-center gap-8 mt-1 text-[6px] text-[var(--text-secondary)] uppercase tracking-wider font-bold"><span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span></div>
         </div>
       )}
 
-      {/* Platzhalter für den Controller - nur auf Handy, minimal */}
+      {/* Platzhalter für Controller auf Handy */}
       <div className="md:hidden" style={{ height: '85px' }}></div>
 
       {showNameInput && (
@@ -991,19 +1108,8 @@ export function ScndDropGame() {
           <div className="bg-[var(--bg-secondary)] p-4 md:p-6 rounded-lg border-2 border-[#FF4400] max-w-sm w-full mx-4 shadow-2xl">
             <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2"><span className="text-[#FF4400]">✨ NEW</span>_<span className="text-[var(--text-primary)]">HIGHSCORE</span></h3>
             <p className="text-xs md:text-sm text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-lg md:text-xl">{finalScore}</span></p>
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              maxLength={15}
-              className="w-full p-2 md:p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-sm md:text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider"
-              placeholder="DEIN SPITZNAME"
-              autoFocus
-            />
-            <div className="flex gap-3">
-              <button onClick={saveHighscore} className="flex-1 px-3 md:px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded text-sm md:text-base hover:bg-[#FF4400]/80 transition">SPEICHERN</button>
-              <button onClick={() => setShowNameInput(false)} className="flex-1 px-3 md:px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition text-sm md:text-base">ABBRECHEN</button>
-            </div>
+            <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} maxLength={15} className="w-full p-2 md:p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-sm md:text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider" placeholder="DEIN SPITZNAME" autoFocus />
+            <div className="flex gap-3"><button onClick={saveHighscore} className="flex-1 px-3 md:px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded text-sm md:text-base hover:bg-[#FF4400]/80 transition">SPEICHERN</button><button onClick={() => setShowNameInput(false)} className="flex-1 px-3 md:px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition text-sm md:text-base">ABBRECHEN</button></div>
           </div>
         </div>
       )}
