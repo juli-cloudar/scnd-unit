@@ -8,12 +8,12 @@ const BOARD_HEIGHT = 20;
 
 // Adaptive Zellengröße – basierend auf verfügbarer Bildschirmhöhe
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 28;
+  if (typeof window === 'undefined') return 26;
   const height = window.innerHeight;
-  // Reserve: Header (ca. 80px), Touch-Controller (ca. 100px), Padding (20px)
-  const availableHeight = height - 200;
+  // Reserve: Header (~80px), Touch-Controller (~120px), Abstände (~20px)
+  const availableHeight = height - 220;
   let cell = Math.floor(availableHeight / BOARD_HEIGHT);
-  return Math.min(Math.max(cell, 18), 32);
+  return Math.min(Math.max(cell, 18), 30);
 };
 
 // Normale Tetrominos
@@ -49,7 +49,7 @@ interface Highscore {
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameContainerRef = useRef<HTMLDivElement>(null);
-  const [cellSize, setCellSize] = useState(28);
+  const [cellSize, setCellSize] = useState(26);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -83,27 +83,26 @@ export function ScndDropGame() {
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
-  const [hasScrolled, setHasScrolled] = useState(false); // Verhindert mehrfaches Scrollen
+  const [hasScrolled, setHasScrolled] = useState(false);
 
-  // Zentriert das Canvas im Viewport
+  // Zentriert das Canvas mit einem kleinen Abstand zum oberen Rand
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
       const scrollTop = window.scrollY;
-      const targetTop = rect.top + scrollTop - (window.innerHeight / 2) + (rect.height / 2);
+      // Abstand zum oberen Rand: 20px (nicht zentrieren)
+      const targetTop = rect.top + scrollTop - 20;
       window.scrollTo({ top: targetTop, behavior: 'smooth' });
       setHasScrolled(true);
     }
   };
 
-  // Scroll zum Spielbereich beim Klick auf den Header
   const scrollToGame = () => {
     centerCanvasInView();
   };
 
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused && !hasScrolled) {
-      // Nur einmal nach Spielstart zentrieren
       const timer = setTimeout(() => centerCanvasInView(), 200);
       return () => clearTimeout(timer);
     }
