@@ -6,20 +6,12 @@ import { useEffect, useRef, useState } from 'react';
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
 
-// Dynamische Zellengröße: Auf Handys wird sie an die verfügbare Höhe angepasst
+// Zellengröße: Auf Handys größer (34px), auf Desktop 32px
 const getCellSize = () => {
-  if (typeof window === 'undefined') return 28;
+  if (typeof window === 'undefined') return 34;
   const width = window.innerWidth;
-  const height = window.innerHeight;
-  
-  // Auf mobilen Geräten: maximale Höhe des Grids auf ~60% der Bildschirmhöhe begrenzen
-  if (width < 768) {
-    const maxGridHeight = height * 0.6; // 60% für Grid, Rest für Header und Touch-Controls
-    let cell = Math.floor(maxGridHeight / BOARD_HEIGHT);
-    // Begrenzung auf sinnvolle Werte (min 18px, max 32px)
-    return Math.min(Math.max(cell, 18), 32);
-  }
-  if (width < 1024) return 30;
+  if (width < 768) return 34;   // Handy: 340x680 Pixel
+  if (width < 1024) return 32;
   return 32;
 };
 
@@ -34,15 +26,18 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#00A86B', borderColor: '#008050', name: 'J', isBrand: false, isPowerUp: false }
 ];
 
-// Power‑Up‑Tetrominos
+// 10 verschiedene Power‑Up‑Tetrominos
 const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8888', borderColor: '#FF0000', name: '💣 BOMBE', isBrand: false, isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF4444' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF88FF', borderColor: '#FF00FF', name: '⚡ LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF00FF' },
   { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA00', name: '🎨 FARBE', isBrand: false, isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFD700' },
   { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFCC66', borderColor: '#FFAA00', name: '⭐ 3x', isBrand: false, isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFAA00' },
   { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#88FFFF', borderColor: '#00FFFF', name: '⏰ FREEZE', isBrand: false, isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#00FFFF' },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#FF88FF', borderColor: '#FF00FF', name: '⚡ LASER', isBrand: false, isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF00FF' },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA00', name: '🎨 FARBE', isBrand: false, isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFD700' }
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#AAFFAA', borderColor: '#00FF00', name: '🌀 GRAVITY', isBrand: false, isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#00FF00' },
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFAACC', borderColor: '#FF6699', name: '🔄 SWAP', isBrand: false, isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FF6699' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#CCCCFF', borderColor: '#9999FF', name: '🔍 CLEAR LINE', isBrand: false, isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#9999FF' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFCC99', borderColor: '#FF9966', name: '⏩ FAST FORWARD', isBrand: false, isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FF9966' },
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF99FF', borderColor: '#FF33FF', name: '🎲 RANDOM', isBrand: false, isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FF33FF' }
 ];
 
 interface Highscore {
@@ -52,7 +47,7 @@ interface Highscore {
 
 export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cellSize, setCellSize] = useState(28);
+  const [cellSize, setCellSize] = useState(34);
   const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
@@ -80,12 +75,13 @@ export function ScndDropGame() {
   const [freezeMode, setFreezeMode] = useState(false);
   const [scndBonusActive, setScndBonusActive] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<string | null>(null);
+  const [fastForwardActive, setFastForwardActive] = useState(false);
   const gameLoopRef = useRef<number | null>(null);
   const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {});
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
 
-  // Scroll-Schutz und dynamische Zellengröße bei Resize
+  // Scroll-Schutz und Layout (kein Überlappen)
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       document.body.style.overflow = 'hidden';
@@ -121,6 +117,7 @@ export function ScndDropGame() {
     if (freezeMode) return Infinity;
     let delay = Math.max(150, 1000 - (level - 1) * 80);
     if (slowMode) delay = delay * 2;
+    if (fastForwardActive) delay = delay / 2;
     return delay;
   };
 
@@ -149,6 +146,7 @@ export function ScndDropGame() {
     setFreezeMode(false);
     setScndBonusActive(false);
     setActivePowerUp(null);
+    setFastForwardActive(false);
     setGameOver(false);
     setShowNameInput(false);
     setParticles([]);
@@ -191,6 +189,7 @@ export function ScndDropGame() {
   const triggerPowerUpEffect = (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
+
     switch(effect) {
       case 'bomb': {
         const bombBoard = board.map(row => [...row]);
@@ -251,6 +250,83 @@ export function ScndDropGame() {
           setActivePowerUp(null);
         }, 3000);
         break;
+      case 'gravity': {
+        const gravityBoard = board.map(row => [...row]);
+        for (let col = 0; col < BOARD_WIDTH; col++) {
+          const columnBlocks = [];
+          for (let row = BOARD_HEIGHT - 1; row >= 0; row--) {
+            if (gravityBoard[row][col] !== null) {
+              columnBlocks.push(gravityBoard[row][col]);
+              gravityBoard[row][col] = null;
+            }
+          }
+          for (let i = 0; i < columnBlocks.length; i++) {
+            gravityBoard[BOARD_HEIGHT - 1 - i][col] = columnBlocks[i];
+          }
+        }
+        setBoard(gravityBoard);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
+      case 'swap': {
+        const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
+        const randomPiece = JSON.parse(JSON.stringify(allPieces[Math.floor(Math.random() * allPieces.length)]));
+        setCurrentPiece(randomPiece);
+        setPieceX(Math.floor((BOARD_WIDTH - randomPiece.shape[0].length) / 2));
+        setPieceY(0);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
+      case 'clearLine': {
+        if (y >= 0 && y < BOARD_HEIGHT) {
+          const clearBoard = board.map(row => [...row]);
+          clearBoard[y] = Array(BOARD_WIDTH).fill(null);
+          for (let row = y; row > 0; row--) {
+            clearBoard[row] = [...clearBoard[row - 1]];
+          }
+          clearBoard[0] = Array(BOARD_WIDTH).fill(null);
+          setBoard(clearBoard);
+          const newScore = score + 40;
+          setScore(newScore);
+          setLinesCleared(linesCleared + 1);
+          const newLevel = Math.floor((linesCleared + 1) / 8) + 1;
+          if (newLevel !== level) setLevel(newLevel);
+        }
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
+      case 'fastForward': {
+        setFastForwardActive(true);
+        setTimeout(() => {
+          setFastForwardActive(false);
+          setActivePowerUp(null);
+        }, 10000);
+        break;
+      }
+      case 'randomize': {
+        const randomBoard = board.map(row => [...row]);
+        const allPieces = [...TETROMINOS, ...POWERUP_TETROMINOS];
+        let changed = 0;
+        for (let attempt = 0; attempt < 100 && changed < 3; attempt++) {
+          const randX = Math.floor(Math.random() * BOARD_WIDTH);
+          const randY = Math.floor(Math.random() * BOARD_HEIGHT);
+          if (randomBoard[randY][randX] !== null) {
+            const newPiece = allPieces[Math.floor(Math.random() * allPieces.length)];
+            randomBoard[randY][randX] = {
+              color: newPiece.color,
+              borderColor: newPiece.borderColor,
+              isBrand: newPiece.isBrand,
+              isPowerUp: newPiece.isPowerUp || false,
+              powerUpEffect: newPiece.powerUpEffect,
+              glowColor: newPiece.glowColor
+            };
+            changed++;
+          }
+        }
+        setBoard(randomBoard);
+        setTimeout(() => setActivePowerUp(null), 2000);
+        break;
+      }
       default: break;
     }
   };
@@ -415,7 +491,6 @@ export function ScndDropGame() {
     } else if (dy === 1) mergePiece();
   };
 
-  // Referenz aktuell halten
   useEffect(() => {
     movePieceRef.current = movePiece;
   }, [movePiece]);
@@ -452,7 +527,7 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
-  // ========== GAME LOOP (mit movePieceRef) ==========
+  // ========== GAME LOOP ==========
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -474,7 +549,7 @@ export function ScndDropGame() {
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, currentPiece]);
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece]);
 
   // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
@@ -622,6 +697,11 @@ export function ScndDropGame() {
       ctx.fillStyle = '#00FFFF';
       ctx.fillText('⏰ FREEZE!', canvas.width / 2 - 40, 30);
     }
+    if (fastForwardActive) {
+      ctx.font = `bold ${Math.max(12, cellSize * 0.5)}px monospace`;
+      ctx.fillStyle = '#FF9966';
+      ctx.fillText('⏩ FAST FORWARD!', canvas.width / 2 - 60, 60);
+    }
     if (activePowerUp) {
       ctx.font = `bold ${Math.max(10, cellSize * 0.45)}px monospace`;
       ctx.fillStyle = '#00FF00';
@@ -638,7 +718,7 @@ export function ScndDropGame() {
       ctx.fillText(`+${popupScore.score}`, popupScore.x - 20, popupScore.y);
     }
     ctx.shadowBlur = 0;
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, particles, linesCleared, activePowerUp, isPaused]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, popupScore, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -680,6 +760,7 @@ export function ScndDropGame() {
             <div className="flex justify-center gap-3 mt-2">
               {slowMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full">🐌 TIME SLOW</span>}
               {freezeMode && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[10px] rounded-full animate-pulse">⏰ FREEZE</span>}
+              {fastForwardActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[10px] rounded-full animate-pulse">⏩ FAST FORWARD</span>}
               {scndBonusActive && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[10px] rounded-full animate-pulse">⭐ 3x BONUS</span>}
               {activePowerUp && <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[10px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
             </div>
@@ -693,7 +774,8 @@ export function ScndDropGame() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 justify-center items-center md:items-start w-full">
-            <div className="relative">
+            {/* Canvas-Container mit ausreichend Abstand nach unten für die Touch-Controls */}
+            <div className="relative mb-28 md:mb-0">
               <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
               <canvas ref={canvasRef} className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl" style={{ width: BOARD_WIDTH * cellSize, height: BOARD_HEIGHT * cellSize }} />
 
@@ -774,14 +856,14 @@ export function ScndDropGame() {
                 <div className="text-[8px] md:text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">STEUERUNG</div>
                 <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">← → ↓</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[#FF4400]">↑</kbd><kbd className="px-2 py-1 bg-black/50 rounded text-xs font-mono text-[var(--text-secondary)]">DREHEN</kbd></div>
                 <div className="flex justify-center gap-3 mt-1"><kbd className="px-2 py-0.5 bg-black/50 rounded text-[8px] font-mono text-[var(--text-secondary)]">ESC</kbd><span className="text-[8px] text-[var(--text-secondary)]">PAUSE</span></div>
-                <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">POWER‑UP‑TETROMINOS</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+SCHWARZ = 2x</span></div>
+                <div className="mt-2 flex flex-wrap justify-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-[#FF4400]"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">10 POWER‑UP‑TETROMINOS</span><span className="inline-block w-2 h-2 rounded-full bg-[#FFD700] ml-1"></span><span className="text-[7px] md:text-[8px] text-[var(--text-secondary)]">ORANGE+SCHWARZ = 2x</span></div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ========== TOUCH CONTROLLER ========== */}
+      {/* ========== TOUCH CONTROLLER (fixed bottom) ========== */}
       {isPlaying && !gameOver && (
         <div className="fixed bottom-0 left-0 right-0 md:hidden bg-black/80 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 z-50">
           <div className="flex justify-between items-center px-6 max-w-md mx-auto">
