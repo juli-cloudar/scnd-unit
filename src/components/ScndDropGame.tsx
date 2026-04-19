@@ -14,8 +14,9 @@ const getCellSize = () => {
   return Math.min(Math.max(16, maxCell), 32);
 };
 
-// ========== TETROMINOS (Standard + neue Formen) ==========
+// ========== TETROMINOS (neue Formen) ==========
 const TETROMINOS = [
+  // Standard
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FF6666', borderColor: '#CC3333', name: 'T', isPowerUp: false },
@@ -32,6 +33,7 @@ const TETROMINOS = [
 
 // ========== POWER-UP TETROMINOS (alle neuen Effekte) ==========
 const POWERUP_TETROMINOS = [
+  // Bestehende
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4444', borderColor: '#AA0000', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF44FF', borderColor: '#AA00AA', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF88FF' },
   { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#AA8800', name: '🎨 FARBE', isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
@@ -101,6 +103,7 @@ export function ScndDropGame() {
   const [scndBonusActive, setScndBonusActive] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<string | null>(null);
   const [fastForwardActive, setFastForwardActive] = useState(false);
+  const [antiGravityActive, setAntiGravityActive] = useState(false);
   const [doubleScoreActive, setDoubleScoreActive] = useState(false);
   const [shieldActive, setShieldActive] = useState(false);
   const gameLoopRef = useRef<number | null>(null);
@@ -151,6 +154,7 @@ export function ScndDropGame() {
     });
   };
 
+  // ========== BEWEGUNGSUMRECHNUNG (visuelle Richtung -> intern) ==========
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -214,31 +218,13 @@ export function ScndDropGame() {
     setPieceY(spawnPos.y);
   };
 
-  // ========== ROTATIONSUNABHÄNGIGE GRAVITÄT (nach unten, mit Verankerung) ==========
-  // Bestimmt die aktuelle Fallrichtung in internen Koordinaten (immer visuell nach unten)
-  const getFallDirection = (): { dx: number; dy: number } => {
-    return translateMove(0, 1);
-  };
-
-  // Prüft, ob eine Zelle an einer visuellen Wand liegt (in der aktuellen Rotation)
-  const isAtWall = (x: number, y: number): boolean => {
-    const { dx, dy } = getFallDirection();
-    // Eine Zelle ist an der Wand, wenn sie in Fallrichtung am Rand ist
-    // Vereinfacht: Alle Zellen am Rand des internen Boards sind potenziell Wände,
-    // aber nur diejenigen, die in Fallrichtung die letzte Zelle sind.
-    // Besser: Wir behandeln alle Randzellen als verankert.
-    return x === 0 || x === BOARD_WIDTH - 1 || y === 0 || y === BOARD_HEIGHT - 1;
-  };
-
+  // ========== ROTATIONSUNABHÄNGIGE GRAVITÄT (Flood Fill + Fall in visuelle Unterseite) ==========
   const applyGravity = (currentBoard: any[][]) => {
-    const fallDir = getFallDirection();
-    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
-
     // 1. Verankerung bestimmen (Flood Fill von allen Wänden)
     const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
     const queue: [number, number][] = [];
 
-    // Alle Zellen am Rand sind verankert (unabhängig von Fallrichtung – Wände sind immer Wände)
+    // Alle Blöcke, die eine Wand berühren, sind verankert
     for (let x = 0; x < BOARD_WIDTH; x++) {
       if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
       if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
@@ -260,11 +246,15 @@ export function ScndDropGame() {
       }
     }
 
-    // 2. Alle nicht verankerten Blöcke in Fallrichtung verschieben (wiederholt, bis keine Bewegung mehr)
+    // 2. Fallrichtung bestimmen (visuell unten -> intern via translateMove)
+    const fallDir = translateMove(0, 1);
+    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
+
+    // 3. Nicht verankerte Blöcke in Fallrichtung verschieben (mehrere Durchläufe)
     let changed = true;
     while (changed) {
       changed = false;
-      // Blöcke sammeln, sortiert entgegen der Fallrichtung (von "oben" nach "unten")
+      // Alle nicht verankerten Blöcke sammeln
       const blocks: { y: number, x: number, block: any }[] = [];
       for (let y = 0; y < BOARD_HEIGHT; y++) {
         for (let x = 0; x < BOARD_WIDTH; x++) {
@@ -273,7 +263,7 @@ export function ScndDropGame() {
           }
         }
       }
-      // Sortieren: Blöcke, die weiter in Fallrichtung liegen, zuerst verschieben
+      // Sortierung nach Fallrichtung (von "oben" nach "unten")
       if (fallDir.dy > 0) blocks.sort((a,b) => b.y - a.y);
       else if (fallDir.dy < 0) blocks.sort((a,b) => a.y - b.y);
       if (fallDir.dx > 0) blocks.sort((a,b) => b.x - a.x);
@@ -292,7 +282,7 @@ export function ScndDropGame() {
     return currentBoard;
   };
 
-  // ========== POWER-UP EFFEKTE (alle, ohne Anti-Gravity) ==========
+  // ========== POWER-UP EFFEKTE (alle mit Animationen) ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
@@ -425,8 +415,7 @@ export function ScndDropGame() {
         const pieceShape = currentPiece.shape;
         const pieceWidth = pieceShape[0].length;
         const pieceHeight = pieceShape.length;
-        const maxAttempts = 50;
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        for (let attempt = 0; attempt < 50; attempt++) {
           const randX = Math.floor(Math.random() * (BOARD_WIDTH - pieceWidth + 1));
           const randY = Math.floor(Math.random() * (BOARD_HEIGHT - pieceHeight + 1));
           if (!collision(pieceShape, randX, randY)) {
@@ -453,6 +442,10 @@ export function ScndDropGame() {
       case 'slowMo':
         setSlowMode(true);
         setTimeout(() => setSlowMode(false), 10000);
+        break;
+      case 'antiGravity':
+        setAntiGravityActive(true);
+        setTimeout(() => setAntiGravityActive(false), 5000);
         break;
       case 'rainbow': {
         const colors = ['#FF0000', '#FF8800', '#FFFF00', '#88FF00', '#00FF88', '#0088FF', '#8800FF', '#FF00FF'];
@@ -494,6 +487,7 @@ export function ScndDropGame() {
         setSlowMode(false);
         setFreezeMode(false);
         setFastForwardActive(false);
+        setAntiGravityActive(false);
         setScndBonusActive(false);
         setDoubleScoreActive(false);
         setShieldActive(false);
@@ -532,7 +526,7 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  // ========== LINIENLÖSCHUNG ==========
+  // ========== LINIENLÖSCHUNG mit neuen Block-Typen (Eis, Gift, Gold, Teleporter) ==========
   const clearLineGroups = (newBoard: any[][]): { rowsCleared: number; extraScore: number } => {
     let totalCleared = 0;
     let extraScore = 0;
@@ -540,14 +534,43 @@ export function ScndDropGame() {
       for (const [y, x] of cells) {
         const cell = newBoard[y][x];
         if (cell) {
+          // Eisblöcke: brauchen 2 Treffer
           if (cell.isIce && !cell.hit) {
             cell.hit = true;
             newBoard[y][x] = { ...cell, hit: true };
             burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 3);
             continue;
           }
-          if (cell.isPoison) extraScore -= 200;
-          if (cell.isGold) extraScore += 500;
+          // Giftblöcke: Punktabzug
+          if (cell.isPoison) {
+            extraScore -= 200;
+            burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
+          }
+          // Goldblöcke: Extra-Punkte
+          if (cell.isGold) {
+            extraScore += 500;
+            burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 10);
+          }
+          // Teleporter: tauscht mit einem zufälligen anderen Block
+          if (cell.isTeleporter) {
+            const otherBlocks: {y: number, x: number}[] = [];
+            for (let yy = 0; yy < BOARD_HEIGHT; yy++) {
+              for (let xx = 0; xx < BOARD_WIDTH; xx++) {
+                if ((yy !== y || xx !== x) && newBoard[yy][xx] !== null) {
+                  otherBlocks.push({y: yy, x: xx});
+                }
+              }
+            }
+            if (otherBlocks.length > 0) {
+              const other = otherBlocks[Math.floor(Math.random() * otherBlocks.length)];
+              const temp = newBoard[other.y][other.x];
+              newBoard[other.y][other.x] = cell;
+              newBoard[y][x] = temp;
+              burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 10);
+              burstParticles(other.x * cellSize + cellSize/2, other.y * cellSize + cellSize/2, 10);
+              continue; // nicht löschen, nur tauschen
+            }
+          }
           newBoard[y][x] = null;
           burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
         }
@@ -591,7 +614,7 @@ export function ScndDropGame() {
         }
       }
     }
-    // Diagonal
+    // Diagonal (links oben -> rechts unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
         let runLen = 0, y = startRow, x = startCol;
@@ -603,6 +626,7 @@ export function ScndDropGame() {
         }
       }
     }
+    // Diagonal (rechts oben -> links unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
         let runLen = 0, y = startRow, x = startCol;
@@ -627,9 +651,10 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== MERGE ==========
+  // ========== MERGE mit History für REWIND ==========
   const mergePiece = () => {
     if (!currentPiece) return;
+    // Zustand für History speichern (vor dem Merge)
     const currentState: GameState = {
       board: board.map(row => [...row]),
       score,
@@ -653,9 +678,11 @@ export function ScndDropGame() {
               isPowerUp: currentPiece.isPowerUp || false,
               powerUpEffect: currentPiece.powerUpEffect,
               glowColor: currentPiece.glowColor,
+              // Neue Block-Eigenschaften (zufällig für normale Blöcke)
               isIce: !currentPiece.isPowerUp && Math.random() < 0.05,
               isPoison: !currentPiece.isPowerUp && Math.random() < 0.03,
               isGold: !currentPiece.isPowerUp && Math.random() < 0.04,
+              isTeleporter: !currentPiece.isPowerUp && Math.random() < 0.02,
               hit: false
             };
             newBoard[boardY][boardX] = block;
@@ -667,6 +694,7 @@ export function ScndDropGame() {
 
     const { rowsCleared, extraScore } = clearLineGroups(newBoard);
 
+    // Power-Ups auslösen
     for (const block of powerUpBlocks) {
       triggerPowerUpEffect(block.effect, block.x, block.y);
     }
@@ -718,6 +746,7 @@ export function ScndDropGame() {
     const newY = pieceY + dy;
     let wouldCollide = false;
     if (shieldActive) {
+      // Shield: nur Wand-Kollision, keine Block-Kollision
       for (let y = 0; y < currentPiece.shape.length; y++) {
         for (let x = 0; x < currentPiece.shape[y].length; x++) {
           if (currentPiece.shape[y][x] !== 0) {
@@ -745,7 +774,7 @@ export function ScndDropGame() {
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
-    const wouldCollide = shieldActive ? false : collision(rotated, pieceX, pieceY);
+    let wouldCollide = shieldActive ? false : collision(rotated, pieceX, pieceY);
     if (!wouldCollide) {
       setCurrentPiece({ ...currentPiece, shape: rotated });
     }
@@ -916,6 +945,7 @@ export function ScndDropGame() {
     setScndBonusActive(false);
     setActivePowerUp(null);
     setFastForwardActive(false);
+    setAntiGravityActive(false);
     setDoubleScoreActive(false);
     setShieldActive(false);
     setGameOver(false);
@@ -976,7 +1006,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // ========== CANVAS ZEICHNEN (angepasst) ==========
+  // ========== CANVAS ZEICHNEN (angepasst für neue Block-Typen) ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1040,6 +1070,10 @@ export function ScndDropGame() {
             ctx.fillStyle = '#FFDD88';
             ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
             ctx.fillText('💰', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
+          } else if (cell.isTeleporter) {
+            ctx.fillStyle = '#FF88FF';
+            ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
+            ctx.fillText('🌀', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
           }
           ctx.shadowBlur = 0;
         }
@@ -1215,7 +1249,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste (gekürzt, aber identisch) */}
+        {/* Rechte Seitenleiste (vereinfacht) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
