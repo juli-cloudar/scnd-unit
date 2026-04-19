@@ -27,7 +27,7 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isPowerUp: false }
 ];
 
-// Power‑Up‑Tetrominos (vereinfacht)
+// Power‑Up‑Tetrominos
 const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
@@ -87,7 +87,7 @@ export function ScndDropGame() {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
 
-  // Rotation
+  // Rotation (visuell)
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
@@ -119,7 +119,7 @@ export function ScndDropGame() {
     });
   };
 
-  // Bewegungsumrechnung (Bildschirm -> intern)
+  // Bewegungsumrechnung (Bildschirm -> intern) – immer nach unten auf dem Bildschirm
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -130,7 +130,7 @@ export function ScndDropGame() {
     }
   };
 
-  // Spawn-Position (immer visuell oben)
+  // Spawn-Position: immer an der visuell oberen Kante (KEINE Kollisionsprüfung!)
   const getSpawnPosition = (pieceShape: number[][]) => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
@@ -143,7 +143,7 @@ export function ScndDropGame() {
     }
   };
 
-  // Ghost-Position (wo der Block landen würde)
+  // Ghost-Position (wo der Block landen würde, wenn keine Hindernisse wären – nur für Anzeige)
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
@@ -157,6 +157,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
+  // Kollision (wird nur für Bewegung und Merge benötigt, nicht für Spawn)
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -170,7 +171,17 @@ export function ScndDropGame() {
     return false;
   };
 
-  // Linien löschen (horizontal & vertikal, ab 10 Blöcken)
+  // Prüft, ob das gesamte Board voll ist (Game Over Bedingung)
+  const isBoardFull = () => {
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      for (let x = 0; x < BOARD_WIDTH; x++) {
+        if (board[y][x] === null) return false;
+      }
+    }
+    return true;
+  };
+
+  // Linien löschen (horizontal & vertikal, mindestens 10 Blöcke)
   const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
     const clearedRows: number[] = [];
     const clearedCols: number[] = [];
@@ -192,7 +203,7 @@ export function ScndDropGame() {
       newBoard.splice(row, 1);
       newBoard.unshift(Array(BOARD_WIDTH).fill(null));
     }
-    // Vertikale Linien löschen (Spalte leeren und komprimieren)
+    // Vertikale Linien löschen
     for (const col of clearedCols) {
       for (let row = 0; row < BOARD_HEIGHT; row++) {
         newBoard[row][col] = null;
@@ -226,7 +237,7 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  // Spiel-Logik
+  // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
     if (rotationPending) {
       setTimeout(() => spawnNewPiece(), 100);
@@ -238,11 +249,7 @@ export function ScndDropGame() {
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
     const { x, y } = getSpawnPosition(piece.shape);
-    // Klassische Tetris-Regel: Wenn sofort Kollision, Game Over
-    if (collision(piece.shape, x, y)) {
-      endGame();
-      return;
-    }
+    // KEINE Kollisionsprüfung – Block erscheint immer, auch über anderen Blöcken!
     setPieceX(x);
     setPieceY(y);
   };
@@ -330,6 +337,12 @@ export function ScndDropGame() {
 
     setBoard(newBoard);
     checkAndRotate();
+
+    // Game Over prüfen: nur wenn das gesamte Board voll ist
+    if (isBoardFull()) {
+      endGame();
+      return;
+    }
     spawnNewPiece();
   };
 
@@ -435,7 +448,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
-  // Scroll-Verhalten (nur wenn nötig)
+  // Scroll-Verhalten
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
@@ -564,7 +577,7 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // Canvas zeichnen
+  // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
