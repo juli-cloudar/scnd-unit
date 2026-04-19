@@ -91,6 +91,7 @@ export function ScndDropGame() {
   const [rotationPending, setRotationPending] = useState(false);
   const [needsRespawnAfterRotation, setNeedsRespawnAfterRotation] = useState(false);
 
+  // ========== ROTATION MIT TIMEOUT (Animation abwarten) ==========
   const changeRotationRandom = () => {
     const rots: Rotation[] = [0, 90, 180, 270];
     let newRot = rots[Math.floor(Math.random() * rots.length)];
@@ -124,6 +125,7 @@ export function ScndDropGame() {
     });
   };
 
+  // ========== BEWEGUNGSUMRECHNUNG (für Pfeiltasten / Touch) ==========
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -134,14 +136,7 @@ export function ScndDropGame() {
     }
   };
 
-  // Spawn-Position: immer obere Bildschirmmitte (Canvas ist nicht gedreht! – die CSS-Rotation ist nur visuell)
-  const getSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
-    const pieceWidth = pieceShape[0].length;
-    const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
-    const startY = 0;
-    return { x: startX, y: startY };
-  };
-
+  // ========== KOLLISION ==========
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -169,29 +164,120 @@ export function ScndDropGame() {
     return false;
   };
 
-  const movePieceWithGhost = (screenDx: number, screenDy: number) => {
-    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
-    const { dx, dy } = translateMove(screenDx, screenDy);
-    const newX = pieceX + dx;
-    const newY = pieceY + dy;
-    if (!collisionWithGhost(currentPiece.shape, newX, newY, ghostFallActive)) {
-      setPieceX(newX);
-      setPieceY(newY);
-    } else if (screenDy === 1) {
-      mergePiece();
+  // ========== SPAWN MIT UNSICHTBAREM FIXPUNKT UND DISTANZSUCHE ==========
+  const getFixedScreenPoint = (canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: rect.width / 2, y: 0 };
+  };
+
+  const screenToBoard = (screenX: number, screenY: number, cs: number): { x: number; y: number } => {
+    const centerX = (BOARD_WIDTH * cs) / 2;
+    const centerY = (BOARD_HEIGHT * cs) / 2;
+    let dx = screenX - centerX;
+    let dy = screenY - centerY;
+    switch (rotation) {
+      case 90:  { const tmp = dx; dx = -dy; dy = tmp; break; }
+      case 180: dx = -dx; dy = -dy; break;
+      case 270: { const tmp = dx; dx = dy; dy = -tmp; break; }
+      default: break;
+    }
+    let boardX = (dx + centerX) / cs;
+    let boardY = (dy + centerY) / cs;
+    boardX = Math.min(Math.max(0, boardX), BOARD_WIDTH - 1);
+    boardY = Math.min(Math.max(0, boardY), BOARD_HEIGHT - 1);
+    return { x: Math.floor(boardX), y: Math.floor(boardY) };
+  };
+
+  const getBestSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
+    if (!canvasRef.current) return null;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const cs = rect.width / BOARD_WIDTH;
+    const fixedPoint = getFixedScreenPoint(canvas);
+    const targetBoard = screenToBoard(fixedPoint.x, fixedPoint.y, cs);
+    const pieceWidth = pieceShape[0].length;
+    const pieceHeight = pieceShape.length;
+
+    let bestX = -1, bestY = -1;
+    let bestDist = Infinity;
+    for (let dy = -5; dy <= 5; dy++) {
+      for (let dx = -5; dx <= 5; dx++) {
+        let testX = targetBoard.x + dx;
+        let testY = targetBoard.y + dy;
+        testX = Math.min(Math.max(0, testX), BOARD_WIDTH - pieceWidth);
+        testY = Math.min(Math.max(0, testY), BOARD_HEIGHT - pieceHeight);
+        if (!collision(pieceShape, testX, testY)) {
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestX = testX;
+            bestY = testY;
+          }
+        }
+      }
+    }
+    if (bestX === -1) return null;
+    return { x: bestX, y: bestY };
+  };
+
+  const spawnWithDoubleCheck = (piece: any, retries = 2) => {
+    if (rotationPending) {
+      setNeedsRespawnAfterRotation(true);
+      return;
+    }
+    const spawnPos = getBestSpawnPosition(piece.shape);
+    if (!spawnPos) {
+      endGame();
+      return;
+    }
+    const doSpawn = () => {
+      // Doppelprüfung
+      if (!collision(piece.shape, spawnPos.x, spawnPos.y)) {
+        setCurrentPiece(piece);
+        setPieceX(spawnPos.x);
+        setPieceY(spawnPos.y);
+        setGhostFallActive(true);
+        setTimeout(() => setGhostFallActive(false), 600);
+      } else if (retries > 0) {
+        setTimeout(() => spawnWithDoubleCheck(piece, retries - 1), 50);
+      } else {
+        endGame();
+      }
+    };
+    requestAnimationFrame(() => setTimeout(doSpawn, 0));
+  };
+
+  const spawnNewPiece = () => {
+    if (rotationPending) {
+      setNeedsRespawnAfterRotation(true);
+      return;
+    }
+    const isPowerUpSpawn = Math.random() < 0.15;
+    const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
+    const random = Math.floor(Math.random() * pool.length);
+    const piece = JSON.parse(JSON.stringify(pool[random]));
+    spawnWithDoubleCheck(piece);
+  };
+
+  // ========== GAME OVER ==========
+  const endGame = () => {
+    setGameOver(true);
+    setFinalScore(score);
+    setIsPlaying(false);
+    setIsPaused(false);
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+    if (!showNameInput && !isSaving) {
+      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
+      if (score > 0 && isHighscore) {
+        setShowNameInput(true);
+        setNewHighscoreGlow(true);
+        setTimeout(() => setNewHighscoreGlow(false), 2000);
+      }
     }
   };
 
-  const rotatePieceWithGhost = () => {
-    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
-    const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
-      currentPiece.shape.map((row: any[]) => row[idx]).reverse()
-    );
-    if (!collisionWithGhost(rotated, pieceX, pieceY, ghostFallActive)) {
-      setCurrentPiece({ ...currentPiece, shape: rotated });
-    }
-  };
-
+  // ========== GRAVITATION (rotationsabhängig) ==========
   const applyGravityWithRotation = (currentBoard: any[][]) => {
     const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
     const queue: [number, number][] = [];
@@ -249,6 +335,7 @@ export function ScndDropGame() {
     return currentBoard;
   };
 
+  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) ==========
   const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
     let totalCleared = 0;
     const deleteChain = (cells: [number, number][]) => {
@@ -259,6 +346,7 @@ export function ScndDropGame() {
       totalCleared++;
     };
 
+    // Horizontal
     for (let row = 0; row < BOARD_HEIGHT; row++) {
       let runStart = -1, runLen = 0;
       for (let x = 0; x <= BOARD_WIDTH; x++) {
@@ -276,6 +364,7 @@ export function ScndDropGame() {
         }
       }
     }
+    // Vertikal
     for (let col = 0; col < BOARD_WIDTH; col++) {
       let runStart = -1, runLen = 0;
       for (let y = 0; y <= BOARD_HEIGHT; y++) {
@@ -293,6 +382,7 @@ export function ScndDropGame() {
         }
       }
     }
+    // Diagonal (links oben -> rechts unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
         let runLen = 0, y = startRow, x = startCol;
@@ -304,6 +394,7 @@ export function ScndDropGame() {
         }
       }
     }
+    // Diagonal (rechts oben -> links unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
         let runLen = 0, y = startRow, x = startCol;
@@ -334,41 +425,7 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  // ========== SPIEL-LOGIK ==========
-  const spawnNewPiece = () => {
-    if (rotationPending) {
-      setNeedsRespawnAfterRotation(true);
-      return;
-    }
-    const isPowerUpSpawn = Math.random() < 0.15;
-    const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
-    const random = Math.floor(Math.random() * pool.length);
-    const piece = JSON.parse(JSON.stringify(pool[random]));
-    setCurrentPiece(piece);
-    const spawnPos = getSpawnPosition(piece.shape);
-    setPieceX(spawnPos.x);
-    setPieceY(spawnPos.y);
-    setGhostFallActive(true);
-    setTimeout(() => setGhostFallActive(false), 600);
-  };
-
-  const endGame = () => {
-    setGameOver(true);
-    setFinalScore(score);
-    setIsPlaying(false);
-    setIsPaused(false);
-    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-    if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-    if (!showNameInput && !isSaving) {
-      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
-      if (score > 0 && isHighscore) {
-        setShowNameInput(true);
-        setNewHighscoreGlow(true);
-        setTimeout(() => setNewHighscoreGlow(false), 2000);
-      }
-    }
-  };
-
+  // ========== MERGE (Block ins Board einfügen) ==========
   const mergePiece = () => {
     if (!currentPiece) return;
     let newBoard = board.map(row => [...row]);
@@ -430,6 +487,30 @@ export function ScndDropGame() {
     spawnNewPiece();
   };
 
+  // ========== BEWEGUNG UND ROTATION (mit GhostFall) ==========
+  const movePieceWithGhost = (screenDx: number, screenDy: number) => {
+    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
+    const { dx, dy } = translateMove(screenDx, screenDy);
+    const newX = pieceX + dx;
+    const newY = pieceY + dy;
+    if (!collisionWithGhost(currentPiece.shape, newX, newY, ghostFallActive)) {
+      setPieceX(newX);
+      setPieceY(newY);
+    } else if (screenDy === 1) {
+      mergePiece();
+    }
+  };
+
+  const rotatePieceWithGhost = () => {
+    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
+    const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
+      currentPiece.shape.map((row: any[]) => row[idx]).reverse()
+    );
+    if (!collisionWithGhost(rotated, pieceX, pieceY, ghostFallActive)) {
+      setCurrentPiece({ ...currentPiece, shape: rotated });
+    }
+  };
+
   const movePiece = (screenDx: number, screenDy: number) => movePieceWithGhost(screenDx, screenDy);
   const rotatePiece = () => rotatePieceWithGhost();
 
@@ -438,6 +519,7 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
+  // ========== TASTATUR ==========
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -462,6 +544,7 @@ export function ScndDropGame() {
     return delay;
   };
 
+  // ========== GAME LOOP (fallender Block) ==========
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -484,6 +567,7 @@ export function ScndDropGame() {
 
   useEffect(() => { movePieceRef.current = movePiece; }, [movePiece]);
 
+  // ========== DAUERHAFTE GRAVITATION (alle 200 ms) ==========
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
@@ -496,6 +580,7 @@ export function ScndDropGame() {
     return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
   }, [isPlaying, gameOver, isPaused]);
 
+  // ========== PULSIEREN (für Glow-Effekt) ==========
   useEffect(() => {
     let animFrame: number;
     const step = () => {
@@ -506,6 +591,7 @@ export function ScndDropGame() {
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
+  // ========== PARTIKEL LEBENSDAUER ==========
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
@@ -514,6 +600,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
+  // ========== SCROLL-VERHALTEN ==========
   const isElementInViewport = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     return rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -530,6 +617,7 @@ export function ScndDropGame() {
     }
   }, [isPlaying, gameOver, isPaused]);
 
+  // ========== RESIZE & HIGHSCORES ==========
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
     handleResize();
@@ -562,6 +650,7 @@ export function ScndDropGame() {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
+  // ========== START, PAUSE, AUFGABEN ==========
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
@@ -621,6 +710,7 @@ export function ScndDropGame() {
   const handleRestart = () => { setIsPaused(false); startGame(); };
   const handleGiveUp = () => { setIsPaused(false); giveUp(); };
 
+  // ========== GHOST-POSITION (für Anzeige) ==========
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
@@ -634,7 +724,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen (mit CSS-Transformation)
+  // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -859,7 +949,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste (wie gehabt) */}
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
