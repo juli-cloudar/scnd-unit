@@ -105,6 +105,7 @@ export function ScndDropGame() {
   const gameLoopRef = useRef<number | null>(null);
   const gravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fastGravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
@@ -119,6 +120,7 @@ export function ScndDropGame() {
   const [needsRespawnAfterRotation, setNeedsRespawnAfterRotation] = useState(false);
 
   const changeRotationRandom = () => {
+    if (rotationTimerRef.current) clearTimeout(rotationTimerRef.current);
     const rots: Rotation[] = [0, 90, 180, 270];
     let newRot = rots[Math.floor(Math.random() * rots.length)];
     while (newRot === rotation) newRot = rots[Math.floor(Math.random() * rots.length)];
@@ -128,12 +130,13 @@ export function ScndDropGame() {
       canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
     }
     if (window.navigator.vibrate) window.navigator.vibrate(100);
-    setTimeout(() => {
+    rotationTimerRef.current = setTimeout(() => {
       setRotationPending(false);
       if (needsRespawnAfterRotation) {
         setNeedsRespawnAfterRotation(false);
         spawnNewPiece();
       }
+      rotationTimerRef.current = null;
     }, 450);
   };
 
@@ -710,14 +713,16 @@ export function ScndDropGame() {
     spawnNewPiece();
   };
 
+  // ========== BEWEGUNG MIT SHIELD ==========
   const movePiece = (screenDx: number, screenDy: number) => {
-    if (!currentPiece || gameOver || isPaused || rotationPending) return;
-    if (freezeMode) return; // fallender Block stoppt bei freezeMode
+    if (!currentPiece || gameOver || isPaused) return;
+    if (freezeMode) return;
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
     let wouldCollide = false;
     if (shieldActive) {
+      // Shield: nur Wandkollision prüfen, keine Blockkollision
       for (let y = 0; y < currentPiece.shape.length; y++) {
         for (let x = 0; x < currentPiece.shape[y].length; x++) {
           if (currentPiece.shape[y][x] !== 0) {
@@ -741,7 +746,7 @@ export function ScndDropGame() {
   };
 
   const rotatePiece = () => {
-    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
+    if (!currentPiece || gameOver || freezeMode || isPaused) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
@@ -770,7 +775,7 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending, shieldActive]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, shieldActive]);
 
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
@@ -780,29 +785,27 @@ export function ScndDropGame() {
     return delay;
   };
 
-  // ========== GAME LOOP (fallender Block) – freezeMode blockiert ==========
- const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-const changeRotationRandom = () => {
-  if (rotationTimerRef.current) clearTimeout(rotationTimerRef.current);
-  const rots: Rotation[] = [0, 90, 180, 270];
-  let newRot = rots[Math.floor(Math.random() * rots.length)];
-  while (newRot === rotation) newRot = rots[Math.floor(Math.random() * rots.length)];
-  setRotation(newRot);
-  if (canvasRef.current) {
-    canvasRef.current.style.transform = `rotate(${newRot}deg)`;
-    canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-  }
-  if (window.navigator.vibrate) window.navigator.vibrate(100);
-  rotationTimerRef.current = setTimeout(() => {
-    setRotationPending(false);
-    if (needsRespawnAfterRotation) {
-      setNeedsRespawnAfterRotation(false);
-      spawnNewPiece();
+  // ========== GAME LOOP (fallender Block) – rotationPending blockiert nicht mehr ==========
+  useEffect(() => {
+    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      return;
     }
-    rotationTimerRef.current = null;
-  }, 450);
-};
+    let lastFall = performance.now();
+    const delay = getFallDelay();
+    if (delay === Infinity) return;
+    const step = (now: number) => {
+      if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) return;
+      if (now - lastFall >= delay) {
+        movePiece(0, 1);
+        lastFall = now;
+      }
+      gameLoopRef.current = requestAnimationFrame(step);
+    };
+    gameLoopRef.current = requestAnimationFrame(step);
+    return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, shieldActive]);
+
   // ========== DAUERHAFTE GRAVITY (läuft IMMER, auch bei freezeMode) ==========
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
