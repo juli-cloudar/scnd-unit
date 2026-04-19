@@ -84,20 +84,31 @@ export function ScndDropGame() {
   const [pulseValue, setPulseValue] = useState(0);
   const [ghostFallActive, setGhostFallActive] = useState(false);
 
-  // Rotation (nur intern, keine visuelle Transformation mehr)
+  // Rotation
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
   const [rotationPending, setRotationPending] = useState(false);
+  const [needsRespawnAfterRotation, setNeedsRespawnAfterRotation] = useState(false);
 
   const changeRotationRandom = () => {
     const rots: Rotation[] = [0, 90, 180, 270];
     let newRot = rots[Math.floor(Math.random() * rots.length)];
     while (newRot === rotation) newRot = rots[Math.floor(Math.random() * rots.length)];
     setRotation(newRot);
-    // Keine CSS-Transformation mehr – nur Vibration als Feedback
+    if (canvasRef.current) {
+      canvasRef.current.style.transform = `rotate(${newRot}deg)`;
+      canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+    }
     if (window.navigator.vibrate) window.navigator.vibrate(100);
-    setRotationPending(false); // Sofort verfügbar
+    // Warte 450 ms (etwas länger als Transition) und beende dann den Pending-Zustand
+    setTimeout(() => {
+      setRotationPending(false);
+      if (needsRespawnAfterRotation) {
+        setNeedsRespawnAfterRotation(false);
+        spawnNewPiece();
+      }
+    }, 450);
   };
 
   const checkAndRotate = () => {
@@ -123,7 +134,7 @@ export function ScndDropGame() {
     }
   };
 
-  // Spawn-Position: immer obere Bildschirmmitte (Canvas ist nicht gedreht!)
+  // Spawn-Position: immer obere Bildschirmmitte (Canvas ist nicht gedreht! – die CSS-Rotation ist nur visuell)
   const getSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
     const pieceWidth = pieceShape[0].length;
     const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
@@ -326,8 +337,7 @@ export function ScndDropGame() {
   // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
     if (rotationPending) {
-      // Kurze Verzögerung, falls Rotation gerade wechselt (aber ohne CSS-Transition ist das minimal)
-      setTimeout(() => spawnNewPiece(), 10);
+      setNeedsRespawnAfterRotation(true);
       return;
     }
     const isPowerUpSpawn = Math.random() < 0.15;
@@ -573,10 +583,12 @@ export function ScndDropGame() {
     setIsSaving(false);
     setBlocksPlaced(0);
     setGhostFallActive(false);
+    setNeedsRespawnAfterRotation(false);
     blocksUntilRotation.current = Math.floor(Math.random() * 5) + 1;
     const rots: Rotation[] = [0, 90, 180, 270];
     const randomRot = rots[Math.floor(Math.random() * rots.length)];
     setRotation(randomRot);
+    if (canvasRef.current) canvasRef.current.style.transform = `rotate(${randomRot}deg)`;
     setRotationPending(false);
     spawnNewPiece();
     setIsPlaying(true);
@@ -622,7 +634,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen (keine Rotation mehr, daher kein transform)
+  // Canvas zeichnen (mit CSS-Transformation)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -808,8 +820,9 @@ export function ScndDropGame() {
               style={{
                 width: '100%',
                 height: 'auto',
-                aspectRatio: `${BOARD_WIDTH} / ${BOARD_HEIGHT}`
-                // KEIN transform: rotate mehr
+                aspectRatio: `${BOARD_WIDTH} / ${BOARD_HEIGHT}`,
+                transform: `rotate(${rotation}deg)`,
+                transition: 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)'
               }}
             />
 
@@ -846,7 +859,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste – unverändert */}
+        {/* Rechte Seitenleiste (wie gehabt) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
