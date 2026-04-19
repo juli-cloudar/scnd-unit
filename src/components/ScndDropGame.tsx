@@ -8,7 +8,6 @@ const BOARD_HEIGHT = 20;
 
 type Rotation = 0 | 90 | 180 | 270;
 
-// Adaptive Zellengröße
 const getCellSize = () => {
   if (typeof window === 'undefined') return 24;
   const height = window.innerHeight;
@@ -17,7 +16,6 @@ const getCellSize = () => {
   return Math.min(Math.max(cell, 16), 28);
 };
 
-// Normale Tetrominos (ohne isBrand)
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isPowerUp: false },
@@ -28,7 +26,6 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isPowerUp: false }
 ];
 
-// Power‑Up‑Tetrominos
 const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
@@ -87,11 +84,10 @@ export function ScndDropGame() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
-
-  // ========== ROTATION (nur visuell) ==========
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
+  const [rotationPending, setRotationPending] = useState(false);
 
   const changeRotationRandom = () => {
     const rots: Rotation[] = [0, 90, 180, 270];
@@ -110,16 +106,15 @@ export function ScndDropGame() {
       const newCount = prev + 1;
       if (newCount >= blocksUntilRotation.current) {
         blocksUntilRotation.current = Math.floor(Math.random() * 5) + 1;
+        setRotationPending(true);
         changeRotationRandom();
+        setTimeout(() => setRotationPending(false), 500);
         return 0;
       }
       return newCount;
     });
   };
 
-  // ========== BEWEGUNGSUMECHNUNG ==========
-  // Wandelt Bildschirmrichtung (dx, dy) in interne Board-Richtung um.
-  // Bildschirm-unten = (0,1) soll immer in die interne Richtung übersetzt werden, die dem "Fall" entspricht.
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -130,7 +125,6 @@ export function ScndDropGame() {
     }
   };
 
-  // Spawn-Position: immer an der visuell oberen Seite (abhängig von Rotation)
   const getSpawnPosition = (pieceShape: number[][]) => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
@@ -143,11 +137,9 @@ export function ScndDropGame() {
     }
   };
 
-  // Ghost-Position: Block so weit wie möglich in Fallrichtung (intern) verschieben
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
-      // Fallrichtung ist intern (0,1) nach Umrechnung der Bildschirmrichtung (0,1)
       const { dx, dy } = translateMove(0, 1);
       const nextX = testX + dx;
       const nextY = testY + dy;
@@ -158,7 +150,6 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // ========== KOLLISION ==========
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -172,40 +163,30 @@ export function ScndDropGame() {
     return false;
   };
 
-  // ========== LINIENLÖSCHUNG (horizontal & vertikal, mindestens 10 Blöcke) ==========
   const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
     const clearedRows: number[] = [];
     const clearedCols: number[] = [];
 
-    // Horizontale Linien
     for (let row = 0; row < BOARD_HEIGHT; row++) {
       const nonEmpty = newBoard[row].filter(cell => cell !== null).length;
-      if (nonEmpty >= 10) {
-        clearedRows.push(row);
-      }
+      if (nonEmpty >= 10) clearedRows.push(row);
     }
-    // Vertikale Linien
     for (let col = 0; col < BOARD_WIDTH; col++) {
       let nonEmpty = 0;
       for (let row = 0; row < BOARD_HEIGHT; row++) {
         if (newBoard[row][col] !== null) nonEmpty++;
       }
-      if (nonEmpty >= 10) {
-        clearedCols.push(col);
-      }
+      if (nonEmpty >= 10) clearedCols.push(col);
     }
 
-    // Horizontale Linien löschen
     for (const row of clearedRows.sort((a,b) => b-a)) {
       newBoard.splice(row, 1);
       newBoard.unshift(Array(BOARD_WIDTH).fill(null));
     }
-    // Vertikale Linien löschen (Spalten auf null setzen und komprimieren)
     for (const col of clearedCols) {
       for (let row = 0; row < BOARD_HEIGHT; row++) {
         newBoard[row][col] = null;
       }
-      // Spalte komprimieren: Blöcke nach unten fallen lassen
       const columnBlocks: any[] = [];
       for (let row = BOARD_HEIGHT - 1; row >= 0; row--) {
         if (newBoard[row][col] !== null) {
@@ -218,11 +199,9 @@ export function ScndDropGame() {
       }
     }
 
-    const rowsCleared = clearedRows.length + clearedCols.length;
-    return { rowsCleared, clearedRows, clearedCols };
+    return { rowsCleared: clearedRows.length + clearedCols.length, clearedRows, clearedCols };
   };
 
-  // ========== PARTIKEL ==========
   const burstParticles = (cx: number, cy: number, count: number) => {
     for (let i = 0; i < count; i++) {
       const offX = (Math.random() - 0.5) * cellSize * 3;
@@ -231,15 +210,17 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== POWER‑UP EFFEKTE (vereinfacht) ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
+    if (rotationPending) {
+      setTimeout(() => spawnNewPiece(), 100);
+      return;
+    }
     const isPowerUpSpawn = Math.random() < 0.15;
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
@@ -294,17 +275,14 @@ export function ScndDropGame() {
       }
     }
 
-    // Linien löschen
     const { rowsCleared, clearedRows, clearedCols } = clearLines(newBoard);
 
-    // Power‑Up‑Effekte auslösen
     for (const block of powerUpBlocks) {
       if (clearedRows.includes(block.y) || clearedCols.includes(block.x)) {
         triggerPowerUpEffect(block.effect, block.x, block.y);
       }
     }
 
-    // Punkteberechnung
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[Math.min(rowsCleared, 4)];
     if (rowsCleared > 0) {
@@ -313,7 +291,7 @@ export function ScndDropGame() {
       let multiplier = 1 + newCombo * 0.15;
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
-      addedScore *= 2; // Bonus
+      addedScore *= 2;
       showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
@@ -344,7 +322,7 @@ export function ScndDropGame() {
   };
 
   const movePiece = (screenDx: number, screenDy: number) => {
-    if (!currentPiece || gameOver || freezeMode || isPaused) return;
+    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
@@ -357,7 +335,7 @@ export function ScndDropGame() {
   };
 
   const rotatePiece = () => {
-    if (!currentPiece || gameOver || freezeMode || isPaused) return;
+    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
@@ -371,7 +349,6 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
-  // ========== TASTATUR & GAME LOOP ==========
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -386,7 +363,7 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending]);
 
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
@@ -397,7 +374,7 @@ export function ScndDropGame() {
   };
 
   useEffect(() => {
-    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
+    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       return;
     }
@@ -405,7 +382,7 @@ export function ScndDropGame() {
     const delay = getFallDelay();
     if (delay === Infinity) return;
     const step = (now: number) => {
-      if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) return;
+      if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) return;
       if (now - lastFall >= delay) {
         movePieceRef.current(0, 1);
         lastFall = now;
@@ -416,13 +393,12 @@ export function ScndDropGame() {
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece]);
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending]);
 
   useEffect(() => {
     movePieceRef.current = movePiece;
   }, [movePiece]);
 
-  // ========== PULSIEREN ==========
   useEffect(() => {
     let animFrame: number;
     const step = () => {
@@ -435,7 +411,6 @@ export function ScndDropGame() {
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
-  // ========== PARTIKEL LEBENSDAUER ==========
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
@@ -444,14 +419,15 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
-  // ========== SCROLL & RESIZE ==========
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
-      const scrollTop = window.scrollY;
-      const offset = window.innerHeight * 0.15;
-      const targetTop = rect.top + scrollTop - offset;
-      window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      if (rect.top < 0 || rect.bottom > window.innerHeight) {
+        const scrollTop = window.scrollY;
+        const offset = window.innerHeight * 0.15;
+        const targetTop = rect.top + scrollTop - offset;
+        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      }
       setHasScrolled(true);
     }
   };
@@ -534,6 +510,7 @@ export function ScndDropGame() {
     const randomRot = rots[Math.floor(Math.random() * rots.length)];
     setRotation(randomRot);
     if (canvasRef.current) canvasRef.current.style.transform = `rotate(${randomRot}deg)`;
+    setRotationPending(false);
     spawnNewPiece();
     setIsPlaying(true);
   };
@@ -570,7 +547,7 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== CANVAS ZEICHNEN ==========
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -602,7 +579,6 @@ export function ScndDropGame() {
       ctx.stroke();
     }
 
-    // Liegende Blöcke halbtransparent
     ctx.globalAlpha = 0.6;
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
@@ -634,8 +610,7 @@ export function ScndDropGame() {
     }
     ctx.globalAlpha = 1;
 
-    // Ghost
-    if (currentPiece && !gameOver && !freezeMode && !isPaused) {
+    if (currentPiece && !gameOver && !freezeMode && !isPaused && !rotationPending) {
       const ghost = getGhostPosition();
       ctx.globalAlpha = 0.3;
       for (let y = 0; y < currentPiece.shape.length; y++) {
@@ -651,7 +626,6 @@ export function ScndDropGame() {
       }
       ctx.globalAlpha = 1;
 
-      // Fallender Block
       const glowIntensity = 10 + 5 * Math.sin(pulseValue);
       ctx.shadowBlur = glowIntensity;
       ctx.shadowColor = 'white';
@@ -684,19 +658,17 @@ export function ScndDropGame() {
       ctx.shadowOffsetY = 0;
     }
 
-    // Partikel
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
 
-    // Fortschrittsbalken
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -732,7 +704,6 @@ export function ScndDropGame() {
     <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl z-10"></div>
 
-      {/* Header */}
       <div className="pt-2 pb-1 px-2 text-center">
         <h3 className={'text-xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
           SCND DROP
@@ -753,7 +724,6 @@ export function ScndDropGame() {
         )}
       </div>
 
-      {/* Hauptinhalt */}
       <div ref={gameContainerRef} className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 justify-center items-center md:items-start px-2 py-1">
         <div className="flex justify-center items-center">
           <div className="relative">
@@ -802,7 +772,6 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
@@ -838,7 +807,6 @@ export function ScndDropGame() {
         </div>
       </div>
 
-      {/* TOUCH CONTROLLER */}
       {isPlaying && !gameOver && !isPaused && (
         <div className="md:hidden bg-black/90 backdrop-blur-sm border-t border-[#FF4400]/30 py-3 fixed bottom-0 left-0 right-0 z-50">
           <div className="flex justify-between items-center px-4 max-w-md mx-auto">
