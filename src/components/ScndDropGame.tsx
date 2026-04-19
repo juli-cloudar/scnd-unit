@@ -132,7 +132,7 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== KOLLISION (normale, ohne Schutz) ==========
+  // ========== KOLLISION ==========
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -146,13 +146,12 @@ export function ScndDropGame() {
     return false;
   };
 
-  // ========== SPAWN IN DER MITTE ==========
+  // ========== SPAWN IN DER MITTE (mit Ausweichradius ±2) ==========
   const getCenterSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
     const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
     const startY = Math.floor((BOARD_HEIGHT - pieceHeight) / 2);
-    // Kleiner Suchradius (±2), falls Mitte blockiert ist
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
         const testX = startX + dx;
@@ -186,12 +185,28 @@ export function ScndDropGame() {
     setPieceY(spawnPos.y);
   };
 
-  // ========== POWER-UP EFFEKTE (alle implementiert) ==========
+  // ========== EINFACHE, ROBUSTE GRAVITÄT (spaltenweise nach unten) ==========
+  const applyGravity = (currentBoard: any[][]) => {
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      const columnBlocks: any[] = [];
+      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+        if (currentBoard[y][x] !== null) {
+          columnBlocks.push(currentBoard[y][x]);
+          currentBoard[y][x] = null;
+        }
+      }
+      for (let i = 0; i < columnBlocks.length; i++) {
+        currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
+      }
+    }
+    return currentBoard;
+  };
+
+  // ========== POWER-UP EFFEKTE ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
     
-    // Partikel-Explosion am Ort des Power-Ups
     for (let i = 0; i < 30; i++) {
       setTimeout(() => {
         burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 1);
@@ -204,15 +219,13 @@ export function ScndDropGame() {
         for (let dy = -2; dy <= 2; dy++) {
           for (let dx = -2; dx <= 2; dx++) {
             const nx = x + dx, ny = y + dy;
-            if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
-              if (newBoard[ny][nx] !== null) {
-                newBoard[ny][nx] = null;
-                burstParticles(nx * cellSize + cellSize/2, ny * cellSize + cellSize/2, 5);
-              }
+            if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT && newBoard[ny][nx] !== null) {
+              newBoard[ny][nx] = null;
+              burstParticles(nx * cellSize + cellSize/2, ny * cellSize + cellSize/2, 5);
             }
           }
         }
-        setBoard(newBoard);
+        setBoard(applyGravity(newBoard));
         break;
       }
       case 'laser': {
@@ -223,7 +236,7 @@ export function ScndDropGame() {
             burstParticles(col * cellSize + cellSize/2, y * cellSize + cellSize/2, 3);
           }
         }
-        setBoard(newBoard);
+        setBoard(applyGravity(newBoard));
         break;
       }
       case 'colorBlast': {
@@ -239,7 +252,7 @@ export function ScndDropGame() {
             return cell;
           })
         );
-        setBoard(newBoard);
+        setBoard(applyGravity(newBoard));
         break;
       }
       case 'scndBonus':
@@ -251,13 +264,11 @@ export function ScndDropGame() {
         setTimeout(() => setFreezeMode(false), 3000);
         break;
       case 'gravity': {
-        // Alle nicht verankerten Blöcke sofort nach unten fallen lassen
-        let newBoard = applyGravityWithRotation(board.map(row => [...row]));
+        const newBoard = applyGravity(board.map(row => [...row]));
         setBoard(newBoard);
         break;
       }
       case 'swap': {
-        // Zwei zufällige Blöcke tauschen
         const blocks: {y: number, x: number, block: any}[] = [];
         for (let y = 0; y < BOARD_HEIGHT; y++) {
           for (let x = 0; x < BOARD_WIDTH; x++) {
@@ -272,14 +283,12 @@ export function ScndDropGame() {
           newBoard[a.y][a.x] = b.block;
           newBoard[b.y][b.x] = a.block;
           setBoard(newBoard);
-          // Animation: Partikel an beiden Positionen
           burstParticles(a.x * cellSize + cellSize/2, a.y * cellSize + cellSize/2, 10);
           burstParticles(b.x * cellSize + cellSize/2, b.y * cellSize + cellSize/2, 10);
         }
         break;
       }
       case 'clearLine': {
-        // Löscht eine zufällige horizontale Linie
         const row = Math.floor(Math.random() * BOARD_HEIGHT);
         const newBoard = board.map(row => [...row]);
         for (let col = 0; col < BOARD_WIDTH; col++) {
@@ -288,7 +297,7 @@ export function ScndDropGame() {
             burstParticles(col * cellSize + cellSize/2, row * cellSize + cellSize/2, 3);
           }
         }
-        setBoard(newBoard);
+        setBoard(applyGravity(newBoard));
         break;
       }
       case 'fastForward':
@@ -296,16 +305,12 @@ export function ScndDropGame() {
         setTimeout(() => setFastForwardActive(false), 5000);
         break;
       case 'randomize': {
-        // Alle Blöcke zufällig im Board neu anordnen
         const allBlocks: any[] = [];
         for (let y = 0; y < BOARD_HEIGHT; y++) {
           for (let x = 0; x < BOARD_WIDTH; x++) {
-            if (board[y][x] !== null) {
-              allBlocks.push(board[y][x]);
-            }
+            if (board[y][x] !== null) allBlocks.push(board[y][x]);
           }
         }
-        // Zufällig mischen
         for (let i = allBlocks.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [allBlocks[i], allBlocks[j]] = [allBlocks[j], allBlocks[i]];
@@ -317,8 +322,7 @@ export function ScndDropGame() {
             newBoard[y][x] = allBlocks[idx++];
           }
         }
-        setBoard(newBoard);
-        // Visueller Effekt: Partikel über das ganze Board
+        setBoard(applyGravity(newBoard));
         for (let i = 0; i < 100; i++) {
           setTimeout(() => {
             burstParticles(Math.random() * BOARD_WIDTH * cellSize, Math.random() * BOARD_HEIGHT * cellSize, 1);
@@ -331,65 +335,7 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  // ========== GRAVITATION (rotationsabhängig) ==========
-  const applyGravityWithRotation = (currentBoard: any[][]) => {
-    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
-    const queue: [number, number][] = [];
-
-    for (let x = 0; x < BOARD_WIDTH; x++) {
-      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
-      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
-    }
-    for (let y = 0; y < BOARD_HEIGHT; y++) {
-      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
-      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
-    }
-
-    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    while (queue.length) {
-      const [y, x] = queue.shift()!;
-      for (const [dy, dx] of dirs) {
-        const ny = y + dy, nx = x + dx;
-        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
-          anchored[ny][nx] = true;
-          queue.push([ny, nx]);
-        }
-      }
-    }
-
-    const fallDir = translateMove(0, 1);
-    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
-
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const blocks: { y: number, x: number, block: any }[] = [];
-      for (let y = 0; y < BOARD_HEIGHT; y++) {
-        for (let x = 0; x < BOARD_WIDTH; x++) {
-          if (currentBoard[y][x] !== null && !anchored[y][x]) {
-            blocks.push({ y, x, block: currentBoard[y][x] });
-          }
-        }
-      }
-      if (fallDir.dy > 0) blocks.sort((a,b) => b.y - a.y);
-      else if (fallDir.dy < 0) blocks.sort((a,b) => a.y - b.y);
-      if (fallDir.dx > 0) blocks.sort((a,b) => b.x - a.x);
-      else if (fallDir.dx < 0) blocks.sort((a,b) => a.x - b.x);
-
-      for (const { y, x, block } of blocks) {
-        const newX = x + fallDir.dx;
-        const newY = y + fallDir.dy;
-        if (newX >= 0 && newX < BOARD_WIDTH && newY >= 0 && newY < BOARD_HEIGHT && currentBoard[newY][newX] === null) {
-          currentBoard[y][x] = null;
-          currentBoard[newY][newX] = block;
-          changed = true;
-        }
-      }
-    }
-    return currentBoard;
-  };
-
-  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) ==========
+  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) mit Gravity ==========
   const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
     let totalCleared = 0;
     const deleteChain = (cells: [number, number][]) => {
@@ -461,7 +407,8 @@ export function ScndDropGame() {
       }
     }
 
-    applyGravityWithRotation(newBoard);
+    // Nach dem Löschen: Gravity anwenden
+    applyGravity(newBoard);
     return { rowsCleared: totalCleared };
   };
 
@@ -473,7 +420,7 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== MERGE (Block ins Board einfügen, Power-Ups auslösen) ==========
+  // ========== MERGE ==========
   const mergePiece = () => {
     if (!currentPiece) return;
     let newBoard = board.map(row => [...row]);
@@ -500,10 +447,8 @@ export function ScndDropGame() {
 
     const { rowsCleared } = clearLineGroups(newBoard);
 
-    // Power-Ups auslösen, wenn sie Teil einer gelöschten Linie waren
+    // Power-Ups auslösen, die Teil einer gelöschten Gruppe waren
     for (const block of powerUpBlocks) {
-      // Prüfen, ob der Block in einer der gelöschten Gruppen lag
-      // Vereinfacht: löse immer aus, wenn er überhaupt im Board ist (wird beim nächsten Merge sowieso gelöscht)
       triggerPowerUpEffect(block.effect, block.x, block.y);
     }
 
@@ -620,12 +565,12 @@ export function ScndDropGame() {
     return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
   }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending]);
 
-  // ========== DAUERHAFTE GRAVITATION (alle 200 ms) ==========
+  // ========== DAUERHAFTE GRAVITÄT (alle 200 ms) ==========
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
       gravityIntervalRef.current = setInterval(() => {
-        setBoard(prevBoard => applyGravityWithRotation(prevBoard.map(row => [...row])));
+        setBoard(prevBoard => applyGravity(prevBoard.map(row => [...row])));
       }, 200);
     } else {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
