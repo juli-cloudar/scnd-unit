@@ -1006,9 +1006,9 @@ export function ScndDropGame() {
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black/95 border-t border-[#FF4400]/30 py-3 z-50">
           <div className="flex justify-between items-center px-6 max-w-sm mx-auto">
             <div className="flex gap-4">
-              {[['◀',()=>movePiece(-1,0)],['▼',()=>movePiece(0,1)],['▶',()=>movePiece(1,0)]].map(([lbl,fn])=>(
-                <button key={lbl as string}
-                  onTouchStart={e=>{e.preventDefault();(fn as ()=>void)();}}
+              {([['◀',()=>movePiece(-1,0)],['▼',()=>movePiece(0,1)],['▶',()=>movePiece(1,0)]] as [string,()=>void][]).map(([lbl,fn])=>(
+                <button key={lbl}
+                  onTouchStart={e=>{e.preventDefault();fn();}}
                   className="w-14 h-14 bg-black border-2 border-[#FF4400] rounded-full flex items-center justify-center text-white text-xl font-bold active:scale-90 transition-all"
                   style={{touchAction:'none',userSelect:'none'}}>
                   {lbl}
