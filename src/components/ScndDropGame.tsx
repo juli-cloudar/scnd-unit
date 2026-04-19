@@ -83,10 +83,9 @@ export function ScndDropGame() {
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
-  
-  // Ghost Mode für Spawn
-  const [isGhostMode, setIsGhostMode] = useState(false);
-  const ghostTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ghost-Phase: Block ignoriert liegende Blöcke für kurze Zeit
+  const [ghostPhase, setGhostPhase] = useState(false);
 
   // Rotation (visuell)
   const [rotation, setRotation] = useState<Rotation>(0);
@@ -120,6 +119,7 @@ export function ScndDropGame() {
     });
   };
 
+  // Bewegungsumrechnung (Bildschirm -> intern)
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -130,6 +130,7 @@ export function ScndDropGame() {
     }
   };
 
+  // Bildschirmkoordinaten (Pixel) in Board-Zellen umrechnen (rotationsunabhängig)
   const screenToBoard = (screenX: number, screenY: number): { x: number; y: number } => {
     const cs = getCellSize();
     const centerX = (BOARD_WIDTH * cs) / 2;
@@ -149,7 +150,7 @@ export function ScndDropGame() {
     return { x: Math.floor(boardX), y: Math.floor(boardY) };
   };
 
-  // Spawn immer exakt an der oberen Bildschirmmitte (rotationsunabhängig)
+  // Spawn-Position: IMMER visuell oben (Mitte) – rotationsunabhängig, keine Verschiebung
   const getSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
     const cs = getCellSize();
     const screenX = (BOARD_WIDTH * cs) / 2;
@@ -164,26 +165,23 @@ export function ScndDropGame() {
     return { x: startX, y: startY };
   };
 
-  const collision = (shape: number[][], offsetX: number, offsetY: number, ignoreBoard = false) => {
+  // Kollisionsprüfung mit Ghost-Phase: Während ghostPhase ignorieren wir liegende Blöcke (aber nicht die Wände)
+  const collision = (shape: number[][], offsetX: number, offsetY: number, ignoreGhostPhase: boolean = false) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
         if (shape[y][x] !== 0) {
           const boardX = offsetX + x, boardY = offsetY + y;
           if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
-          if (!ignoreBoard && boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
+          // Während Ghost-Phase ignorieren wir liegende Blöcke
+          if (!ignoreGhostPhase && ghostPhase) continue;
+          if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
         }
       }
     }
     return false;
   };
 
-  // Ghost-Modus beenden
-  const disableGhostMode = () => {
-    if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
-    setIsGhostMode(false);
-  };
-
-  // Gravity etc. (unverändert)
+  // ========== ROTATIONSUNABHÄNGIGE GRAVITATION ==========
   const applyGravityWithRotation = (currentBoard: any[][]) => {
     const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
     const queue: [number, number][] = [];
@@ -241,6 +239,7 @@ export function ScndDropGame() {
     return currentBoard;
   };
 
+  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) ==========
   const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
     let totalCleared = 0;
     const deleteChain = (cells: [number, number][]) => {
@@ -344,13 +343,11 @@ export function ScndDropGame() {
     const { x, y } = getSpawnPosition(piece.shape);
     setPieceX(x);
     setPieceY(y);
-    
-    // Ghost-Modus aktivieren
-    setIsGhostMode(true);
-    if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
-    ghostTimerRef.current = setTimeout(() => {
-      setIsGhostMode(false);
-    }, 2000); // 2 Sekunden Gnadenfrist
+    // Ghost-Phase aktivieren: 500ms lang keine Kollision mit liegenden Blöcken
+    setGhostPhase(true);
+    setTimeout(() => {
+      setGhostPhase(false);
+    }, 500);
   };
 
   const endGame = () => {
@@ -360,7 +357,6 @@ export function ScndDropGame() {
     setIsPaused(false);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-    if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
     if (!showNameInput && !isSaving) {
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
@@ -430,10 +426,12 @@ export function ScndDropGame() {
     setBoard(newBoard);
     checkAndRotate();
 
-    // Nach erfolgreichem Merge Ghost-Modus deaktivieren
-    disableGhostMode();
-
-    // Prüfen ob weiterer Spawn möglich (einfach nur neues Teil erzeugen – keine Kollisionsprüfung nötig)
+    // Prüfen, ob neuer Block spawnen kann – hier verwenden wir die normale Kollision (ohne Ghost-Phase)
+    const { x: spawnX, y: spawnY } = getSpawnPosition(currentPiece.shape);
+    if (collision(currentPiece.shape, spawnX, spawnY, true)) {
+      endGame();
+      return;
+    }
     spawnNewPiece();
   };
 
@@ -442,17 +440,11 @@ export function ScndDropGame() {
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
-    
-    // Im Ghost-Modus ignorieren wir Kollision mit anderen Blöcken (nur Wandkollision)
-    const ignoreBoard = isGhostMode;
-    if (!collision(currentPiece.shape, newX, newY, ignoreBoard)) {
+    // Kollision unter Berücksichtigung der Ghost-Phase
+    if (!collision(currentPiece.shape, newX, newY)) {
       setPieceX(newX);
       setPieceY(newY);
     } else if (screenDy === 1) {
-      // Fall: Block würde mit Wand oder (wenn nicht Ghost) mit anderem Block kollidieren
-      // Wenn Ghost-Modus aktiv und nur Wandkollision, dann trotzdem mergen? 
-      // Eigentlich soll Ghost nur Blöcke ignorieren, Wände aber nicht.
-      // Bei Wandkollision oder nach Ghost-Ablauf wird gemerged.
       mergePiece();
     }
   };
@@ -462,9 +454,7 @@ export function ScndDropGame() {
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
-    // Drehung erlaubt auch im Ghost-Modus (Kollision mit Blöcken ignorieren)
-    const ignoreBoard = isGhostMode;
-    if (!collision(rotated, pieceX, pieceY, ignoreBoard)) {
+    if (!collision(rotated, pieceX, pieceY)) {
       setCurrentPiece({ ...currentPiece, shape: rotated });
     }
   };
@@ -489,7 +479,7 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending, isGhostMode]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending, ghostPhase]);
 
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
@@ -522,7 +512,7 @@ export function ScndDropGame() {
 
   useEffect(() => { movePieceRef.current = movePiece; }, [movePiece]);
 
-  // Dauerhafte Schwerkraft
+  // Dauerhafte Schwerkraft (alle 200 ms)
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
@@ -642,7 +632,6 @@ export function ScndDropGame() {
       setIsPaused(false);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-      if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
       if (!showNameInput && !isSaving) {
         const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
         if (score > 0 && isHighscore) {
@@ -662,13 +651,14 @@ export function ScndDropGame() {
   const handleRestart = () => { setIsPaused(false); startGame(); };
   const handleGiveUp = () => { setIsPaused(false); giveUp(); };
 
+  // Ghost-Position (für Anzeige)
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
       const { dx, dy } = translateMove(0, 1);
       const nextX = testX + dx;
       const nextY = testY + dy;
-      if (collision(currentPiece.shape, nextX, nextY, false)) break;
+      if (collision(currentPiece.shape, nextX, nextY)) break;
       testX = nextX;
       testY = nextY;
     }
@@ -755,7 +745,7 @@ export function ScndDropGame() {
       ctx.globalAlpha = 1;
       const glowIntensity = 10 + 5 * Math.sin(pulseValue);
       ctx.shadowBlur = glowIntensity;
-      ctx.shadowColor = isGhostMode ? '#AAAAFF' : 'white';
+      ctx.shadowColor = 'white';
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 4;
       for (let y = 0; y < currentPiece.shape.length; y++) {
@@ -795,7 +785,7 @@ export function ScndDropGame() {
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending, isGhostMode]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending, ghostPhase]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -841,7 +831,6 @@ export function ScndDropGame() {
           {fastForwardActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[7px] rounded-full animate-pulse">⏩ FAST</span>}
           {scndBonusActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[7px] rounded-full animate-pulse">⭐ 3x</span>}
           {activePowerUp && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[7px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
-          {isGhostMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#AAAAFF]/20 text-[#AAAAFF] text-[7px] rounded-full animate-pulse">👻 GHOST</span>}
         </div>
         {bonusMessage.show && (
           <div className="mt-1 animate-bounce">
@@ -900,7 +889,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste (unverändert) */}
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
