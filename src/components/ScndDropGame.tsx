@@ -83,6 +83,10 @@ export function ScndDropGame() {
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
+  
+  // Ghost Mode für Spawn
+  const [isGhostMode, setIsGhostMode] = useState(false);
+  const ghostTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Rotation (visuell)
   const [rotation, setRotation] = useState<Rotation>(0);
@@ -145,49 +149,41 @@ export function ScndDropGame() {
     return { x: Math.floor(boardX), y: Math.floor(boardY) };
   };
 
-
-  const findFreeSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
-  const cs = getCellSize();
-  const screenX = (BOARD_WIDTH * cs) / 2;
-  const screenY = 0;
-  const { x: idealX, y: idealY } = screenToBoard(screenX, screenY);
-  const pieceWidth = pieceShape[0].length;
-  const pieceHeight = pieceShape.length;
-
-  // Offsets in internen Zellen (die durch screenToBoard bereits rotationsunabhängig sind)
-  const offsets = [
-    { dx: 0, dy: 0 },                     // Ideal
-    { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, // links/rechts
-    { dx: 0, dy: 1 }, { dx: 0, dy: -1 }, // unten/oben
-    { dx: 2, dy: 0 }, { dx: -2, dy: 0 },
-    { dx: 1, dy: 1 }, { dx: -1, dy: 1 }, { dx: 1, dy: -1 }, { dx: -1, dy: -1 }
-  ];
-
-  for (const offset of offsets) {
-    let startX = idealX + offset.dx;
-    let startY = idealY + offset.dy;
+  // Spawn immer exakt an der oberen Bildschirmmitte (rotationsunabhängig)
+  const getSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
+    const cs = getCellSize();
+    const screenX = (BOARD_WIDTH * cs) / 2;
+    const screenY = 0;
+    const { x, y } = screenToBoard(screenX, screenY);
+    const pieceWidth = pieceShape[0].length;
+    const pieceHeight = pieceShape.length;
+    let startX = Math.floor(x - pieceWidth / 2);
+    let startY = y;
     startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
     startY = Math.min(Math.max(0, startY), BOARD_HEIGHT - pieceHeight);
-    if (!collision(pieceShape, startX, startY)) {
-      return { x: startX, y: startY };
-    }
-  }
-  return null;
-};
+    return { x: startX, y: startY };
+  };
 
-  const collision = (shape: number[][], offsetX: number, offsetY: number) => {
+  const collision = (shape: number[][], offsetX: number, offsetY: number, ignoreBoard = false) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
         if (shape[y][x] !== 0) {
           const boardX = offsetX + x, boardY = offsetY + y;
           if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
-          if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
+          if (!ignoreBoard && boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
         }
       }
     }
     return false;
   };
 
+  // Ghost-Modus beenden
+  const disableGhostMode = () => {
+    if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
+    setIsGhostMode(false);
+  };
+
+  // Gravity etc. (unverändert)
   const applyGravityWithRotation = (currentBoard: any[][]) => {
     const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
     const queue: [number, number][] = [];
@@ -291,7 +287,7 @@ export function ScndDropGame() {
         }
       }
     }
-    // Diagonal ↙
+    // Diagonal (links oben -> rechts unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
         let runLen = 0, y = startRow, x = startCol;
@@ -303,7 +299,7 @@ export function ScndDropGame() {
         }
       }
     }
-    // Diagonal ↗
+    // Diagonal (rechts oben -> links unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
         let runLen = 0, y = startRow, x = startCol;
@@ -334,6 +330,7 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
+  // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
     if (rotationPending) {
       setTimeout(() => spawnNewPiece(), 100);
@@ -344,13 +341,16 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const spawnPos = findFreeSpawnPosition(piece.shape);
-    if (!spawnPos) {
-      endGame();
-      return;
-    }
-    setPieceX(spawnPos.x);
-    setPieceY(spawnPos.y);
+    const { x, y } = getSpawnPosition(piece.shape);
+    setPieceX(x);
+    setPieceY(y);
+    
+    // Ghost-Modus aktivieren
+    setIsGhostMode(true);
+    if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
+    ghostTimerRef.current = setTimeout(() => {
+      setIsGhostMode(false);
+    }, 2000); // 2 Sekunden Gnadenfrist
   };
 
   const endGame = () => {
@@ -360,6 +360,7 @@ export function ScndDropGame() {
     setIsPaused(false);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+    if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
     if (!showNameInput && !isSaving) {
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
@@ -429,11 +430,10 @@ export function ScndDropGame() {
     setBoard(newBoard);
     checkAndRotate();
 
-    const testSpawn = findFreeSpawnPosition(currentPiece.shape);
-    if (!testSpawn) {
-      endGame();
-      return;
-    }
+    // Nach erfolgreichem Merge Ghost-Modus deaktivieren
+    disableGhostMode();
+
+    // Prüfen ob weiterer Spawn möglich (einfach nur neues Teil erzeugen – keine Kollisionsprüfung nötig)
     spawnNewPiece();
   };
 
@@ -442,10 +442,17 @@ export function ScndDropGame() {
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
-    if (!collision(currentPiece.shape, newX, newY)) {
+    
+    // Im Ghost-Modus ignorieren wir Kollision mit anderen Blöcken (nur Wandkollision)
+    const ignoreBoard = isGhostMode;
+    if (!collision(currentPiece.shape, newX, newY, ignoreBoard)) {
       setPieceX(newX);
       setPieceY(newY);
     } else if (screenDy === 1) {
+      // Fall: Block würde mit Wand oder (wenn nicht Ghost) mit anderem Block kollidieren
+      // Wenn Ghost-Modus aktiv und nur Wandkollision, dann trotzdem mergen? 
+      // Eigentlich soll Ghost nur Blöcke ignorieren, Wände aber nicht.
+      // Bei Wandkollision oder nach Ghost-Ablauf wird gemerged.
       mergePiece();
     }
   };
@@ -455,7 +462,9 @@ export function ScndDropGame() {
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
-    if (!collision(rotated, pieceX, pieceY)) {
+    // Drehung erlaubt auch im Ghost-Modus (Kollision mit Blöcken ignorieren)
+    const ignoreBoard = isGhostMode;
+    if (!collision(rotated, pieceX, pieceY, ignoreBoard)) {
       setCurrentPiece({ ...currentPiece, shape: rotated });
     }
   };
@@ -465,6 +474,7 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
+  // Tastatur
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -479,7 +489,7 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending, isGhostMode]);
 
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
@@ -489,6 +499,7 @@ export function ScndDropGame() {
     return delay;
   };
 
+  // Game Loop (fallender Block)
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -511,6 +522,7 @@ export function ScndDropGame() {
 
   useEffect(() => { movePieceRef.current = movePiece; }, [movePiece]);
 
+  // Dauerhafte Schwerkraft
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
@@ -523,6 +535,7 @@ export function ScndDropGame() {
     return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
   }, [isPlaying, gameOver, isPaused]);
 
+  // Pulsieren
   useEffect(() => {
     let animFrame: number;
     const step = () => {
@@ -533,6 +546,7 @@ export function ScndDropGame() {
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
+  // Partikel Lebensdauer
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
@@ -541,6 +555,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
+  // Scroll-Verhalten
   const isElementInViewport = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     return rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -627,6 +642,7 @@ export function ScndDropGame() {
       setIsPaused(false);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+      if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
       if (!showNameInput && !isSaving) {
         const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
         if (score > 0 && isHighscore) {
@@ -652,7 +668,7 @@ export function ScndDropGame() {
       const { dx, dy } = translateMove(0, 1);
       const nextX = testX + dx;
       const nextY = testY + dy;
-      if (collision(currentPiece.shape, nextX, nextY)) break;
+      if (collision(currentPiece.shape, nextX, nextY, false)) break;
       testX = nextX;
       testY = nextY;
     }
@@ -739,7 +755,7 @@ export function ScndDropGame() {
       ctx.globalAlpha = 1;
       const glowIntensity = 10 + 5 * Math.sin(pulseValue);
       ctx.shadowBlur = glowIntensity;
-      ctx.shadowColor = 'white';
+      ctx.shadowColor = isGhostMode ? '#AAAAFF' : 'white';
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 4;
       for (let y = 0; y < currentPiece.shape.length; y++) {
@@ -779,7 +795,7 @@ export function ScndDropGame() {
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending, isGhostMode]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -825,6 +841,7 @@ export function ScndDropGame() {
           {fastForwardActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[7px] rounded-full animate-pulse">⏩ FAST</span>}
           {scndBonusActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[7px] rounded-full animate-pulse">⭐ 3x</span>}
           {activePowerUp && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[7px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
+          {isGhostMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#AAAAFF]/20 text-[#AAAAFF] text-[7px] rounded-full animate-pulse">👻 GHOST</span>}
         </div>
         {bonusMessage.show && (
           <div className="mt-1 animate-bounce">
@@ -883,7 +900,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste */}
+        {/* Rechte Seitenleiste (unverändert) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
