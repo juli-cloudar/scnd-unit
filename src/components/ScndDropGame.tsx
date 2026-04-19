@@ -7,15 +7,12 @@ const BOARD_WIDTH = 20;
 const BOARD_HEIGHT = 20;
 type Rotation = 0 | 90 | 180 | 270;
 
-// Zellgröße: auf Handy nicht größer als verfügbare Breite/Höhe
 const getCellSize = () => {
   if (typeof window === 'undefined') return 24;
-  const maxWidth = window.innerWidth - 40; // Abzug für Padding
-  const maxHeight = window.innerHeight - 280; // Platz für Header + Touch-Controls
-  let cellByWidth = Math.floor(maxWidth / BOARD_WIDTH);
-  let cellByHeight = Math.floor(maxHeight / BOARD_HEIGHT);
-  let cell = Math.min(cellByWidth, cellByHeight, 28); // max 28px
-  return Math.max(cell, 12);
+  // Für Handy: Begrenzung auf max. 32px, aber nicht zu klein
+  const width = window.innerWidth;
+  const maxCell = Math.floor((width - 40) / BOARD_WIDTH);
+  return Math.min(Math.max(16, maxCell), 32);
 };
 
 const TETROMINOS = [
@@ -131,24 +128,42 @@ export function ScndDropGame() {
     }
   };
 
-  // Spawn-Position: immer an der visuell oberen Kante, abhängig von Rotation
-  const getSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
-    const pieceWidth = pieceShape[0].length;
-    const pieceHeight = pieceShape.length;
+  // Bildschirmkoordinaten (Pixel) in Board-Zellen umrechnen (rotationsunabhängig)
+  const screenToBoard = (screenX: number, screenY: number): { x: number; y: number } => {
+    const cs = getCellSize();
+    const centerX = (BOARD_WIDTH * cs) / 2;
+    const centerY = (BOARD_HEIGHT * cs) / 2;
+    let dx = screenX - centerX;
+    let dy = screenY - centerY;
     switch (rotation) {
-      case 0:   // oben (y=0)
-        return { x: Math.floor((BOARD_WIDTH - pieceWidth) / 2), y: 0 };
-      case 90:  // rechts (x=BOARD_WIDTH-1)
-        return { x: BOARD_WIDTH - pieceWidth, y: Math.floor((BOARD_HEIGHT - pieceHeight) / 2) };
-      case 180: // unten (y=BOARD_HEIGHT-1)
-        return { x: Math.floor((BOARD_WIDTH - pieceWidth) / 2), y: BOARD_HEIGHT - pieceHeight };
-      case 270: // links (x=0)
-        return { x: 0, y: Math.floor((BOARD_HEIGHT - pieceHeight) / 2) };
-      default: return { x: 0, y: 0 };
+      case 90: { const tmp = dx; dx = -dy; dy = tmp; break; }
+      case 180: dx = -dx; dy = -dy; break;
+      case 270: { const tmp = dx; dx = dy; dy = -tmp; break; }
+      default: break;
     }
+    let boardX = (dx + centerX) / cs;
+    let boardY = (dy + centerY) / cs;
+    boardX = Math.min(Math.max(0, boardX), BOARD_WIDTH - 1);
+    boardY = Math.min(Math.max(0, boardY), BOARD_HEIGHT - 1);
+    return { x: Math.floor(boardX), y: Math.floor(boardY) };
   };
 
-  // Kollision mit optionaler GhostFall-Option
+  // NEU: Spawn-Position immer exakt in der Mitte der oberen Bildschirmkante (rotationsunabhängig)
+  const getFixedSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
+    const pieceWidth = pieceShape[0].length;
+    const pieceHeight = pieceShape.length;
+    const cs = getCellSize();
+    const screenX = (BOARD_WIDTH * cs) / 2;
+    const screenY = 0;
+    const { x, y } = screenToBoard(screenX, screenY);
+    let startX = Math.floor(x - pieceWidth / 2);
+    let startY = y;
+    startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
+    startY = Math.min(Math.max(0, startY), BOARD_HEIGHT - pieceHeight);
+    return { x: startX, y: startY };
+  };
+
+  // Kollision mit optionaler Rücksicht auf GhostFall
   const collisionWithGhost = (shape: number[][], offsetX: number, offsetY: number, ignoreBlocks: boolean) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -293,7 +308,7 @@ export function ScndDropGame() {
         }
       }
     }
-    // Diagonal ↙
+    // Diagonal
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
         let runLen = 0, y = startRow, x = startCol;
@@ -305,7 +320,6 @@ export function ScndDropGame() {
         }
       }
     }
-    // Diagonal ↗
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
         let runLen = 0, y = startRow, x = startCol;
@@ -347,7 +361,8 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const spawnPos = getSpawnPosition(piece.shape);
+    // Feste Spawn-Position (immer oben, keine Verschiebung)
+    const spawnPos = getFixedSpawnPosition(piece.shape);
     setPieceX(spawnPos.x);
     setPieceY(spawnPos.y);
     
@@ -357,7 +372,7 @@ export function ScndDropGame() {
       setGhostFallActive(false);
     }, 600);
     
-    // Prüfen, ob sofort Merge nötig (falls Block am Boden oder Wand)
+    // Prüfen, ob nach dem Spawn sofort Game Over (Block kann sich nicht bewegen)
     const { dx, dy } = translateMove(0, 1);
     if (collisionWithGhost(piece.shape, spawnPos.x + dx, spawnPos.y + dy, false)) {
       mergePiece();
@@ -404,15 +419,16 @@ export function ScndDropGame() {
 
     const { rowsCleared } = clearLineGroups(newBoard);
 
-    const points = [0, 40, 100, 300, 1200];
+    // Punkte: Basis 40/100/300/1200 -> mal 10 = 400/1000/3000/12000
+    const points = [0, 400, 1000, 3000, 12000];
     let addedScore = points[Math.min(rowsCleared, 4)];
     if (rowsCleared > 0) {
       const newCombo = combo + 1;
       setCombo(newCombo);
-      let multiplier = 1 + newCombo * 0.15;
+      let multiplier = 1 + newCombo * 0.3; // 0.3 pro Combo (statt 0.15)
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
-      addedScore *= 2;
+      addedScore *= 2; // ORANGE + GRAU = 2x
       showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
@@ -440,10 +456,8 @@ export function ScndDropGame() {
     setBoard(newBoard);
     checkAndRotate();
 
-    // Prüfen, ob nächster Block spawnen kann
-    const testPiece = TETROMINOS[0];
-    const testSpawn = getSpawnPosition(testPiece.shape);
-    if (collision(testPiece.shape, testSpawn.x, testSpawn.y)) {
+    const testSpawn = getFixedSpawnPosition(currentPiece.shape);
+    if (collision(currentPiece.shape, testSpawn.x, testSpawn.y)) {
       endGame();
       return;
     }
@@ -551,7 +565,9 @@ export function ScndDropGame() {
   }, [isPlaying, gameOver, isPaused]);
 
   useEffect(() => {
-    const handleResize = () => setCellSize(getCellSize());
+    const handleResize = () => {
+      setCellSize(getCellSize());
+    };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -830,20 +846,18 @@ export function ScndDropGame() {
       </div>
 
       <div ref={gameContainerRef} className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 justify-center items-center md:items-start px-2 py-1">
-        <div className="flex justify-center items-center">
-          <div className="relative" style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 200px)' }}>
+        <div className="flex justify-center items-center w-full md:w-auto">
+          <div className="relative w-full max-w-full">
             <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
             <canvas
               ref={canvasRef}
-              className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl"
+              className="relative border-2 md:border-4 border-[#FF4400] rounded-lg shadow-2xl w-full h-auto"
               style={{
-                width: BOARD_WIDTH * cellSize,
-                height: BOARD_HEIGHT * cellSize,
+                width: '100%',
+                height: 'auto',
+                aspectRatio: `${BOARD_WIDTH} / ${BOARD_HEIGHT}`,
                 transform: `rotate(${rotation}deg)`,
-                transition: 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)',
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain'
+                transition: 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)'
               }}
             />
 
