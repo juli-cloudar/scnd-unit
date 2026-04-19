@@ -99,13 +99,17 @@ export function ScndDropGame() {
     if (canvasRef.current) {
       canvasRef.current.style.transform = `rotate(${newRot}deg)`;
       canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-      // Event-Listener für das Ende der Transition
       const onTransitionEnd = () => {
         setRotationPending(false);
-        if (needsRespawnAfterRotation) {
-          setNeedsRespawnAfterRotation(false);
-          spawnNewPiece();
-        }
+        // Nach der Transition: sicherstellen, dass Layout aktualisiert ist
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (needsRespawnAfterRotation) {
+              setNeedsRespawnAfterRotation(false);
+              spawnNewPiece();
+            }
+          }, 0);
+        });
         canvasRef.current?.removeEventListener('transitionend', onTransitionEnd);
       };
       canvasRef.current.addEventListener('transitionend', onTransitionEnd);
@@ -136,8 +140,8 @@ export function ScndDropGame() {
     }
   };
 
-  const screenToBoard = (screenX: number, screenY: number): { x: number; y: number } => {
-    const cs = getCellSize();
+  // Bildschirmkoordinaten (Pixel relativ zum Canvas) in Board-Zellen umrechnen (rotationsunabhängig)
+  const screenToBoard = (screenX: number, screenY: number, cs: number): { x: number; y: number } => {
     const centerX = (BOARD_WIDTH * cs) / 2;
     const centerY = (BOARD_HEIGHT * cs) / 2;
     let dx = screenX - centerX;
@@ -155,13 +159,17 @@ export function ScndDropGame() {
     return { x: Math.floor(boardX), y: Math.floor(boardY) };
   };
 
+  // Spawn-Position immer exakt in der Mitte der oberen Bildschirmkante
   const getFixedSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const cs = rect.width / BOARD_WIDTH; // tatsächliche Zellengröße in Pixeln
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
-    const cs = getCellSize();
-    const screenX = (BOARD_WIDTH * cs) / 2;
-    const screenY = 0;
-    const { x, y } = screenToBoard(screenX, screenY);
+    const screenX = rect.width / 2;   // Mitte horizontal
+    const screenY = 0;                // oberer Rand
+    const { x, y } = screenToBoard(screenX, screenY, cs);
     let startX = Math.floor(x - pieceWidth / 2);
     let startY = y;
     startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
@@ -666,7 +674,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen
+  // Canvas zeichnen (unverändert, aber mit den aktuellen Werten)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
