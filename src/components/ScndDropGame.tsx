@@ -103,8 +103,6 @@ export function ScndDropGame() {
   const [doubleScoreActive, setDoubleScoreActive] = useState(false);
   const [shieldActive, setShieldActive] = useState(false);
   const gameLoopRef = useRef<number | null>(null);
-  const gravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const fastGravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
@@ -214,18 +212,62 @@ export function ScndDropGame() {
     setPieceY(spawnPos.y);
   };
 
-  // ========== EINFACHE SPALTENWEISE GRAVITÄT (robust, ohne Flood Fill) ==========
-  const applyGravity = (currentBoard: any[][]) => {
+  // ========== ROTATIONSUNABHÄNGIGE GRAVITÄT (Flood Fill + Fall in visuelle Unterseite) ==========
+  const applyGravityWithRotation = (currentBoard: any[][]) => {
+    // 1. Verankerung bestimmen (Flood Fill von allen Wänden)
+    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
+    const queue: [number, number][] = [];
+
     for (let x = 0; x < BOARD_WIDTH; x++) {
-      const columnBlocks: any[] = [];
-      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-        if (currentBoard[y][x] !== null) {
-          columnBlocks.push(currentBoard[y][x]);
-          currentBoard[y][x] = null;
+      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
+      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
+    }
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
+      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
+    }
+
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    while (queue.length) {
+      const [y, x] = queue.shift()!;
+      for (const [dy, dx] of dirs) {
+        const ny = y + dy, nx = x + dx;
+        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
+          anchored[ny][nx] = true;
+          queue.push([ny, nx]);
         }
       }
-      for (let i = 0; i < columnBlocks.length; i++) {
-        currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
+    }
+
+    // 2. Fallrichtung bestimmen (visuell unten -> intern via translateMove)
+    const fallDir = translateMove(0, 1);
+    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
+
+    // 3. Nicht verankerte Blöcke in Fallrichtung verschieben (mehrere Durchläufe)
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const blocks: { y: number, x: number, block: any }[] = [];
+      for (let y = 0; y < BOARD_HEIGHT; y++) {
+        for (let x = 0; x < BOARD_WIDTH; x++) {
+          if (currentBoard[y][x] !== null && !anchored[y][x]) {
+            blocks.push({ y, x, block: currentBoard[y][x] });
+          }
+        }
+      }
+      if (fallDir.dy > 0) blocks.sort((a,b) => b.y - a.y);
+      else if (fallDir.dy < 0) blocks.sort((a,b) => a.y - b.y);
+      if (fallDir.dx > 0) blocks.sort((a,b) => b.x - a.x);
+      else if (fallDir.dx < 0) blocks.sort((a,b) => a.x - b.x);
+
+      for (const { y, x, block } of blocks) {
+        const newX = x + fallDir.dx;
+        const newY = y + fallDir.dy;
+        if (newX >= 0 && newX < BOARD_WIDTH && newY >= 0 && newY < BOARD_HEIGHT && currentBoard[newY][newX] === null) {
+          currentBoard[y][x] = null;
+          currentBoard[newY][newX] = block;
+          changed = true;
+        }
       }
     }
     return currentBoard;
@@ -251,7 +293,8 @@ export function ScndDropGame() {
             }
           }
         }
-        setBoard(applyGravity(newBoard));
+        const boardWithGravity = applyGravityWithRotation(newBoard);
+        setBoard(boardWithGravity);
         break;
       }
       case 'laser': {
@@ -262,7 +305,8 @@ export function ScndDropGame() {
             burstParticles(col * cellSize + cellSize/2, y * cellSize + cellSize/2, 3);
           }
         }
-        setBoard(applyGravity(newBoard));
+        const boardWithGravity = applyGravityWithRotation(newBoard);
+        setBoard(boardWithGravity);
         break;
       }
       case 'colorBlast': {
@@ -278,7 +322,8 @@ export function ScndDropGame() {
             return cell;
           })
         );
-        setBoard(applyGravity(newBoard));
+        const boardWithGravity = applyGravityWithRotation(newBoard);
+        setBoard(boardWithGravity);
         break;
       }
       case 'scndBonus':
@@ -290,7 +335,7 @@ export function ScndDropGame() {
         setTimeout(() => setFreezeMode(false), 3000);
         break;
       case 'gravity': {
-        const newBoard = applyGravity(board.map(row => [...row]));
+        const newBoard = applyGravityWithRotation(board.map(row => [...row]));
         setBoard(newBoard);
         break;
       }
@@ -323,7 +368,8 @@ export function ScndDropGame() {
             burstParticles(col * cellSize + cellSize/2, row * cellSize + cellSize/2, 3);
           }
         }
-        setBoard(applyGravity(newBoard));
+        const boardWithGravity = applyGravityWithRotation(newBoard);
+        setBoard(boardWithGravity);
         break;
       }
       case 'fastForward':
@@ -348,7 +394,8 @@ export function ScndDropGame() {
             newBoard[y][x] = allBlocks[idx++];
           }
         }
-        setBoard(applyGravity(newBoard));
+        const boardWithGravity = applyGravityWithRotation(newBoard);
+        setBoard(boardWithGravity);
         for (let i = 0; i < 100; i++) {
           setTimeout(() => {
             burstParticles(Math.random() * BOARD_WIDTH * cellSize, Math.random() * BOARD_HEIGHT * cellSize, 1);
@@ -418,7 +465,8 @@ export function ScndDropGame() {
             }
           }
         }
-        setBoard(applyGravity(newBoard));
+        const boardWithGravity = applyGravityWithRotation(newBoard);
+        setBoard(boardWithGravity);
         break;
       }
       case 'shield':
@@ -464,7 +512,8 @@ export function ScndDropGame() {
             burstParticles(meteorX * cellSize + cellSize/2, ny * cellSize + cellSize/2, 10);
           }
         }
-        setBoard(applyGravity(newBoard));
+        const boardWithGravity = applyGravityWithRotation(newBoard);
+        setBoard(boardWithGravity);
         break;
       }
       default: break;
@@ -574,8 +623,8 @@ export function ScndDropGame() {
       }
     }
 
-    applyGravity(newBoard);
-    return { rowsCleared: totalCleared, extraScore };
+    const boardWithGravity = applyGravityWithRotation(newBoard);
+    return { rowsCleared: totalCleared, extraScore, board: boardWithGravity };
   };
 
   const burstParticles = (cx: number, cy: number, count: number) => {
@@ -624,7 +673,8 @@ export function ScndDropGame() {
       }
     }
 
-    const { rowsCleared, extraScore } = clearLineGroups(newBoard);
+    const { rowsCleared, extraScore, board: afterGravity } = clearLineGroups(newBoard);
+    newBoard = afterGravity;
 
     for (const block of powerUpBlocks) {
       triggerPowerUpEffect(block.effect, block.x, block.y);
@@ -760,32 +810,6 @@ export function ScndDropGame() {
     return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
   }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, shieldActive]);
 
-  // ========== DAUERHAFTE GRAVITY (alle 200 ms) ==========
-  useEffect(() => {
-    if (isPlaying && !gameOver && !isPaused) {
-      if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-      gravityIntervalRef.current = setInterval(() => {
-        setBoard(prevBoard => applyGravity(prevBoard.map(row => [...row])));
-      }, 200);
-    } else {
-      if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-    }
-    return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
-  }, [isPlaying, gameOver, isPaused]);
-
-  // ========== ZUSÄTZLICHE SCHNELLE GRAVITY (alle 50 ms) ==========
-  useEffect(() => {
-    if (isPlaying && !gameOver && !isPaused) {
-      if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
-      fastGravityIntervalRef.current = setInterval(() => {
-        setBoard(prevBoard => applyGravity(prevBoard.map(row => [...row])));
-      }, 50);
-    } else {
-      if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
-    }
-    return () => { if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current); };
-  }, [isPlaying, gameOver, isPaused]);
-
   // ========== PULSIEREN ==========
   useEffect(() => {
     let animFrame: number;
@@ -861,8 +885,6 @@ export function ScndDropGame() {
     setIsPlaying(false);
     setIsPaused(false);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-    if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-    if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
     if (!showNameInput && !isSaving) {
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
@@ -915,8 +937,6 @@ export function ScndDropGame() {
       setIsPlaying(false);
       setIsPaused(false);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-      if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
       if (!showNameInput && !isSaving) {
         const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
         if (score > 0 && isHighscore) {
