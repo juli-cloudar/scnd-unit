@@ -623,8 +623,9 @@ export function ScndDropGame() {
       }
     }
 
-    const boardWithGravity = applyGravityWithRotation(newBoard);
-    return { rowsCleared: totalCleared, extraScore, board: boardWithGravity };
+    // Gravity anwenden (direkt auf newBoard, kein Return des Boards)
+    applyGravityWithRotation(newBoard);
+    return { rowsCleared: totalCleared, extraScore };
   };
 
   const burstParticles = (cx: number, cy: number, count: number) => {
@@ -673,8 +674,8 @@ export function ScndDropGame() {
       }
     }
 
-    const { rowsCleared, extraScore, board: afterGravity } = clearLineGroups(newBoard);
-    newBoard = afterGravity;
+    const { rowsCleared, extraScore } = clearLineGroups(newBoard);
+    // newBoard wurde durch clearLineGroups verändert (Gravity wurde angewendet)
 
     for (const block of powerUpBlocks) {
       triggerPowerUpEffect(block.effect, block.x, block.y);
