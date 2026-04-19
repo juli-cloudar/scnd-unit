@@ -84,7 +84,7 @@ export function ScndDropGame() {
   const [isSaving, setIsSaving] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
 
-  // Rotation
+  // Rotation (visuell)
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
@@ -116,7 +116,7 @@ export function ScndDropGame() {
     });
   };
 
-  // Bewegungsumrechnung
+  // Bewegungsumrechnung (Bildschirm -> intern) – immer nach unten auf dem Bildschirm
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -127,76 +127,18 @@ export function ScndDropGame() {
     }
   };
 
-  // Bildschirmkoordinaten (Pixel) in Board-Zellen umrechnen (rotationsunabhängig)
-  const screenToBoard = (screenX: number, screenY: number): { x: number; y: number } => {
-    const cs = getCellSize(); // aktuelle Zellengröße
-    const centerX = BOARD_WIDTH * cs / 2;
-    const centerY = BOARD_HEIGHT * cs / 2;
-    let dx = screenX - centerX;
-    let dy = screenY - centerY;
-    // inverse Rotation
-    switch (rotation) {
-      case 90:
-        dx = -dy;
-        dy = screenX - centerX;
-        break;
-      case 180:
-        dx = -dx;
-        dy = -dy;
-        break;
-      case 270:
-        dx = dy;
-        dy = -(screenX - centerX);
-        break;
-      default: break;
-    }
-    let boardX = (dx + centerX) / cs;
-    let boardY = (dy + centerY) / cs;
-    boardX = Math.min(Math.max(0, boardX), BOARD_WIDTH - 1);
-    boardY = Math.min(Math.max(0, boardY), BOARD_HEIGHT - 1);
-    return { x: Math.floor(boardX), y: Math.floor(boardY) };
-  };
-
-  // Spawn-Position: immer in der Mitte der oberen Bildschirmkante
+  // ========== SPAWN-LOGIK: oberste freie Zeile (klassisches Tetris) ==========
   const getSpawnPosition = (pieceShape: number[][]) => {
     const pieceWidth = pieceShape[0].length;
-    const pieceHeight = pieceShape.length;
-    const cs = getCellSize();
-    // Bildschirmkoordinaten: oben, horizontal zentriert
-    const screenX = BOARD_WIDTH * cs / 2;
-    const screenY = 0;
-    const { x, y } = screenToBoard(screenX, screenY);
-    // Block so platzieren, dass seine Mitte auf (x,y) liegt (optional – vereinfacht: linke obere Ecke)
-    let startX = Math.floor(x - pieceWidth / 2);
-    let startY = y;
-    // Begrenzen, damit nicht außerhalb des Boards
-    startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
-    startY = Math.min(Math.max(0, startY), BOARD_HEIGHT - pieceHeight);
-    return { x: startX, y: startY };
-  };
-
-  // Versuche, den Block nach unten (intern) zu verschieben, bis er auf etwas stößt
-  const findLowestValidPosition = (shape: number[][], startX: number, startY: number) => {
-    let testY = startY;
-    while (true) {
-      const nextY = testY + 1;
-      if (collision(shape, startX, nextY)) break;
-      testY = nextY;
+    const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
+    // Suche die oberste Zeile (y von 0 bis BOARD_HEIGHT-1), in der der Block platziert werden kann
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      if (!collision(pieceShape, startX, y)) {
+        return { x: startX, y };
+      }
     }
-    return { x: startX, y: testY };
-  };
-
-  const getGhostPosition = () => {
-    let testX = pieceX, testY = pieceY;
-    while (true) {
-      const { dx, dy } = translateMove(0, 1);
-      const nextX = testX + dx;
-      const nextY = testY + dy;
-      if (collision(currentPiece.shape, nextX, nextY)) break;
-      testX = nextX;
-      testY = nextY;
-    }
-    return { x: testX, y: testY };
+    // Falls keine Zeile frei (Board voll) -> Game Over
+    return null;
   };
 
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
@@ -221,6 +163,7 @@ export function ScndDropGame() {
     return true;
   };
 
+  // Linien löschen (ab 10 Blöcken pro Reihe)
   const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
     const clearedRows: number[] = [];
     const clearedCols: number[] = [];
@@ -285,16 +228,13 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const { x: spawnX, y: spawnY } = getSpawnPosition(piece.shape);
-    // Verschiebe den Block sofort nach unten, bis er auf etwas trifft
-    const { x, y } = findLowestValidPosition(piece.shape, spawnX, spawnY);
-    setPieceX(x);
-    setPieceY(y);
-    // Wenn der Block bereits am unteren Rand oder auf einem Block sitzt, sofort mergen
-    const { dx, dy } = translateMove(0, 1);
-    if (collision(piece.shape, x + dx, y + dy)) {
-      mergePiece();
+    const spawnPos = getSpawnPosition(piece.shape);
+    if (!spawnPos) {
+      endGame();
+      return;
     }
+    setPieceX(spawnPos.x);
+    setPieceY(spawnPos.y);
   };
 
   const endGame = () => {
@@ -486,6 +426,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
+  // Scroll-Verhalten (nur wenn nötig)
   const isElementInViewport = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     return rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -499,7 +440,7 @@ export function ScndDropGame() {
 
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
-      const timer = setTimeout(() => centerCanvasInView(), 200);
+      const timer = setTimeout(centerCanvasInView, 200);
       return () => clearTimeout(timer);
     }
   }, [isPlaying, gameOver, isPaused]);
@@ -598,7 +539,20 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== CANVAS ZEICHNEN ==========
+  // Canvas zeichnen (mit Ghost und visuellen Effekten)
+  const getGhostPosition = () => {
+    let testX = pieceX, testY = pieceY;
+    while (true) {
+      const { dx, dy } = translateMove(0, 1);
+      const nextX = testX + dx;
+      const nextY = testY + dy;
+      if (collision(currentPiece.shape, nextX, nextY)) break;
+      testX = nextX;
+      testY = nextY;
+    }
+    return { x: testX, y: testY };
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -823,6 +777,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
