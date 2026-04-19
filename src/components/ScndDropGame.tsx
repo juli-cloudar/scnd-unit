@@ -99,6 +99,16 @@ export function ScndDropGame() {
     if (canvasRef.current) {
       canvasRef.current.style.transform = `rotate(${newRot}deg)`;
       canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+      // Event-Listener für das Ende der Transition
+      const onTransitionEnd = () => {
+        setRotationPending(false);
+        if (needsRespawnAfterRotation) {
+          setNeedsRespawnAfterRotation(false);
+          spawnNewPiece();
+        }
+        canvasRef.current?.removeEventListener('transitionend', onTransitionEnd);
+      };
+      canvasRef.current.addEventListener('transitionend', onTransitionEnd);
     }
     if (window.navigator.vibrate) window.navigator.vibrate(100);
   };
@@ -110,14 +120,6 @@ export function ScndDropGame() {
         blocksUntilRotation.current = Math.floor(Math.random() * 5) + 1;
         setRotationPending(true);
         changeRotationRandom();
-        setTimeout(() => {
-          setRotationPending(false);
-          // Nach der Rotation: falls ein Spawn ansteht, jetzt ausführen
-          if (needsRespawnAfterRotation) {
-            setNeedsRespawnAfterRotation(false);
-            spawnNewPiece();
-          }
-        }, 500);
         return 0;
       }
       return newCount;
@@ -353,7 +355,6 @@ export function ScndDropGame() {
   // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
     if (rotationPending) {
-      // Spawn nach der Rotation nachholen
       setNeedsRespawnAfterRotation(true);
       return;
     }
@@ -371,7 +372,6 @@ export function ScndDropGame() {
       setGhostFallActive(false);
     }, 600);
     
-    // Sofort prüfen, ob der Block nach dem Spawn sofort mit der Wand kollidiert
     const { dx, dy } = translateMove(0, 1);
     if (collisionWithGhost(piece.shape, spawnPos.x + dx, spawnPos.y + dy, false)) {
       mergePiece();
@@ -454,10 +454,7 @@ export function ScndDropGame() {
     setBoard(newBoard);
     checkAndRotate();
 
-    // **Game Over Prüfung: Kann der nächste Block spawnen?**
-    const nextPiece = TETROMINOS[0]; // Dummy, Form egal – wir prüfen nur die Position
     const testSpawn = getFixedSpawnPosition(currentPiece.shape);
-    // Wenn der Block an der Spawn-Position sofort mit der Wand oder einem liegenden Block kollidieren würde -> Game Over
     if (collision(currentPiece.shape, testSpawn.x, testSpawn.y)) {
       endGame();
       return;
@@ -669,7 +666,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen (unverändert, aber vollständig)
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -894,7 +891,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste – unverändert */}
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
