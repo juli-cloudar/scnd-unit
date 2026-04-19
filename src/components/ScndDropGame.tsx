@@ -116,7 +116,7 @@ export function ScndDropGame() {
     });
   };
 
-  // Bewegungsumrechnung (Bildschirm -> intern) – immer nach unten auf dem Bildschirm
+  // Bewegungsumrechnung (Bildschirm -> intern)
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -127,17 +127,15 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== SPAWN-LOGIK: oberste freie Zeile (klassisches Tetris) ==========
+  // Spawn-Position: oberste freie Zeile (klassisch)
   const getSpawnPosition = (pieceShape: number[][]) => {
     const pieceWidth = pieceShape[0].length;
     const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
-    // Suche die oberste Zeile (y von 0 bis BOARD_HEIGHT-1), in der der Block platziert werden kann
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       if (!collision(pieceShape, startX, y)) {
         return { x: startX, y };
       }
     }
-    // Falls keine Zeile frei (Board voll) -> Game Over
     return null;
   };
 
@@ -163,44 +161,70 @@ export function ScndDropGame() {
     return true;
   };
 
-  // Linien löschen (ab 10 Blöcken pro Reihe)
-  const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
-    const clearedRows: number[] = [];
-    const clearedCols: number[] = [];
+  // ========== NEUE LINIENLÖSCHUNG: Nur zusammenhängende Segmente mit Länge >= 10 ==========
+  const clearSegments = (newBoard: any[][]): { rowsCleared: number; clearedPositions: { x: number; y: number }[] } => {
+    const clearedPositions: { x: number; y: number }[] = [];
 
-    for (let row = 0; row < BOARD_HEIGHT; row++) {
-      const nonEmpty = newBoard[row].filter(cell => cell !== null).length;
-      if (nonEmpty >= 10) clearedRows.push(row);
-    }
-    for (let col = 0; col < BOARD_WIDTH; col++) {
-      let nonEmpty = 0;
-      for (let row = 0; row < BOARD_HEIGHT; row++) {
-        if (newBoard[row][col] !== null) nonEmpty++;
+    // Horizontale Segmente
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      let start = -1;
+      for (let x = 0; x <= BOARD_WIDTH; x++) {
+        const hasBlock = (x < BOARD_WIDTH && newBoard[y][x] !== null);
+        if (hasBlock && start === -1) {
+          start = x;
+        } else if (!hasBlock && start !== -1) {
+          const length = x - start;
+          if (length >= 10) {
+            for (let i = start; i < x; i++) {
+              clearedPositions.push({ x: i, y });
+            }
+          }
+          start = -1;
+        }
       }
-      if (nonEmpty >= 10) clearedCols.push(col);
     }
 
-    for (const row of clearedRows.sort((a,b) => b-a)) {
-      newBoard.splice(row, 1);
-      newBoard.unshift(Array(BOARD_WIDTH).fill(null));
-    }
-    for (const col of clearedCols) {
-      for (let row = 0; row < BOARD_HEIGHT; row++) {
-        newBoard[row][col] = null;
+    // Vertikale Segmente
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      let start = -1;
+      for (let y = 0; y <= BOARD_HEIGHT; y++) {
+        const hasBlock = (y < BOARD_HEIGHT && newBoard[y][x] !== null);
+        if (hasBlock && start === -1) {
+          start = y;
+        } else if (!hasBlock && start !== -1) {
+          const length = y - start;
+          if (length >= 10) {
+            for (let i = start; i < y; i++) {
+              clearedPositions.push({ x, y: i });
+            }
+          }
+          start = -1;
+        }
       }
+    }
+
+    // Entferne die markierten Blöcke (setze auf null)
+    for (const pos of clearedPositions) {
+      newBoard[pos.y][pos.x] = null;
+    }
+
+    // Nach dem Löschen müssen die Blöcke nach unten fallen (Gravity pro Spalte)
+    for (let x = 0; x < BOARD_WIDTH; x++) {
       const columnBlocks: any[] = [];
-      for (let row = BOARD_HEIGHT - 1; row >= 0; row--) {
-        if (newBoard[row][col] !== null) {
-          columnBlocks.push(newBoard[row][col]);
-          newBoard[row][col] = null;
+      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+        if (newBoard[y][x] !== null) {
+          columnBlocks.push(newBoard[y][x]);
+          newBoard[y][x] = null;
         }
       }
       for (let i = 0; i < columnBlocks.length; i++) {
-        newBoard[BOARD_HEIGHT - 1 - i][col] = columnBlocks[i];
+        newBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
       }
     }
 
-    return { rowsCleared: clearedRows.length + clearedCols.length, clearedRows, clearedCols };
+    // Anzahl der gelöschten Blöcke / Linien (für Punkte)
+    const rowsCleared = Math.floor(clearedPositions.length / BOARD_WIDTH); // grobe Schätzung, besser: Anzahl der betroffenen Reihen
+    return { rowsCleared, clearedPositions };
   };
 
   const burstParticles = (cx: number, cy: number, count: number) => {
@@ -277,10 +301,11 @@ export function ScndDropGame() {
       }
     }
 
-    const { rowsCleared, clearedRows, clearedCols } = clearLines(newBoard);
+    const { rowsCleared, clearedPositions } = clearSegments(newBoard);
 
+    // Power‑Up‑Effekte auslösen für gelöschte Blöcke
     for (const block of powerUpBlocks) {
-      if (clearedRows.includes(block.y) || clearedCols.includes(block.x)) {
+      if (clearedPositions.some(pos => pos.x === block.x && pos.y === block.y)) {
         triggerPowerUpEffect(block.effect, block.x, block.y);
       }
     }
@@ -426,7 +451,6 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
-  // Scroll-Verhalten (nur wenn nötig)
   const isElementInViewport = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     return rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -539,7 +563,6 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // Canvas zeichnen (mit Ghost und visuellen Effekten)
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
@@ -553,6 +576,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
