@@ -145,33 +145,35 @@ export function ScndDropGame() {
     return { x: Math.floor(boardX), y: Math.floor(boardY) };
   };
 
+
   const findFreeSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
-    const cs = getCellSize();
-    const screenX = (BOARD_WIDTH * cs) / 2;
-    const screenY = 0;
-    const { x: idealX, y: idealY } = screenToBoard(screenX, screenY);
-    const pieceWidth = pieceShape[0].length;
-    const pieceHeight = pieceShape.length;
+  const cs = getCellSize();
+  const screenX = (BOARD_WIDTH * cs) / 2;
+  const screenY = 0;
+  const { x: idealX, y: idealY } = screenToBoard(screenX, screenY);
+  const pieceWidth = pieceShape[0].length;
+  const pieceHeight = pieceShape.length;
 
-    const offsets = [
-      { dx: 0, dy: 0 },
-      { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
-      { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
-      { dx: 2, dy: 0 }, { dx: -2, dy: 0 },
-      { dx: 1, dy: 1 }, { dx: -1, dy: 1 }, { dx: 1, dy: -1 }, { dx: -1, dy: -1 }
-    ];
+  // Offsets in internen Zellen (die durch screenToBoard bereits rotationsunabhängig sind)
+  const offsets = [
+    { dx: 0, dy: 0 },                     // Ideal
+    { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, // links/rechts
+    { dx: 0, dy: 1 }, { dx: 0, dy: -1 }, // unten/oben
+    { dx: 2, dy: 0 }, { dx: -2, dy: 0 },
+    { dx: 1, dy: 1 }, { dx: -1, dy: 1 }, { dx: 1, dy: -1 }, { dx: -1, dy: -1 }
+  ];
 
-    for (const offset of offsets) {
-      let startX = idealX + offset.dx;
-      let startY = idealY + offset.dy;
-      startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
-      startY = Math.min(Math.max(0, startY), BOARD_HEIGHT - pieceHeight);
-      if (!collision(pieceShape, startX, startY)) {
-        return { x: startX, y: startY };
-      }
+  for (const offset of offsets) {
+    let startX = idealX + offset.dx;
+    let startY = idealY + offset.dy;
+    startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
+    startY = Math.min(Math.max(0, startY), BOARD_HEIGHT - pieceHeight);
+    if (!collision(pieceShape, startX, startY)) {
+      return { x: startX, y: startY };
     }
-    return null;
-  };
+  }
+  return null;
+};
 
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
