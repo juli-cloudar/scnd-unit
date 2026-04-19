@@ -7,12 +7,17 @@ const BOARD_WIDTH = 20;
 const BOARD_HEIGHT = 20;
 type Rotation = 0 | 90 | 180 | 270;
 
+// Verbesserte Zellgrößenberechnung für Handys (sowohl Breite als auch Höhe)
 const getCellSize = () => {
   if (typeof window === 'undefined') return 24;
-  const height = window.innerHeight;
-  const availableHeight = height - 220;
-  let cell = Math.floor(availableHeight / BOARD_HEIGHT);
-  return Math.min(Math.max(cell, 16), 28);
+  const padding = 32; // horizontaler Sicherheitsabstand
+  const headerOffset = 200; // Platz für Header, Sidebar, Controls
+  const maxWidth = window.innerWidth - padding;
+  const maxHeight = window.innerHeight - headerOffset;
+  const cellByWidth = Math.floor(maxWidth / BOARD_WIDTH);
+  const cellByHeight = Math.floor(maxHeight / BOARD_HEIGHT);
+  let cell = Math.min(cellByWidth, cellByHeight);
+  return Math.min(Math.max(cell, 14), 32);
 };
 
 const TETROMINOS = [
@@ -83,7 +88,7 @@ export function ScndDropGame() {
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
-  const [ghostFallActive, setGhostFallActive] = useState(false); // NEU: Gnadenfrist für Kollision
+  const [ghostFallActive, setGhostFallActive] = useState(false);
 
   // Rotation (visuell)
   const [rotation, setRotation] = useState<Rotation>(0);
@@ -117,7 +122,6 @@ export function ScndDropGame() {
     });
   };
 
-  // Bewegungsumrechnung (Bildschirm -> intern)
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -128,7 +132,6 @@ export function ScndDropGame() {
     }
   };
 
-  // Bildschirmkoordinaten (Pixel) in Board-Zellen umrechnen (rotationsunabhängig)
   const screenToBoard = (screenX: number, screenY: number): { x: number; y: number } => {
     const cs = getCellSize();
     const centerX = (BOARD_WIDTH * cs) / 2;
@@ -148,7 +151,6 @@ export function ScndDropGame() {
     return { x: Math.floor(boardX), y: Math.floor(boardY) };
   };
 
-  // NEU: Spawn-Position immer exakt in der Mitte der oberen Bildschirmkante
   const getFixedSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
@@ -163,14 +165,13 @@ export function ScndDropGame() {
     return { x: startX, y: startY };
   };
 
-  // Kollision mit optionaler Rücksicht auf GhostFall (während Gnadenfrist ignorieren wir liegende Blöcke)
   const collisionWithGhost = (shape: number[][], offsetX: number, offsetY: number, ignoreBlocks: boolean) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
         if (shape[y][x] !== 0) {
           const boardX = offsetX + x, boardY = offsetY + y;
           if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
-          if (ignoreBlocks) continue; // Während GhostFall: nur Wand- und Bodenkollision, keine Blockkollision
+          if (ignoreBlocks) continue;
           if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
         }
       }
@@ -178,23 +179,19 @@ export function ScndDropGame() {
     return false;
   };
 
-  // Normale Kollision (für reguläre Bewegung nach Ablauf der Gnadenfrist)
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     return collisionWithGhost(shape, offsetX, offsetY, false);
   };
 
-  // Bewegung mit GhostFall-Unterstützung
   const movePieceWithGhost = (screenDx: number, screenDy: number) => {
     if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
-    // Während GhostFall: ignoriere Blockkollision, nur Wand/Boden prüfen
     if (!collisionWithGhost(currentPiece.shape, newX, newY, ghostFallActive)) {
       setPieceX(newX);
       setPieceY(newY);
     } else if (screenDy === 1) {
-      // Fall: Bewegung nach unten nicht möglich – mergen
       mergePiece();
     }
   };
@@ -355,7 +352,6 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
     if (rotationPending) {
       setTimeout(() => spawnNewPiece(), 100);
@@ -366,22 +362,17 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    // Feste Spawn-Position (immer oben, keine Verschiebung)
     const spawnPos = getFixedSpawnPosition(piece.shape);
     setPieceX(spawnPos.x);
     setPieceY(spawnPos.y);
     
-    // GhostFall aktivieren für 0,6 Sekunden
     setGhostFallActive(true);
     setTimeout(() => {
       setGhostFallActive(false);
     }, 600);
     
-    // Prüfen, ob nach dem Spawn sofort Game Over (Block kann sich nicht bewegen)
-    // Das wäre nur der Fall, wenn er sofort mit der Wand oder dem Boden kollidiert
     const { dx, dy } = translateMove(0, 1);
     if (collisionWithGhost(piece.shape, spawnPos.x + dx, spawnPos.y + dy, false)) {
-      // Sofort mergen, wenn er nicht fallen kann
       mergePiece();
     }
   };
@@ -462,8 +453,6 @@ export function ScndDropGame() {
     setBoard(newBoard);
     checkAndRotate();
 
-    // Prüfen, ob nach dem Merge der nächste Block spawnen kann
-    const nextPiece = TETROMINOS[0]; // dummy, aber wir prüfen nur die Position
     const testSpawn = getFixedSpawnPosition(currentPiece.shape);
     if (collisionWithGhost(currentPiece.shape, testSpawn.x, testSpawn.y, false)) {
       endGame();
@@ -472,7 +461,6 @@ export function ScndDropGame() {
     spawnNewPiece();
   };
 
-  // Bewegung mit GhostFall (überschreibt movePiece)
   const movePiece = (screenDx: number, screenDy: number) => movePieceWithGhost(screenDx, screenDy);
   const rotatePiece = () => rotatePieceWithGhost();
 
@@ -676,7 +664,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // ========== CANVAS ZEICHNEN ==========
+  // Canvas zeichnen
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -829,7 +817,7 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
+    <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col overflow-x-hidden">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl z-10"></div>
 
       <div className="pt-2 pb-1 px-2 text-center">
