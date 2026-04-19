@@ -198,6 +198,25 @@ export function ScndDropGame() {
     return true;
   };
 
+  // Gravity: alle Blöcke in jeder Spalte nach unten fallen lassen
+  const applyGravity = (grid: any[][]) => {
+    for (let col = 0; col < BOARD_WIDTH; col++) {
+      const columnBlocks: any[] = [];
+      // alle Blöcke dieser Spalte einsammeln (von unten nach oben)
+      for (let row = BOARD_HEIGHT - 1; row >= 0; row--) {
+        if (grid[row][col] !== null) {
+          columnBlocks.push(grid[row][col]);
+          grid[row][col] = null;
+        }
+      }
+      // wieder von unten nach oben einfügen
+      for (let i = 0; i < columnBlocks.length; i++) {
+        grid[BOARD_HEIGHT - 1 - i][col] = columnBlocks[i];
+      }
+    }
+    return grid;
+  };
+
   const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
     const clearedRows: number[] = [];
     const clearedCols: number[] = [];
@@ -221,23 +240,16 @@ export function ScndDropGame() {
       newBoard.splice(row, 1);
       newBoard.unshift(Array(BOARD_WIDTH).fill(null));
     }
-    // vertikale löschen
+    // vertikale löschen (einfach auf null setzen, Gravity macht den Rest)
     for (const col of clearedCols) {
       for (let row = 0; row < BOARD_HEIGHT; row++) {
         newBoard[row][col] = null;
       }
-      // kompaktiere die Spalte nach unten
-      const columnBlocks: any[] = [];
-      for (let row = BOARD_HEIGHT - 1; row >= 0; row--) {
-        if (newBoard[row][col] !== null) {
-          columnBlocks.push(newBoard[row][col]);
-          newBoard[row][col] = null;
-        }
-      }
-      for (let i = 0; i < columnBlocks.length; i++) {
-        newBoard[BOARD_HEIGHT - 1 - i][col] = columnBlocks[i];
-      }
     }
+
+    // Nach dem Löschen: Gravity anwenden (alle Blöcke nach unten sinken lassen)
+    applyGravity(newBoard);
+
     return { rowsCleared: clearedRows.length + clearedCols.length, clearedRows, clearedCols };
   };
 
