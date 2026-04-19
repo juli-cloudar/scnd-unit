@@ -214,62 +214,18 @@ export function ScndDropGame() {
     setPieceY(spawnPos.y);
   };
 
-  // ========== ROTATIONSUNABHÄNGIGE GRAVITÄT (Flood Fill + Fall in visuelle Unterseite) ==========
+  // ========== EINFACHE SPALTENWEISE GRAVITÄT (robust, ohne Flood Fill) ==========
   const applyGravity = (currentBoard: any[][]) => {
-    // 1. Verankerung bestimmen (Flood Fill von allen Wänden)
-    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
-    const queue: [number, number][] = [];
-
     for (let x = 0; x < BOARD_WIDTH; x++) {
-      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
-      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
-    }
-    for (let y = 0; y < BOARD_HEIGHT; y++) {
-      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
-      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
-    }
-
-    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    while (queue.length) {
-      const [y, x] = queue.shift()!;
-      for (const [dy, dx] of dirs) {
-        const ny = y + dy, nx = x + dx;
-        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
-          anchored[ny][nx] = true;
-          queue.push([ny, nx]);
-        }
-      }
-    }
-
-    // 2. Fallrichtung bestimmen (visuell unten -> intern via translateMove)
-    const fallDir = translateMove(0, 1);
-    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
-
-    // 3. Nicht verankerte Blöcke in Fallrichtung verschieben (mehrere Durchläufe)
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const blocks: { y: number, x: number, block: any }[] = [];
-      for (let y = 0; y < BOARD_HEIGHT; y++) {
-        for (let x = 0; x < BOARD_WIDTH; x++) {
-          if (currentBoard[y][x] !== null && !anchored[y][x]) {
-            blocks.push({ y, x, block: currentBoard[y][x] });
-          }
-        }
-      }
-      if (fallDir.dy > 0) blocks.sort((a,b) => b.y - a.y);
-      else if (fallDir.dy < 0) blocks.sort((a,b) => a.y - b.y);
-      if (fallDir.dx > 0) blocks.sort((a,b) => b.x - a.x);
-      else if (fallDir.dx < 0) blocks.sort((a,b) => a.x - b.x);
-
-      for (const { y, x, block } of blocks) {
-        const newX = x + fallDir.dx;
-        const newY = y + fallDir.dy;
-        if (newX >= 0 && newX < BOARD_WIDTH && newY >= 0 && newY < BOARD_HEIGHT && currentBoard[newY][newX] === null) {
+      const columnBlocks: any[] = [];
+      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+        if (currentBoard[y][x] !== null) {
+          columnBlocks.push(currentBoard[y][x]);
           currentBoard[y][x] = null;
-          currentBoard[newY][newX] = block;
-          changed = true;
         }
+      }
+      for (let i = 0; i < columnBlocks.length; i++) {
+        currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
       }
     }
     return currentBoard;
@@ -713,7 +669,6 @@ export function ScndDropGame() {
     spawnNewPiece();
   };
 
-  // ========== BEWEGUNG MIT SHIELD ==========
   const movePiece = (screenDx: number, screenDy: number) => {
     if (!currentPiece || gameOver || isPaused) return;
     if (freezeMode) return;
@@ -722,7 +677,6 @@ export function ScndDropGame() {
     const newY = pieceY + dy;
     let wouldCollide = false;
     if (shieldActive) {
-      // Shield: nur Wandkollision prüfen, keine Blockkollision
       for (let y = 0; y < currentPiece.shape.length; y++) {
         for (let x = 0; x < currentPiece.shape[y].length; x++) {
           if (currentPiece.shape[y][x] !== 0) {
@@ -785,7 +739,7 @@ export function ScndDropGame() {
     return delay;
   };
 
-  // ========== GAME LOOP (fallender Block) – rotationPending blockiert nicht mehr ==========
+  // ========== GAME LOOP ==========
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -806,7 +760,7 @@ export function ScndDropGame() {
     return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
   }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, shieldActive]);
 
-  // ========== DAUERHAFTE GRAVITY (läuft IMMER, auch bei freezeMode) ==========
+  // ========== DAUERHAFTE GRAVITY (alle 200 ms) ==========
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
@@ -995,7 +949,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // ========== CANVAS ZEICHNEN ==========
+  // ========== CANVAS ZEICHNEN (vollständig) ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
