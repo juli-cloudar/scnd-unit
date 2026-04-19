@@ -7,17 +7,15 @@ const BOARD_WIDTH = 20;
 const BOARD_HEIGHT = 20;
 type Rotation = 0 | 90 | 180 | 270;
 
-// Verbesserte Zellgrößenberechnung für Handys (sowohl Breite als auch Höhe)
+// Zellgröße: auf Handy nicht größer als verfügbare Breite/Höhe
 const getCellSize = () => {
   if (typeof window === 'undefined') return 24;
-  const padding = 32; // horizontaler Sicherheitsabstand
-  const headerOffset = 200; // Platz für Header, Sidebar, Controls
-  const maxWidth = window.innerWidth - padding;
-  const maxHeight = window.innerHeight - headerOffset;
-  const cellByWidth = Math.floor(maxWidth / BOARD_WIDTH);
-  const cellByHeight = Math.floor(maxHeight / BOARD_HEIGHT);
-  let cell = Math.min(cellByWidth, cellByHeight);
-  return Math.min(Math.max(cell, 14), 32);
+  const maxWidth = window.innerWidth - 40; // Abzug für Padding
+  const maxHeight = window.innerHeight - 280; // Platz für Header + Touch-Controls
+  let cellByWidth = Math.floor(maxWidth / BOARD_WIDTH);
+  let cellByHeight = Math.floor(maxHeight / BOARD_HEIGHT);
+  let cell = Math.min(cellByWidth, cellByHeight, 28); // max 28px
+  return Math.max(cell, 12);
 };
 
 const TETROMINOS = [
@@ -122,6 +120,7 @@ export function ScndDropGame() {
     });
   };
 
+  // Bewegungsumrechnung (Bildschirm -> intern)
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -132,39 +131,24 @@ export function ScndDropGame() {
     }
   };
 
-  const screenToBoard = (screenX: number, screenY: number): { x: number; y: number } => {
-    const cs = getCellSize();
-    const centerX = (BOARD_WIDTH * cs) / 2;
-    const centerY = (BOARD_HEIGHT * cs) / 2;
-    let dx = screenX - centerX;
-    let dy = screenY - centerY;
-    switch (rotation) {
-      case 90: { const tmp = dx; dx = -dy; dy = tmp; break; }
-      case 180: dx = -dx; dy = -dy; break;
-      case 270: { const tmp = dx; dx = dy; dy = -tmp; break; }
-      default: break;
-    }
-    let boardX = (dx + centerX) / cs;
-    let boardY = (dy + centerY) / cs;
-    boardX = Math.min(Math.max(0, boardX), BOARD_WIDTH - 1);
-    boardY = Math.min(Math.max(0, boardY), BOARD_HEIGHT - 1);
-    return { x: Math.floor(boardX), y: Math.floor(boardY) };
-  };
-
-  const getFixedSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
+  // Spawn-Position: immer an der visuell oberen Kante, abhängig von Rotation
+  const getSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
-    const cs = getCellSize();
-    const screenX = (BOARD_WIDTH * cs) / 2;
-    const screenY = 0;
-    const { x, y } = screenToBoard(screenX, screenY);
-    let startX = Math.floor(x - pieceWidth / 2);
-    let startY = y;
-    startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
-    startY = Math.min(Math.max(0, startY), BOARD_HEIGHT - pieceHeight);
-    return { x: startX, y: startY };
+    switch (rotation) {
+      case 0:   // oben (y=0)
+        return { x: Math.floor((BOARD_WIDTH - pieceWidth) / 2), y: 0 };
+      case 90:  // rechts (x=BOARD_WIDTH-1)
+        return { x: BOARD_WIDTH - pieceWidth, y: Math.floor((BOARD_HEIGHT - pieceHeight) / 2) };
+      case 180: // unten (y=BOARD_HEIGHT-1)
+        return { x: Math.floor((BOARD_WIDTH - pieceWidth) / 2), y: BOARD_HEIGHT - pieceHeight };
+      case 270: // links (x=0)
+        return { x: 0, y: Math.floor((BOARD_HEIGHT - pieceHeight) / 2) };
+      default: return { x: 0, y: 0 };
+    }
   };
 
+  // Kollision mit optionaler GhostFall-Option
   const collisionWithGhost = (shape: number[][], offsetX: number, offsetY: number, ignoreBlocks: boolean) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -352,6 +336,7 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
+  // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
     if (rotationPending) {
       setTimeout(() => spawnNewPiece(), 100);
@@ -362,15 +347,17 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const spawnPos = getFixedSpawnPosition(piece.shape);
+    const spawnPos = getSpawnPosition(piece.shape);
     setPieceX(spawnPos.x);
     setPieceY(spawnPos.y);
     
+    // GhostFall aktivieren für 0,6 Sekunden
     setGhostFallActive(true);
     setTimeout(() => {
       setGhostFallActive(false);
     }, 600);
     
+    // Prüfen, ob sofort Merge nötig (falls Block am Boden oder Wand)
     const { dx, dy } = translateMove(0, 1);
     if (collisionWithGhost(piece.shape, spawnPos.x + dx, spawnPos.y + dy, false)) {
       mergePiece();
@@ -453,8 +440,10 @@ export function ScndDropGame() {
     setBoard(newBoard);
     checkAndRotate();
 
-    const testSpawn = getFixedSpawnPosition(currentPiece.shape);
-    if (collisionWithGhost(currentPiece.shape, testSpawn.x, testSpawn.y, false)) {
+    // Prüfen, ob nächster Block spawnen kann
+    const testPiece = TETROMINOS[0];
+    const testSpawn = getSpawnPosition(testPiece.shape);
+    if (collision(testPiece.shape, testSpawn.x, testSpawn.y)) {
       endGame();
       return;
     }
@@ -664,7 +653,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen
+  // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -817,7 +806,7 @@ export function ScndDropGame() {
   };
 
   return (
-    <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col overflow-x-hidden">
+    <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl z-10"></div>
 
       <div className="pt-2 pb-1 px-2 text-center">
@@ -842,7 +831,7 @@ export function ScndDropGame() {
 
       <div ref={gameContainerRef} className="flex-1 flex flex-col md:flex-row gap-2 md:gap-4 justify-center items-center md:items-start px-2 py-1">
         <div className="flex justify-center items-center">
-          <div className="relative">
+          <div className="relative" style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 200px)' }}>
             <div className="absolute -inset-1 bg-gradient-to-r from-[#FF4400]/30 to-[#FF6600]/30 rounded-lg blur-lg opacity-50"></div>
             <canvas
               ref={canvasRef}
@@ -851,7 +840,10 @@ export function ScndDropGame() {
                 width: BOARD_WIDTH * cellSize,
                 height: BOARD_HEIGHT * cellSize,
                 transform: `rotate(${rotation}deg)`,
-                transition: 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)'
+                transition: 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)',
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain'
               }}
             />
 
