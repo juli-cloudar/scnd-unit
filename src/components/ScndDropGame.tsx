@@ -127,7 +127,7 @@ export function ScndDropGame() {
     }
   };
 
-  // Spawn-Position: oberste freie Zeile (klassisch)
+  // Spawn: oberste freie Zeile (klassisch)
   const getSpawnPosition = (pieceShape: number[][]) => {
     const pieceWidth = pieceShape[0].length;
     const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
@@ -152,63 +152,81 @@ export function ScndDropGame() {
     return false;
   };
 
-  const isBoardFull = () => {
+  // ========== GRAVITATION NACH MERGE ==========
+  // Jeder Block erhält ein Flag "anchored" (verankert). Ein Block ist verankert, wenn er eine Wand berührt oder über einen anderen verankerten Block verbunden ist.
+  // Nach einem Merge wird das Board neu berechnet: alle nicht verankerten Blöcke fallen nach unten (intern y+1).
+  const applyGravity = (currentBoard: any[][]) => {
+    // 1. Verankerung bestimmen (Flood Fill von allen Wänden)
+    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
+    const queue: [number, number][] = [];
+
+    // Alle Zellen am Rand (Wand) sind verankert
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
+      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
+    }
     for (let y = 0; y < BOARD_HEIGHT; y++) {
-      for (let x = 0; x < BOARD_WIDTH; x++) {
-        if (board[y][x] === null) return false;
+      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
+      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
+    }
+
+    // Flood Fill: verankerte Blöcke, die mit anderen verankerten Blöcken verbunden sind
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    while (queue.length) {
+      const [y, x] = queue.shift()!;
+      for (const [dy, dx] of dirs) {
+        const ny = y + dy, nx = x + dx;
+        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
+          anchored[ny][nx] = true;
+          queue.push([ny, nx]);
+        }
       }
     }
-    return true;
+
+    // 2. Alle nicht verankerten Blöcke nach unten fallen lassen (pro Spalte)
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      const columnBlocks: any[] = [];
+      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+        if (currentBoard[y][x] !== null && !anchored[y][x]) {
+          columnBlocks.push(currentBoard[y][x]);
+          currentBoard[y][x] = null;
+        }
+      }
+      // Von unten nach oben wieder einfügen
+      for (let i = 0; i < columnBlocks.length; i++) {
+        currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
+      }
+    }
+    return currentBoard;
   };
 
-  // ========== NEUE LINIENLÖSCHUNG: Nur zusammenhängende Segmente mit Länge >= 10 ==========
-  const clearSegments = (newBoard: any[][]): { rowsCleared: number; clearedPositions: { x: number; y: number }[] } => {
-    const clearedPositions: { x: number; y: number }[] = [];
-
-    // Horizontale Segmente
-    for (let y = 0; y < BOARD_HEIGHT; y++) {
-      let start = -1;
+  // ========== LINIENLÖSCHUNG (nur zusammenhängende Gruppen von mindestens 10 Blöcken) ==========
+  const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
+    let totalCleared = 0;
+    // Für jede Zeile prüfen wir auf zusammenhängende Läufe
+    for (let row = 0; row < BOARD_HEIGHT; row++) {
+      let runStart = -1;
+      let runLength = 0;
       for (let x = 0; x <= BOARD_WIDTH; x++) {
-        const hasBlock = (x < BOARD_WIDTH && newBoard[y][x] !== null);
-        if (hasBlock && start === -1) {
-          start = x;
-        } else if (!hasBlock && start !== -1) {
-          const length = x - start;
-          if (length >= 10) {
-            for (let i = start; i < x; i++) {
-              clearedPositions.push({ x: i, y });
+        const cell = (x < BOARD_WIDTH) ? newBoard[row][x] : null;
+        if (cell !== null) {
+          if (runStart === -1) runStart = x;
+          runLength++;
+        } else {
+          if (runLength >= 10) {
+            // Lösche diese zusammenhängende Gruppe
+            for (let i = runStart; i < runStart + runLength; i++) {
+              newBoard[row][i] = null;
+              burstParticles(i * cellSize + cellSize/2, row * cellSize + cellSize/2, 5);
             }
+            totalCleared++;
           }
-          start = -1;
+          runStart = -1;
+          runLength = 0;
         }
       }
     }
-
-    // Vertikale Segmente
-    for (let x = 0; x < BOARD_WIDTH; x++) {
-      let start = -1;
-      for (let y = 0; y <= BOARD_HEIGHT; y++) {
-        const hasBlock = (y < BOARD_HEIGHT && newBoard[y][x] !== null);
-        if (hasBlock && start === -1) {
-          start = y;
-        } else if (!hasBlock && start !== -1) {
-          const length = y - start;
-          if (length >= 10) {
-            for (let i = start; i < y; i++) {
-              clearedPositions.push({ x, y: i });
-            }
-          }
-          start = -1;
-        }
-      }
-    }
-
-    // Entferne die markierten Blöcke (setze auf null)
-    for (const pos of clearedPositions) {
-      newBoard[pos.y][pos.x] = null;
-    }
-
-    // Nach dem Löschen müssen die Blöcke nach unten fallen (Gravity pro Spalte)
+    // Nach dem Löschen müssen die Blöcke in den Spalten nach unten fallen (normale Gravitation)
     for (let x = 0; x < BOARD_WIDTH; x++) {
       const columnBlocks: any[] = [];
       for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
@@ -221,10 +239,7 @@ export function ScndDropGame() {
         newBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
       }
     }
-
-    // Anzahl der gelöschten Blöcke / Linien (für Punkte)
-    const rowsCleared = Math.floor(clearedPositions.length / BOARD_WIDTH); // grobe Schätzung, besser: Anzahl der betroffenen Reihen
-    return { rowsCleared, clearedPositions };
+    return { rowsCleared: totalCleared };
   };
 
   const burstParticles = (cx: number, cy: number, count: number) => {
@@ -279,9 +294,9 @@ export function ScndDropGame() {
 
   const mergePiece = () => {
     if (!currentPiece) return;
-    const newBoard = board.map(row => [...row]);
-    const powerUpBlocks: { x: number; y: number; effect: string }[] = [];
+    let newBoard = board.map(row => [...row]);
 
+    // Aktuellen Block ins Board einfügen
     for (let y = 0; y < currentPiece.shape.length; y++) {
       for (let x = 0; x < currentPiece.shape[y].length; x++) {
         if (currentPiece.shape[y][x] !== 0) {
@@ -295,21 +310,18 @@ export function ScndDropGame() {
               glowColor: currentPiece.glowColor
             };
             newBoard[boardY][boardX] = block;
-            if (block.isPowerUp) powerUpBlocks.push({ x: boardX, y: boardY, effect: block.powerUpEffect });
           }
         }
       }
     }
 
-    const { rowsCleared, clearedPositions } = clearSegments(newBoard);
+    // Linienlöschung für zusammenhängende Gruppen
+    const { rowsCleared } = clearLineGroups(newBoard);
 
-    // Power‑Up‑Effekte auslösen für gelöschte Blöcke
-    for (const block of powerUpBlocks) {
-      if (clearedPositions.some(pos => pos.x === block.x && pos.y === block.y)) {
-        triggerPowerUpEffect(block.effect, block.x, block.y);
-      }
-    }
+    // Gravitation auf das gesamte Board anwenden (nicht verankerte Blöcke fallen)
+    newBoard = applyGravity(newBoard);
 
+    // Punkteberechnung
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[Math.min(rowsCleared, 4)];
     if (rowsCleared > 0) {
@@ -346,7 +358,9 @@ export function ScndDropGame() {
     setBoard(newBoard);
     checkAndRotate();
 
-    if (isBoardFull()) {
+    // Prüfen, ob Board voll (kein Spawn möglich)
+    const testSpawn = getSpawnPosition(currentPiece.shape);
+    if (!testSpawn) {
       endGame();
       return;
     }
@@ -451,6 +465,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
+  // Scroll-Verhalten
   const isElementInViewport = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     return rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -563,6 +578,7 @@ export function ScndDropGame() {
     giveUp();
   };
 
+  // Ghost-Position (für Anzeige)
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
@@ -608,6 +624,7 @@ export function ScndDropGame() {
       ctx.stroke();
     }
 
+    // Liegende Blöcke halbtransparent
     ctx.globalAlpha = 0.6;
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
@@ -639,6 +656,7 @@ export function ScndDropGame() {
     }
     ctx.globalAlpha = 1;
 
+    // Ghost
     if (currentPiece && !gameOver && !freezeMode && !isPaused && !rotationPending) {
       const ghost = getGhostPosition();
       ctx.globalAlpha = 0.3;
@@ -655,6 +673,7 @@ export function ScndDropGame() {
       }
       ctx.globalAlpha = 1;
 
+      // Fallender Block
       const glowIntensity = 10 + 5 * Math.sin(pulseValue);
       ctx.shadowBlur = glowIntensity;
       ctx.shadowColor = 'white';
@@ -687,6 +706,7 @@ export function ScndDropGame() {
       ctx.shadowOffsetY = 0;
     }
 
+    // Partikel
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
