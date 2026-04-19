@@ -781,26 +781,28 @@ export function ScndDropGame() {
   };
 
   // ========== GAME LOOP (fallender Block) – freezeMode blockiert ==========
-  useEffect(() => {
-    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
-      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      return;
-    }
-    let lastFall = performance.now();
-    const delay = getFallDelay();
-    if (delay === Infinity) return;
-    const step = (now: number) => {
-      if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) return;
-      if (now - lastFall >= delay) {
-        movePiece(0, 1);
-        lastFall = now;
-      }
-      gameLoopRef.current = requestAnimationFrame(step);
-    };
-    gameLoopRef.current = requestAnimationFrame(step);
-    return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending, shieldActive]);
+ const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+const changeRotationRandom = () => {
+  if (rotationTimerRef.current) clearTimeout(rotationTimerRef.current);
+  const rots: Rotation[] = [0, 90, 180, 270];
+  let newRot = rots[Math.floor(Math.random() * rots.length)];
+  while (newRot === rotation) newRot = rots[Math.floor(Math.random() * rots.length)];
+  setRotation(newRot);
+  if (canvasRef.current) {
+    canvasRef.current.style.transform = `rotate(${newRot}deg)`;
+    canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+  }
+  if (window.navigator.vibrate) window.navigator.vibrate(100);
+  rotationTimerRef.current = setTimeout(() => {
+    setRotationPending(false);
+    if (needsRespawnAfterRotation) {
+      setNeedsRespawnAfterRotation(false);
+      spawnNewPiece();
+    }
+    rotationTimerRef.current = null;
+  }, 450);
+};
   // ========== DAUERHAFTE GRAVITY (läuft IMMER, auch bei freezeMode) ==========
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
