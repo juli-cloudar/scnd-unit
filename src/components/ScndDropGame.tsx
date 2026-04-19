@@ -1,5 +1,6 @@
 // src/components/ScndDropGame.tsx
 'use client';
+
 import { useEffect, useRef, useState } from 'react';
 
 const BOARD_WIDTH = 20;
@@ -28,11 +29,11 @@ const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
   { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFEECC', borderColor: '#FFCC66', name: '🎨 FARBE', isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA44', name: '3️⃣ 3x', isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFCC66' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#AAFFFF', borderColor: '#44FFFF', name: '❄️ FREEZE', isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#66FFFF' },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#CCFFCC', borderColor: '#66FF66', name: '⬇️ GRAVITY', isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#88FF88' },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA44', name: '⭐ 3x', isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFCC66' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#AAFFFF', borderColor: '#44FFFF', name: '⏰ FREEZE', isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#66FFFF' },
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#CCFFCC', borderColor: '#66FF66', name: '🌀 GRAVITY', isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#88FF88' },
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFCCDD', borderColor: '#FF88AA', name: '🔄 SWAP', isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FF99BB' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#DDDDFF', borderColor: '#9999FF', name: '🧹 CLEAR LINE', isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#DDDDFF', borderColor: '#9999FF', name: '🔍 CLEAR LINE', isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDDCC', borderColor: '#FFAA88', name: '⏩ FAST FORWARD', isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FFBB99' },
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#FF88FF', name: '🎲 RANDOM', isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
 ];
@@ -46,7 +47,7 @@ export function ScndDropGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(24);
-  const [board, setBoard] = useState<any[][]>(() =>
+  const [board, setBoard] = useState<any[][]>(() => 
     Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null))
   );
   const [currentPiece, setCurrentPiece] = useState<any>(null);
@@ -77,12 +78,13 @@ export function ScndDropGame() {
   const [fastForwardActive, setFastForwardActive] = useState(false);
   const gameLoopRef = useRef<number | null>(null);
   const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {});
+  const gravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
 
-  // Rotation
+  // Rotation (visuell)
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
@@ -114,6 +116,17 @@ export function ScndDropGame() {
     });
   };
 
+  // Bewegungsumrechnung (Bildschirm -> intern)
+  const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
+    switch (rotation) {
+      case 0:   return { dx: screenDx, dy: screenDy };
+      case 90:  return { dx: screenDy, dy: -screenDx };
+      case 180: return { dx: -screenDx, dy: -screenDy };
+      case 270: return { dx: -screenDy, dy: screenDx };
+      default: return { dx: screenDx, dy: screenDy };
+    }
+  };
+
   // Bildschirmkoordinaten (Pixel) in Board-Zellen umrechnen (rotationsunabhängig)
   const screenToBoard = (screenX: number, screenY: number): { x: number; y: number } => {
     const cs = getCellSize();
@@ -138,44 +151,33 @@ export function ScndDropGame() {
     return { x: Math.floor(boardX), y: Math.floor(boardY) };
   };
 
-  // Spawn-Position: immer in der Mitte der oberen Bildschirmkante
-  const getSpawnPosition = (pieceShape: number[][]) => {
+  // Spawn: immer visuell oben (Mitte) – rotationsunabhängig
+  const getScreenSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
     const pieceWidth = pieceShape[0].length;
     const cs = getCellSize();
-    const screenX = (BOARD_WIDTH * cs) / 2;
-    const screenY = 0;
-    const { x, y } = screenToBoard(screenX, screenY);
+    const screenX = (BOARD_WIDTH * cs) / 2;          // Mitte horizontal
+    const screenY = 0;                              // obere Kante
+    let { x, y } = screenToBoard(screenX, screenY);
+    // Block so ausrichten, dass seine Mitte möglichst nahe an (x,y) ist
     let startX = Math.floor(x - pieceWidth / 2);
     let startY = y;
     startX = Math.min(Math.max(0, startX), BOARD_WIDTH - pieceWidth);
     startY = Math.min(Math.max(0, startY), BOARD_HEIGHT - pieceShape.length);
+    // Nun nach unten verschieben, bis keine Kollision mehr besteht (freier Platz)
+    while (!collision(pieceShape, startX, startY) && startY < BOARD_HEIGHT - pieceShape.length) {
+      startY++;
+    }
+    // Wenn der Block am oberen Rand schon kollidiert, versuchen wir nach oben zu gehen? 
+    // Eigentlich sollte er dann nicht spawnen – Spiel vorbei.
+    if (collision(pieceShape, startX, startY)) {
+      // Falls schon auf dem Spawn-Platz Kollision, verschiebe nach oben? 
+      // Besser: Spiel beenden.
+      return null;
+    }
     return { x: startX, y: startY };
   };
 
-  // Bewegungsumrechnung (Bildschirm -> intern)
-  const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
-    switch (rotation) {
-      case 0: return { dx: screenDx, dy: screenDy };
-      case 90: return { dx: screenDy, dy: -screenDx };
-      case 180: return { dx: -screenDx, dy: -screenDy };
-      case 270: return { dx: -screenDy, dy: screenDx };
-      default: return { dx: screenDx, dy: screenDy };
-    }
-  };
-
-  const getGhostPosition = () => {
-    let testX = pieceX, testY = pieceY;
-    while (true) {
-      const { dx, dy } = translateMove(0, 1);
-      const nextX = testX + dx;
-      const nextY = testY + dy;
-      if (collision(currentPiece.shape, nextX, nextY)) break;
-      testX = nextX;
-      testY = nextY;
-    }
-    return { x: testX, y: testY };
-  };
-
+  // Klassische Kollisionsprüfung
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -189,68 +191,152 @@ export function ScndDropGame() {
     return false;
   };
 
-  const isBoardFull = () => {
-    for (let y = 0; y < BOARD_HEIGHT; y++) {
-      for (let x = 0; x < BOARD_WIDTH; x++) {
-        if (board[y][x] === null) return false;
-      }
-    }
-    return true;
-  };
+  // ========== GRAVITATION FÜR BEREITS GELEGTE BLÖCKE (dauerhaft) ==========
+  const applyGravity = (currentBoard: any[][]) => {
+    // 1. Verankerung bestimmen (Flood Fill von allen Wänden)
+    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
+    const queue: [number, number][] = [];
 
-  // Gravity: alle Blöcke in jeder Spalte nach unten fallen lassen
-  const applyGravity = (grid: any[][]) => {
-    for (let col = 0; col < BOARD_WIDTH; col++) {
-      const columnBlocks: any[] = [];
-      // alle Blöcke dieser Spalte einsammeln (von unten nach oben)
-      for (let row = BOARD_HEIGHT - 1; row >= 0; row--) {
-        if (grid[row][col] !== null) {
-          columnBlocks.push(grid[row][col]);
-          grid[row][col] = null;
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
+      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
+    }
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
+      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
+    }
+
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    while (queue.length) {
+      const [y, x] = queue.shift()!;
+      for (const [dy, dx] of dirs) {
+        const ny = y + dy, nx = x + dx;
+        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
+          anchored[ny][nx] = true;
+          queue.push([ny, nx]);
         }
       }
-      // wieder von unten nach oben einfügen
+    }
+
+    // 2. Alle nicht verankerten Blöcke nach unten fallen lassen (pro Spalte)
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      const columnBlocks: any[] = [];
+      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+        if (currentBoard[y][x] !== null && !anchored[y][x]) {
+          columnBlocks.push(currentBoard[y][x]);
+          currentBoard[y][x] = null;
+        }
+      }
       for (let i = 0; i < columnBlocks.length; i++) {
-        grid[BOARD_HEIGHT - 1 - i][col] = columnBlocks[i];
+        currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
       }
     }
-    return grid;
+    return currentBoard;
   };
 
-  const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
-    const clearedRows: number[] = [];
-    const clearedCols: number[] = [];
+  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) ==========
+  const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
+    let totalCleared = 0;
+    // Hilfsfunktion: löscht eine zusammenhängende Kette von Zellen
+    const deleteChain = (cells: [number, number][]) => {
+      for (const [y, x] of cells) {
+        newBoard[y][x] = null;
+        burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
+      }
+      totalCleared++;
+    };
 
-    // horizontale Linien
+    // Prüfe horizontale Läufe
     for (let row = 0; row < BOARD_HEIGHT; row++) {
-      const nonEmpty = newBoard[row].filter(cell => cell !== null).length;
-      if (nonEmpty >= 10) clearedRows.push(row);
+      let runStart = -1;
+      let runLength = 0;
+      for (let x = 0; x <= BOARD_WIDTH; x++) {
+        const cell = (x < BOARD_WIDTH) ? newBoard[row][x] : null;
+        if (cell !== null) {
+          if (runStart === -1) runStart = x;
+          runLength++;
+        } else {
+          if (runLength >= 10) {
+            const cells: [number, number][] = [];
+            for (let i = runStart; i < runStart + runLength; i++) cells.push([row, i]);
+            deleteChain(cells);
+          }
+          runStart = -1;
+          runLength = 0;
+        }
+      }
     }
-    // vertikale Linien
+
+    // Prüfe vertikale Läufe
     for (let col = 0; col < BOARD_WIDTH; col++) {
-      let nonEmpty = 0;
-      for (let row = 0; row < BOARD_HEIGHT; row++) {
-        if (newBoard[row][col] !== null) nonEmpty++;
+      let runStart = -1;
+      let runLength = 0;
+      for (let y = 0; y <= BOARD_HEIGHT; y++) {
+        const cell = (y < BOARD_HEIGHT) ? newBoard[y][col] : null;
+        if (cell !== null) {
+          if (runStart === -1) runStart = y;
+          runLength++;
+        } else {
+          if (runLength >= 10) {
+            const cells: [number, number][] = [];
+            for (let i = runStart; i < runStart + runLength; i++) cells.push([i, col]);
+            deleteChain(cells);
+          }
+          runStart = -1;
+          runLength = 0;
+        }
       }
-      if (nonEmpty >= 10) clearedCols.push(col);
     }
 
-    // horizontale löschen (von unten nach oben)
-    for (const row of clearedRows.sort((a,b) => b - a)) {
-      newBoard.splice(row, 1);
-      newBoard.unshift(Array(BOARD_WIDTH).fill(null));
-    }
-    // vertikale löschen (einfach auf null setzen, Gravity macht den Rest)
-    for (const col of clearedCols) {
-      for (let row = 0; row < BOARD_HEIGHT; row++) {
-        newBoard[row][col] = null;
+    // Prüfe diagonale Läufe (von links oben nach rechts unten)
+    for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
+      for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
+        let runLength = 0;
+        let y = startRow, x = startCol;
+        while (y < BOARD_HEIGHT && x < BOARD_WIDTH && newBoard[y][x] !== null) {
+          runLength++;
+          y++; x++;
+        }
+        if (runLength >= 10) {
+          const cells: [number, number][] = [];
+          for (let i = 0; i < runLength; i++) cells.push([startRow + i, startCol + i]);
+          deleteChain(cells);
+        }
       }
     }
 
-    // Nach dem Löschen: Gravity anwenden (alle Blöcke nach unten sinken lassen)
-    applyGravity(newBoard);
+    // Prüfe diagonale Läufe (von rechts oben nach links unten)
+    for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
+      for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
+        let runLength = 0;
+        let y = startRow, x = startCol;
+        while (y < BOARD_HEIGHT && x >= 0 && newBoard[y][x] !== null) {
+          runLength++;
+          y++; x--;
+        }
+        if (runLength >= 10) {
+          const cells: [number, number][] = [];
+          for (let i = 0; i < runLength; i++) cells.push([startRow + i, startCol - i]);
+          deleteChain(cells);
+        }
+      }
+    }
 
-    return { rowsCleared: clearedRows.length + clearedCols.length, clearedRows, clearedCols };
+    // Nach dem Löschen: normale Spalten‑Gravitation (alle Blöcke fallen)
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      const columnBlocks: any[] = [];
+      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+        if (newBoard[y][x] !== null) {
+          columnBlocks.push(newBoard[y][x]);
+          newBoard[y][x] = null;
+        }
+      }
+      for (let i = 0; i < columnBlocks.length; i++) {
+        newBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
+      }
+    }
+
+    return { rowsCleared: totalCleared };
   };
 
   const burstParticles = (cx: number, cy: number, count: number) => {
@@ -263,7 +349,7 @@ export function ScndDropGame() {
 
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
-    showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
+    showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
@@ -278,10 +364,13 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const { x, y } = getSpawnPosition(piece.shape);
-    // KEINE Kollisionsprüfung – Block erscheint exakt hier, auch über anderen Blöcken
-    setPieceX(x);
-    setPieceY(y);
+    const spawnPos = getScreenSpawnPosition(piece.shape);
+    if (!spawnPos) {
+      endGame();
+      return;
+    }
+    setPieceX(spawnPos.x);
+    setPieceY(spawnPos.y);
   };
 
   const endGame = () => {
@@ -290,6 +379,7 @@ export function ScndDropGame() {
     setIsPlaying(false);
     setIsPaused(false);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
     if (!showNameInput && !isSaving) {
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
@@ -302,9 +392,9 @@ export function ScndDropGame() {
 
   const mergePiece = () => {
     if (!currentPiece) return;
-    const newBoard = board.map(row => [...row]);
-    const powerUpBlocks: { x: number; y: number; effect: string }[] = [];
+    let newBoard = board.map(row => [...row]);
 
+    // Aktuellen Block ins Board einfügen
     for (let y = 0; y < currentPiece.shape.length; y++) {
       for (let x = 0; x < currentPiece.shape[y].length; x++) {
         if (currentPiece.shape[y][x] !== 0) {
@@ -318,20 +408,18 @@ export function ScndDropGame() {
               glowColor: currentPiece.glowColor
             };
             newBoard[boardY][boardX] = block;
-            if (block.isPowerUp) powerUpBlocks.push({ x: boardX, y: boardY, effect: block.powerUpEffect });
           }
         }
       }
     }
 
-    const { rowsCleared, clearedRows, clearedCols } = clearLines(newBoard);
+    // Linienlöschung (horizontal, vertikal, diagonal)
+    const { rowsCleared } = clearLineGroups(newBoard);
 
-    for (const block of powerUpBlocks) {
-      if (clearedRows.includes(block.y) || clearedCols.includes(block.x)) {
-        triggerPowerUpEffect(block.effect, block.x, block.y);
-      }
-    }
+    // Gravitation auf das gesamte Board anwenden (nicht verankerte Blöcke fallen)
+    newBoard = applyGravity(newBoard);
 
+    // Punkteberechnung
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[Math.min(rowsCleared, 4)];
     if (rowsCleared > 0) {
@@ -340,13 +428,13 @@ export function ScndDropGame() {
       let multiplier = 1 + newCombo * 0.15;
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
-      addedScore *= 2; // ORANGE + GRAU = 2x
-      showBonus('🧡 ORANGE + GRAU = 2x PUNKTE!');
+      addedScore *= 2;
+      showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
         setScndMode(true);
         setTimeout(() => setScndMode(false), 10000);
-        showBonus('🔥 SCND MODE AKTIVIERT! 10x COMBO! 🔥');
+        showBonus('⚡ SCND MODE AKTIVIERT! 10x COMBO!');
       }
     } else {
       setCombo(0);
@@ -361,13 +449,16 @@ export function ScndDropGame() {
     if (newLevel !== level) setLevel(newLevel);
 
     if (addedScore > 0) {
-      setPopupScore({ score: addedScore, x: (BOARD_WIDTH * cellSize) / 2, y: (BOARD_HEIGHT * cellSize) / 2 - 50 });
+      setPopupScore({ score: addedScore, x: BOARD_WIDTH * cellSize / 2, y: BOARD_HEIGHT * cellSize / 2 - 50 });
       setTimeout(() => setPopupScore(null), 500);
     }
+
     setBoard(newBoard);
     checkAndRotate();
 
-    if (isBoardFull()) {
+    // Prüfen, ob Board voll (kein Spawn möglich)
+    const testSpawn = getScreenSpawnPosition(currentPiece.shape);
+    if (!testSpawn) {
       endGame();
       return;
     }
@@ -389,7 +480,7 @@ export function ScndDropGame() {
 
   const rotatePiece = () => {
     if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
-    const rotated = currentPiece.shape[0].map((_: any, idx: number) =>
+    const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
     if (!collision(rotated, pieceX, pieceY)) {
@@ -427,7 +518,7 @@ export function ScndDropGame() {
     return delay;
   };
 
-  // Game Loop
+  // Game Loop (fallender Block)
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -450,6 +541,22 @@ export function ScndDropGame() {
 
   useEffect(() => { movePieceRef.current = movePiece; }, [movePiece]);
 
+  // Dauerhafte Schwerkraft auf bereits gelegte Blöcke (alle 200 ms)
+  useEffect(() => {
+    if (isPlaying && !gameOver && !isPaused) {
+      if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+      gravityIntervalRef.current = setInterval(() => {
+        setBoard(prevBoard => {
+          const newBoard = applyGravity(prevBoard.map(row => [...row]));
+          return newBoard;
+        });
+      }, 200);
+    } else {
+      if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+    }
+    return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
+  }, [isPlaying, gameOver, isPaused]);
+
   // Pulsieren
   useEffect(() => {
     let animFrame: number;
@@ -457,7 +564,9 @@ export function ScndDropGame() {
       setPulseValue(Date.now() * 0.008);
       animFrame = requestAnimationFrame(step);
     };
-    if (isPlaying && !gameOver && !isPaused) animFrame = requestAnimationFrame(step);
+    if (isPlaying && !gameOver && !isPaused) {
+      animFrame = requestAnimationFrame(step);
+    }
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
@@ -482,7 +591,7 @@ export function ScndDropGame() {
   };
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
-      const timer = setTimeout(() => centerCanvasInView(), 200);
+      const timer = setTimeout(centerCanvasInView, 200);
       return () => clearTimeout(timer);
     }
   }, [isPlaying, gameOver, isPaused]);
@@ -500,7 +609,9 @@ export function ScndDropGame() {
         const res = await fetch('/api/game-highscores');
         const data = await res.json();
         if (Array.isArray(data)) setHighscores(data);
-      } catch (error) { console.error('Fehler beim Laden der Highscores:', error); }
+      } catch (error) {
+        console.error('Fehler beim Laden der Highscores:', error);
+      }
     };
     loadHighscores();
   }, []);
@@ -554,6 +665,7 @@ export function ScndDropGame() {
       setIsPlaying(false);
       setIsPaused(false);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
       if (!showNameInput && !isSaving) {
         const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
         if (score > 0 && isHighscore) {
@@ -570,10 +682,30 @@ export function ScndDropGame() {
     setIsPaused(!isPaused);
   };
   const handleResume = () => setIsPaused(false);
-  const handleRestart = () => { setIsPaused(false); startGame(); };
-  const handleGiveUp = () => { setIsPaused(false); giveUp(); };
+  const handleRestart = () => {
+    setIsPaused(false);
+    startGame();
+  };
+  const handleGiveUp = () => {
+    setIsPaused(false);
+    giveUp();
+  };
 
-  // ========== CANVAS ZEICHNEN ==========
+  // Ghost-Position (für Anzeige)
+  const getGhostPosition = () => {
+    let testX = pieceX, testY = pieceY;
+    while (true) {
+      const { dx, dy } = translateMove(0, 1);
+      const nextX = testX + dx;
+      const nextY = testY + dy;
+      if (collision(currentPiece.shape, nextX, nextY)) break;
+      testX = nextX;
+      testY = nextY;
+    }
+    return { x: testX, y: testY };
+  };
+
+  // Canvas zeichnen (unverändert, aber mit aktuellen Variablen)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -637,6 +769,7 @@ export function ScndDropGame() {
     }
     ctx.globalAlpha = 1;
 
+    // Ghost
     if (currentPiece && !gameOver && !freezeMode && !isPaused && !rotationPending) {
       const ghost = getGhostPosition();
       ctx.globalAlpha = 0.3;
@@ -652,6 +785,8 @@ export function ScndDropGame() {
         }
       }
       ctx.globalAlpha = 1;
+
+      // fallender Block
       const glowIntensity = 10 + 5 * Math.sin(pulseValue);
       ctx.shadowBlur = glowIntensity;
       ctx.shadowColor = 'white';
@@ -684,6 +819,7 @@ export function ScndDropGame() {
       ctx.shadowOffsetY = 0;
     }
 
+    // Partikel
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
@@ -729,15 +865,16 @@ export function ScndDropGame() {
   return (
     <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl z-10"></div>
+
       <div className="pt-2 pb-1 px-2 text-center">
-        <h3 className={`text-xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ${titlePulse && isPlaying ? 'scale-110' : ''}`}>
+        <h3 className={'text-xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
           SCND DROP
         </h3>
         <div className="flex justify-center gap-1 mt-1 flex-wrap">
-          {slowMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full">🐢 SLOW</span>}
-          {freezeMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full animate-pulse">❄️ FREEZE</span>}
+          {slowMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full">🐌 SLOW</span>}
+          {freezeMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full animate-pulse">⏰ FREEZE</span>}
           {fastForwardActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[7px] rounded-full animate-pulse">⏩ FAST</span>}
-          {scndBonusActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[7px] rounded-full animate-pulse">3️⃣ 3x</span>}
+          {scndBonusActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[7px] rounded-full animate-pulse">⭐ 3x</span>}
           {activePowerUp && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[7px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
         </div>
         {bonusMessage.show && (
@@ -763,6 +900,7 @@ export function ScndDropGame() {
                 transition: 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)'
               }}
             />
+
             {isPaused && !gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/85 backdrop-blur-md rounded-lg z-40">
                 <div className="text-center">
@@ -770,10 +908,11 @@ export function ScndDropGame() {
                   <div className="w-8 h-0.5 bg-[#FF4400]/50 mx-auto mb-2"></div>
                   <button onClick={handleResume} className="w-28 py-1 mb-1 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-[10px] hover:scale-105 transition-all shadow-lg">▶ WEITER</button>
                   <button onClick={handleRestart} className="w-28 py-1 mb-1 border border-[#FF4400] text-[#FF4400] font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-[#FF4400]/10 hover:scale-105 transition-all">🔄 NEUSTART</button>
-                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⏏️ AUFGABEN</button>
+                  <button onClick={handleGiveUp} className="w-28 py-1 border border-red-500 text-red-500 font-bold uppercase tracking-wider rounded-lg text-[10px] hover:bg-red-500/10 hover:scale-105 transition-all">⚡ AUFGABEN</button>
                 </div>
               </div>
             )}
+
             {!isPlaying && !gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 backdrop-blur-sm rounded-lg">
                 <div className="text-center">
@@ -782,19 +921,20 @@ export function ScndDropGame() {
                 </div>
               </div>
             )}
+
             {gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 backdrop-blur-sm rounded-lg">
                 <div className="text-center">
                   <div className="text-sm md:text-base font-black mb-0.5"><span className="text-[#FF4400]">GAME</span><span className="text-white"> OVER</span></div>
                   <div className="text-xs md:text-sm text-[#FF4400] font-bold mb-1">{finalScore} Pkt</div>
-                  <button onClick={startGame} className="px-2 py-0.5 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-[9px] hover:scale-105 transition-all">🔄 NEUSTART</button>
+                  <button onClick={startGame} className="px-2 py-0.5 bg-gradient-to-r from-[#FF4400] to-[#FF6600] text-white font-bold uppercase tracking-wider rounded-lg text-[9px] hover:scale-105 transition-all">NEUSTART</button>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Rechte Seitenleiste */}
+        {/* Rechte Seitenleiste (unverändert) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
@@ -808,7 +948,7 @@ export function ScndDropGame() {
           <div className="flex justify-center gap-1 mb-1">
             {hotStreak && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent px-1 py-0.5 rounded border-l border-[#FF4400]"><div className="text-[6px] text-[var(--text-secondary)]">🔥</div><div className="text-[8px] font-bold text-[#FF4400]">HOT</div></div>}
             {scndMode && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent px-1 py-0.5 rounded border-l border-[#FF4400]"><div className="text-[6px] text-[var(--text-secondary)]">⚡</div><div className="text-[8px] font-bold text-[#FF4400]">SCND</div></div>}
-            {scndBonusActive && <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent px-1 py-0.5 rounded border-l border-[#FFD700]"><div className="text-[6px] text-[var(--text-secondary)]">✨</div><div className="text-[8px] font-bold text-[#FFD700]">3x</div></div>}
+            {scndBonusActive && <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent px-1 py-0.5 rounded border-l border-[#FFD700]"><div className="text-[6px] text-[var(--text-secondary)]">⭐</div><div className="text-[8px] font-bold text-[#FFD700]">3x</div></div>}
           </div>
           <div className="bg-[var(--bg-secondary)]/50 rounded-lg p-1.5 mb-1">
             <div className="flex items-center gap-1 mb-0.5"><div className="w-1 h-2 bg-[#FF4400] rounded-full"></div><h4 className="font-bold text-[7px] uppercase tracking-wider text-[#FF4400]">🏆 TOP 3</h4></div>
@@ -846,12 +986,13 @@ export function ScndDropGame() {
           <div className="flex justify-center gap-12 mt-1 text-[7px] text-[var(--text-secondary)] uppercase tracking-wider font-bold"><span>BEWEGEN</span><span>DREHEN</span><span>PAUSE</span></div>
         </div>
       )}
+
       <div className="md:hidden" style={{ height: '100px' }}></div>
 
       {showNameInput && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--bg-secondary)] p-4 md:p-6 rounded-lg border-2 border-[#FF4400] max-w-sm w-full mx-4 shadow-2xl">
-            <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2"><span className="text-[#FF4400]">✨ NEW</span> <span className="text-[var(--text-primary)]">HIGHSCORE</span></h3>
+            <h3 className="text-lg md:text-2xl font-bold tracking-tighter mb-2"><span className="text-[#FF4400]">✨ NEW</span>_<span className="text-[var(--text-primary)]">HIGHSCORE</span></h3>
             <p className="text-xs md:text-sm text-[var(--text-secondary)] mb-4">Punktzahl: <span className="text-[#FF4400] font-bold text-lg md:text-xl">{finalScore}</span></p>
             <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} maxLength={15} className="w-full p-2 md:p-3 bg-[var(--bg-primary)] border-2 border-[#FF4400] rounded mb-4 text-sm md:text-base text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[#FF4400] uppercase tracking-wider" placeholder="DEIN SPITZNAME" autoFocus />
             <div className="flex gap-3"><button onClick={saveHighscore} className="flex-1 px-3 md:px-4 py-2 bg-[#FF4400] text-white font-bold uppercase tracking-wider rounded text-sm md:text-base hover:bg-[#FF4400]/80 transition">SPEICHERN</button><button onClick={() => setShowNameInput(false)} className="flex-1 px-3 md:px-4 py-2 border border-gray-500 rounded hover:bg-gray-800 transition text-sm md:text-base">ABBRECHEN</button></div>
