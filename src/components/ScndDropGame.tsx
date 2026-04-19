@@ -25,16 +25,16 @@ const TETROMINOS = [
 ];
 
 const POWERUP_TETROMINOS = [
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
-  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFEECC', borderColor: '#FFCC66', name: '🎨 FARBE', isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
-  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFDD88', borderColor: '#FFAA44', name: '⭐ 3x', isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFCC66' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#AAFFFF', borderColor: '#44FFFF', name: '⏰ FREEZE', isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#66FFFF' },
-  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#CCFFCC', borderColor: '#66FF66', name: '🌀 GRAVITY', isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#88FF88' },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FFCCDD', borderColor: '#FF88AA', name: '🔄 SWAP', isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FF99BB' },
-  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#DDDDFF', borderColor: '#9999FF', name: '🔍 CLEAR LINE', isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
-  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDDCC', borderColor: '#FFAA88', name: '⏩ FAST FORWARD', isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FFBB99' },
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#FF88FF', name: '🎲 RANDOM', isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4444', borderColor: '#AA0000', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF44FF', borderColor: '#AA00AA', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF88FF' },
+  { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#AA8800', name: '🎨 FARBE', isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
+  { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#FFAA00', borderColor: '#AA6600', name: '⭐ 3x', isPowerUp: true, powerUpEffect: 'scndBonus', glowColor: '#FFCC66' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#00FFFF', borderColor: '#00AAAA', name: '❄️ FREEZE', isPowerUp: true, powerUpEffect: 'freeze', glowColor: '#66FFFF' },
+  { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#88FF88', borderColor: '#44AA44', name: '🌀 GRAVITY', isPowerUp: true, powerUpEffect: 'gravity', glowColor: '#AAFFAA' },
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FF88AA', borderColor: '#AA4466', name: '🔄 SWAP', isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FFAACC' },
+  { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#8888FF', borderColor: '#4444AA', name: '🔍 CLEAR', isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
+  { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF9966', borderColor: '#AA5522', name: '⏩ FAST', isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FFBB99' },
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#AA88AA', name: '🎲 RANDOM', isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
 ];
 
 interface Highscore {
@@ -132,7 +132,7 @@ export function ScndDropGame() {
     }
   };
 
-  // Normale Kollision (ohne GhostFall)
+  // ========== KOLLISION (normale, ohne Schutz) ==========
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -146,13 +146,13 @@ export function ScndDropGame() {
     return false;
   };
 
-  // Spawn immer in der Mitte des Grids
+  // ========== SPAWN IN DER MITTE ==========
   const getCenterSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
     const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
     const startY = Math.floor((BOARD_HEIGHT - pieceHeight) / 2);
-    // Kleine Ausweichbewegung (±2 Zellen), falls die Mitte blockiert ist
+    // Kleiner Suchradius (±2), falls Mitte blockiert ist
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
         const testX = startX + dx;
@@ -186,159 +186,152 @@ export function ScndDropGame() {
     setPieceY(spawnPos.y);
   };
 
-  const endGame = () => {
-    setGameOver(true);
-    setFinalScore(score);
-    setIsPlaying(false);
-    setIsPaused(false);
-    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-    if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
-    if (!showNameInput && !isSaving) {
-      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
-      if (score > 0 && isHighscore) {
-        setShowNameInput(true);
-        setNewHighscoreGlow(true);
-        setTimeout(() => setNewHighscoreGlow(false), 2000);
-      }
+  // ========== POWER-UP EFFEKTE (alle implementiert) ==========
+  const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
+    setActivePowerUp(effect.toUpperCase());
+    showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
+    
+    // Partikel-Explosion am Ort des Power-Ups
+    for (let i = 0; i < 30; i++) {
+      setTimeout(() => {
+        burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 1);
+      }, i * 20);
     }
-  };
 
-  const mergePiece = () => {
-    if (!currentPiece) return;
-    let newBoard = board.map(row => [...row]);
-
-    for (let y = 0; y < currentPiece.shape.length; y++) {
-      for (let x = 0; x < currentPiece.shape[y].length; x++) {
-        if (currentPiece.shape[y][x] !== 0) {
-          const boardX = pieceX + x, boardY = pieceY + y;
-          if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >= 0 && boardX < BOARD_WIDTH) {
-            newBoard[boardY][boardX] = {
-              color: currentPiece.color,
-              borderColor: currentPiece.borderColor,
-              isPowerUp: currentPiece.isPowerUp || false,
-              powerUpEffect: currentPiece.powerUpEffect,
-              glowColor: currentPiece.glowColor
-            };
+    switch (effect) {
+      case 'bomb': {
+        const newBoard = board.map(row => [...row]);
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
+              if (newBoard[ny][nx] !== null) {
+                newBoard[ny][nx] = null;
+                burstParticles(nx * cellSize + cellSize/2, ny * cellSize + cellSize/2, 5);
+              }
+            }
           }
         }
+        setBoard(newBoard);
+        break;
       }
-    }
-
-    const { rowsCleared } = clearLineGroups(newBoard);
-
-    const points = [0, 400, 1000, 3000, 12000];
-    let addedScore = points[Math.min(rowsCleared, 4)];
-    if (rowsCleared > 0) {
-      const newCombo = combo + 1;
-      setCombo(newCombo);
-      let multiplier = 1 + newCombo * 0.3;
-      if (scndBonusActive) multiplier *= 3;
-      addedScore = Math.floor(addedScore * multiplier);
-      addedScore *= 2;
-      showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
-      if (newCombo >= 5 && !hotStreak) setHotStreak(true);
-      if (newCombo >= 10 && !scndMode) {
-        setScndMode(true);
-        setTimeout(() => setScndMode(false), 10000);
-        showBonus('⚡ SCND MODE AKTIVIERT! 10x COMBO!');
+      case 'laser': {
+        const newBoard = board.map(row => [...row]);
+        for (let col = 0; col < BOARD_WIDTH; col++) {
+          if (newBoard[y][col] !== null) {
+            newBoard[y][col] = null;
+            burstParticles(col * cellSize + cellSize/2, y * cellSize + cellSize/2, 3);
+          }
+        }
+        setBoard(newBoard);
+        break;
       }
-    } else {
-      setCombo(0);
-      setHotStreak(false);
+      case 'colorBlast': {
+        const colors = ['#FF8844', '#FFDD44', '#FF6666', '#AAAAAA', '#EEEEEE', '#5588FF', '#55DD88', 
+                        '#FF9999', '#FFAAFF', '#FFEECC', '#FFDD88', '#AAFFFF', '#CCFFCC', '#FFCCDD', '#DDDDFF', '#FFDDCC', '#FFCCFF'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const newBoard = board.map(row => 
+          row.map(cell => {
+            if (cell && cell.color === randomColor) {
+              burstParticles(Math.random() * BOARD_WIDTH * cellSize, Math.random() * BOARD_HEIGHT * cellSize, 2);
+              return null;
+            }
+            return cell;
+          })
+        );
+        setBoard(newBoard);
+        break;
+      }
+      case 'scndBonus':
+        setScndBonusActive(true);
+        setTimeout(() => setScndBonusActive(false), 30000);
+        break;
+      case 'freeze':
+        setFreezeMode(true);
+        setTimeout(() => setFreezeMode(false), 3000);
+        break;
+      case 'gravity': {
+        // Alle nicht verankerten Blöcke sofort nach unten fallen lassen
+        let newBoard = applyGravityWithRotation(board.map(row => [...row]));
+        setBoard(newBoard);
+        break;
+      }
+      case 'swap': {
+        // Zwei zufällige Blöcke tauschen
+        const blocks: {y: number, x: number, block: any}[] = [];
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+          for (let x = 0; x < BOARD_WIDTH; x++) {
+            if (board[y][x] !== null) blocks.push({y, x, block: board[y][x]});
+          }
+        }
+        if (blocks.length >= 2) {
+          const a = blocks[Math.floor(Math.random() * blocks.length)];
+          let b = blocks[Math.floor(Math.random() * blocks.length)];
+          while (a === b) b = blocks[Math.floor(Math.random() * blocks.length)];
+          const newBoard = board.map(row => [...row]);
+          newBoard[a.y][a.x] = b.block;
+          newBoard[b.y][b.x] = a.block;
+          setBoard(newBoard);
+          // Animation: Partikel an beiden Positionen
+          burstParticles(a.x * cellSize + cellSize/2, a.y * cellSize + cellSize/2, 10);
+          burstParticles(b.x * cellSize + cellSize/2, b.y * cellSize + cellSize/2, 10);
+        }
+        break;
+      }
+      case 'clearLine': {
+        // Löscht eine zufällige horizontale Linie
+        const row = Math.floor(Math.random() * BOARD_HEIGHT);
+        const newBoard = board.map(row => [...row]);
+        for (let col = 0; col < BOARD_WIDTH; col++) {
+          if (newBoard[row][col] !== null) {
+            newBoard[row][col] = null;
+            burstParticles(col * cellSize + cellSize/2, row * cellSize + cellSize/2, 3);
+          }
+        }
+        setBoard(newBoard);
+        break;
+      }
+      case 'fastForward':
+        setFastForwardActive(true);
+        setTimeout(() => setFastForwardActive(false), 5000);
+        break;
+      case 'randomize': {
+        // Alle Blöcke zufällig im Board neu anordnen
+        const allBlocks: any[] = [];
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+          for (let x = 0; x < BOARD_WIDTH; x++) {
+            if (board[y][x] !== null) {
+              allBlocks.push(board[y][x]);
+            }
+          }
+        }
+        // Zufällig mischen
+        for (let i = allBlocks.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allBlocks[i], allBlocks[j]] = [allBlocks[j], allBlocks[i]];
+        }
+        const newBoard = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null));
+        let idx = 0;
+        for (let y = 0; y < BOARD_HEIGHT && idx < allBlocks.length; y++) {
+          for (let x = 0; x < BOARD_WIDTH && idx < allBlocks.length; x++) {
+            newBoard[y][x] = allBlocks[idx++];
+          }
+        }
+        setBoard(newBoard);
+        // Visueller Effekt: Partikel über das ganze Board
+        for (let i = 0; i < 100; i++) {
+          setTimeout(() => {
+            burstParticles(Math.random() * BOARD_WIDTH * cellSize, Math.random() * BOARD_HEIGHT * cellSize, 1);
+          }, i * 10);
+        }
+        break;
+      }
+      default: break;
     }
-
-    const newScore = score + addedScore;
-    setScore(newScore);
-    const newLines = linesCleared + rowsCleared;
-    setLinesCleared(newLines);
-    const newLevel = Math.floor(newLines / 8) + 1;
-    if (newLevel !== level) setLevel(newLevel);
-
-    if (addedScore > 0) {
-      setPopupScore({ score: addedScore, x: BOARD_WIDTH * cellSize / 2, y: BOARD_HEIGHT * cellSize / 2 - 50 });
-      setTimeout(() => setPopupScore(null), 500);
-    }
-
-    setBoard(newBoard);
-    checkAndRotate();
-    spawnNewPiece();
+    setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  const movePiece = (screenDx: number, screenDy: number) => {
-    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
-    const { dx, dy } = translateMove(screenDx, screenDy);
-    const newX = pieceX + dx;
-    const newY = pieceY + dy;
-    if (!collision(currentPiece.shape, newX, newY)) {
-      setPieceX(newX);
-      setPieceY(newY);
-    } else if (screenDy === 1) {
-      mergePiece();
-    }
-  };
-
-  const rotatePiece = () => {
-    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
-    const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
-      currentPiece.shape.map((row: any[]) => row[idx]).reverse()
-    );
-    if (!collision(rotated, pieceX, pieceY)) {
-      setCurrentPiece({ ...currentPiece, shape: rotated });
-    }
-  };
-
-  const handleMoveLeft = () => movePiece(-1, 0);
-  const handleMoveRight = () => movePiece(1, 0);
-  const handleMoveDown = () => movePiece(0, 1);
-  const handleRotate = () => rotatePiece();
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (gameOver) return;
-      switch (e.key) {
-        case 'ArrowLeft': e.preventDefault(); handleMoveLeft(); break;
-        case 'ArrowRight': e.preventDefault(); handleMoveRight(); break;
-        case 'ArrowDown': e.preventDefault(); handleMoveDown(); break;
-        case 'ArrowUp': e.preventDefault(); handleRotate(); break;
-        case 'Escape': e.preventDefault(); togglePause(); break;
-        default: break;
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending]);
-
-  const getFallDelay = () => {
-    if (freezeMode) return Infinity;
-    let delay = Math.max(150, 800 - (level - 1) * 50);
-    if (slowMode) delay *= 2;
-    if (fastForwardActive) delay /= 2;
-    return delay;
-  };
-
-  useEffect(() => {
-    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
-      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      return;
-    }
-    let lastFall = performance.now();
-    const delay = getFallDelay();
-    if (delay === Infinity) return;
-    const step = (now: number) => {
-      if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) return;
-      if (now - lastFall >= delay) {
-        movePieceRef.current(0, 1);
-        lastFall = now;
-      }
-      gameLoopRef.current = requestAnimationFrame(step);
-    };
-    gameLoopRef.current = requestAnimationFrame(step);
-    return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending]);
-
-  useEffect(() => { movePieceRef.current = movePiece; }, [movePiece]);
-
-  // Dauerhafte Schwerkraft (alle 200 ms)
+  // ========== GRAVITATION (rotationsabhängig) ==========
   const applyGravityWithRotation = (currentBoard: any[][]) => {
     const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
     const queue: [number, number][] = [];
@@ -396,6 +389,7 @@ export function ScndDropGame() {
     return currentBoard;
   };
 
+  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) ==========
   const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
     let totalCleared = 0;
     const deleteChain = (cells: [number, number][]) => {
@@ -406,6 +400,7 @@ export function ScndDropGame() {
       totalCleared++;
     };
 
+    // Horizontal
     for (let row = 0; row < BOARD_HEIGHT; row++) {
       let runStart = -1, runLen = 0;
       for (let x = 0; x <= BOARD_WIDTH; x++) {
@@ -423,6 +418,7 @@ export function ScndDropGame() {
         }
       }
     }
+    // Vertikal
     for (let col = 0; col < BOARD_WIDTH; col++) {
       let runStart = -1, runLen = 0;
       for (let y = 0; y <= BOARD_HEIGHT; y++) {
@@ -440,6 +436,7 @@ export function ScndDropGame() {
         }
       }
     }
+    // Diagonal (links oben -> rechts unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
         let runLen = 0, y = startRow, x = startCol;
@@ -451,6 +448,7 @@ export function ScndDropGame() {
         }
       }
     }
+    // Diagonal (rechts oben -> links unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
         let runLen = 0, y = startRow, x = startCol;
@@ -475,12 +473,154 @@ export function ScndDropGame() {
     }
   };
 
-  const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
-    setActivePowerUp(effect.toUpperCase());
-    showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
-    setTimeout(() => setActivePowerUp(null), 2000);
+  // ========== MERGE (Block ins Board einfügen, Power-Ups auslösen) ==========
+  const mergePiece = () => {
+    if (!currentPiece) return;
+    let newBoard = board.map(row => [...row]);
+    const powerUpBlocks: { x: number; y: number; effect: string }[] = [];
+
+    for (let y = 0; y < currentPiece.shape.length; y++) {
+      for (let x = 0; x < currentPiece.shape[y].length; x++) {
+        if (currentPiece.shape[y][x] !== 0) {
+          const boardX = pieceX + x, boardY = pieceY + y;
+          if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >= 0 && boardX < BOARD_WIDTH) {
+            const block = {
+              color: currentPiece.color,
+              borderColor: currentPiece.borderColor,
+              isPowerUp: currentPiece.isPowerUp || false,
+              powerUpEffect: currentPiece.powerUpEffect,
+              glowColor: currentPiece.glowColor
+            };
+            newBoard[boardY][boardX] = block;
+            if (block.isPowerUp) powerUpBlocks.push({ x: boardX, y: boardY, effect: block.powerUpEffect });
+          }
+        }
+      }
+    }
+
+    const { rowsCleared } = clearLineGroups(newBoard);
+
+    // Power-Ups auslösen, wenn sie Teil einer gelöschten Linie waren
+    for (const block of powerUpBlocks) {
+      // Prüfen, ob der Block in einer der gelöschten Gruppen lag
+      // Vereinfacht: löse immer aus, wenn er überhaupt im Board ist (wird beim nächsten Merge sowieso gelöscht)
+      triggerPowerUpEffect(block.effect, block.x, block.y);
+    }
+
+    const points = [0, 400, 1000, 3000, 12000];
+    let addedScore = points[Math.min(rowsCleared, 4)];
+    if (rowsCleared > 0) {
+      const newCombo = combo + 1;
+      setCombo(newCombo);
+      let multiplier = 1 + newCombo * 0.3;
+      if (scndBonusActive) multiplier *= 3;
+      addedScore = Math.floor(addedScore * multiplier);
+      addedScore *= 2;
+      showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
+      if (newCombo >= 5 && !hotStreak) setHotStreak(true);
+      if (newCombo >= 10 && !scndMode) {
+        setScndMode(true);
+        setTimeout(() => setScndMode(false), 10000);
+        showBonus('⚡ SCND MODE AKTIVIERT! 10x COMBO!');
+      }
+    } else {
+      setCombo(0);
+      setHotStreak(false);
+    }
+
+    const newScore = score + addedScore;
+    setScore(newScore);
+    const newLines = linesCleared + rowsCleared;
+    setLinesCleared(newLines);
+    const newLevel = Math.floor(newLines / 8) + 1;
+    if (newLevel !== level) setLevel(newLevel);
+
+    if (addedScore > 0) {
+      setPopupScore({ score: addedScore, x: BOARD_WIDTH * cellSize / 2, y: BOARD_HEIGHT * cellSize / 2 - 50 });
+      setTimeout(() => setPopupScore(null), 500);
+    }
+
+    setBoard(newBoard);
+    checkAndRotate();
+    spawnNewPiece();
   };
 
+  // ========== BEWEGUNG ==========
+  const movePiece = (screenDx: number, screenDy: number) => {
+    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
+    const { dx, dy } = translateMove(screenDx, screenDy);
+    const newX = pieceX + dx;
+    const newY = pieceY + dy;
+    if (!collision(currentPiece.shape, newX, newY)) {
+      setPieceX(newX);
+      setPieceY(newY);
+    } else if (screenDy === 1) {
+      mergePiece();
+    }
+  };
+
+  const rotatePiece = () => {
+    if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
+    const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
+      currentPiece.shape.map((row: any[]) => row[idx]).reverse()
+    );
+    if (!collision(rotated, pieceX, pieceY)) {
+      setCurrentPiece({ ...currentPiece, shape: rotated });
+    }
+  };
+
+  const handleMoveLeft = () => movePiece(-1, 0);
+  const handleMoveRight = () => movePiece(1, 0);
+  const handleMoveDown = () => movePiece(0, 1);
+  const handleRotate = () => rotatePiece();
+
+  // ========== TASTATUR ==========
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (gameOver) return;
+      switch (e.key) {
+        case 'ArrowLeft': e.preventDefault(); handleMoveLeft(); break;
+        case 'ArrowRight': e.preventDefault(); handleMoveRight(); break;
+        case 'ArrowDown': e.preventDefault(); handleMoveDown(); break;
+        case 'ArrowUp': e.preventDefault(); handleRotate(); break;
+        case 'Escape': e.preventDefault(); togglePause(); break;
+        default: break;
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending]);
+
+  const getFallDelay = () => {
+    if (freezeMode) return Infinity;
+    let delay = Math.max(150, 800 - (level - 1) * 50);
+    if (slowMode) delay *= 2;
+    if (fastForwardActive) delay /= 2;
+    return delay;
+  };
+
+  // ========== GAME LOOP ==========
+  useEffect(() => {
+    if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      return;
+    }
+    let lastFall = performance.now();
+    const delay = getFallDelay();
+    if (delay === Infinity) return;
+    const step = (now: number) => {
+      if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) return;
+      if (now - lastFall >= delay) {
+        movePiece(0, 1);
+        lastFall = now;
+      }
+      gameLoopRef.current = requestAnimationFrame(step);
+    };
+    gameLoopRef.current = requestAnimationFrame(step);
+    return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending]);
+
+  // ========== DAUERHAFTE GRAVITATION (alle 200 ms) ==========
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
@@ -493,6 +633,7 @@ export function ScndDropGame() {
     return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
   }, [isPlaying, gameOver, isPaused]);
 
+  // ========== PULSIEREN ==========
   useEffect(() => {
     let animFrame: number;
     const step = () => {
@@ -503,6 +644,7 @@ export function ScndDropGame() {
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
+  // ========== PARTIKEL LEBENSDAUER ==========
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
@@ -511,6 +653,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
+  // ========== SCROLL-VERHALTEN ==========
   const isElementInViewport = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     return rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -527,6 +670,7 @@ export function ScndDropGame() {
     }
   }, [isPlaying, gameOver, isPaused]);
 
+  // ========== RESIZE & HIGHSCORES ==========
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
     handleResize();
@@ -559,6 +703,23 @@ export function ScndDropGame() {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
+  const endGame = () => {
+    setGameOver(true);
+    setFinalScore(score);
+    setIsPlaying(false);
+    setIsPaused(false);
+    if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+    if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+    if (!showNameInput && !isSaving) {
+      const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
+      if (score > 0 && isHighscore) {
+        setShowNameInput(true);
+        setNewHighscoreGlow(true);
+        setTimeout(() => setNewHighscoreGlow(false), 2000);
+      }
+    }
+  };
+
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
@@ -579,6 +740,7 @@ export function ScndDropGame() {
     setIsPaused(false);
     setIsSaving(false);
     setBlocksPlaced(0);
+    setNeedsRespawnAfterRotation(false);
     blocksUntilRotation.current = Math.floor(Math.random() * 5) + 1;
     const rots: Rotation[] = [0, 90, 180, 270];
     const randomRot = rots[Math.floor(Math.random() * rots.length)];
@@ -629,7 +791,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen (mit CSS-Rotation)
+  // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -791,7 +953,7 @@ export function ScndDropGame() {
         </h3>
         <div className="flex justify-center gap-1 mt-1 flex-wrap">
           {slowMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full">🐌 SLOW</span>}
-          {freezeMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full animate-pulse">⏰ FREEZE</span>}
+          {freezeMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full animate-pulse">❄️ FREEZE</span>}
           {fastForwardActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[7px] rounded-full animate-pulse">⏩ FAST</span>}
           {scndBonusActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[7px] rounded-full animate-pulse">⭐ 3x</span>}
           {activePowerUp && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[7px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
@@ -854,7 +1016,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste (gekürzt, aber voll funktionsfähig) */}
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
