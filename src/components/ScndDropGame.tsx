@@ -84,36 +84,20 @@ export function ScndDropGame() {
   const [pulseValue, setPulseValue] = useState(0);
   const [ghostFallActive, setGhostFallActive] = useState(false);
 
-  // Rotation (visuell)
+  // Rotation (nur intern, keine visuelle Transformation mehr)
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
   const [rotationPending, setRotationPending] = useState(false);
-  const [needsRespawnAfterRotation, setNeedsRespawnAfterRotation] = useState(false);
 
   const changeRotationRandom = () => {
     const rots: Rotation[] = [0, 90, 180, 270];
     let newRot = rots[Math.floor(Math.random() * rots.length)];
     while (newRot === rotation) newRot = rots[Math.floor(Math.random() * rots.length)];
     setRotation(newRot);
-    if (canvasRef.current) {
-      canvasRef.current.style.transform = `rotate(${newRot}deg)`;
-      canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-      const onTransitionEnd = () => {
-        setRotationPending(false);
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (needsRespawnAfterRotation) {
-              setNeedsRespawnAfterRotation(false);
-              spawnNewPiece();
-            }
-          }, 0);
-        });
-        canvasRef.current?.removeEventListener('transitionend', onTransitionEnd);
-      };
-      canvasRef.current.addEventListener('transitionend', onTransitionEnd);
-    }
+    // Keine CSS-Transformation mehr – nur Vibration als Feedback
     if (window.navigator.vibrate) window.navigator.vibrate(100);
+    setRotationPending(false); // Sofort verfügbar
   };
 
   const checkAndRotate = () => {
@@ -139,57 +123,12 @@ export function ScndDropGame() {
     }
   };
 
-  // Bildschirmkoordinaten (Pixel relativ zum Canvas) in Board-Zellen umrechnen
-  const screenToBoard = (screenX: number, screenY: number, cs: number): { x: number; y: number } => {
-    const centerX = (BOARD_WIDTH * cs) / 2;
-    const centerY = (BOARD_HEIGHT * cs) / 2;
-    let dx = screenX - centerX;
-    let dy = screenY - centerY;
-    switch (rotation) {
-      case 90: { const tmp = dx; dx = -dy; dy = tmp; break; }
-      case 180: dx = -dx; dy = -dy; break;
-      case 270: { const tmp = dx; dx = dy; dy = -tmp; break; }
-      default: break;
-    }
-    let boardX = (dx + centerX) / cs;
-    let boardY = (dy + centerY) / cs;
-    boardX = Math.min(Math.max(0, boardX), BOARD_WIDTH - 1);
-    boardY = Math.min(Math.max(0, boardY), BOARD_HEIGHT - 1);
-    return { x: Math.floor(boardX), y: Math.floor(boardY) };
-  };
-
-  // DISTANZ-BASIERTE SPAWN-SUCHE (großer Radius ±5)
-  const getSpawnPositionByDistance = (pieceShape: number[][]): { x: number; y: number } | null => {
-    if (!canvasRef.current) return null;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const cs = rect.width / BOARD_WIDTH;
-    const targetScreenX = rect.width / 2;
-    const targetScreenY = 0;
-    const targetBoard = screenToBoard(targetScreenX, targetScreenY, cs);
+  // Spawn-Position: immer obere Bildschirmmitte (Canvas ist nicht gedreht!)
+  const getSpawnPosition = (pieceShape: number[][]): { x: number; y: number } => {
     const pieceWidth = pieceShape[0].length;
-    const pieceHeight = pieceShape.length;
-
-    let bestX = -1, bestY = -1;
-    let bestDist = Infinity;
-    for (let dy = -5; dy <= 5; dy++) {
-      for (let dx = -5; dx <= 5; dx++) {
-        let testX = targetBoard.x + dx;
-        let testY = targetBoard.y + dy;
-        testX = Math.min(Math.max(0, testX), BOARD_WIDTH - pieceWidth);
-        testY = Math.min(Math.max(0, testY), BOARD_HEIGHT - pieceHeight);
-        if (!collision(pieceShape, testX, testY)) {
-          const dist = Math.abs(dx) + Math.abs(dy);
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestX = testX;
-            bestY = testY;
-          }
-        }
-      }
-    }
-    if (bestX === -1) return null;
-    return { x: bestX, y: bestY };
+    const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
+    const startY = 0;
+    return { x: startX, y: startY };
   };
 
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
@@ -387,7 +326,8 @@ export function ScndDropGame() {
   // ========== SPIEL-LOGIK ==========
   const spawnNewPiece = () => {
     if (rotationPending) {
-      setNeedsRespawnAfterRotation(true);
+      // Kurze Verzögerung, falls Rotation gerade wechselt (aber ohne CSS-Transition ist das minimal)
+      setTimeout(() => spawnNewPiece(), 10);
       return;
     }
     const isPowerUpSpawn = Math.random() < 0.15;
@@ -395,11 +335,7 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const spawnPos = getSpawnPositionByDistance(piece.shape);
-    if (!spawnPos) {
-      endGame(); // GAME OVER – kein einziger freier Platz
-      return;
-    }
+    const spawnPos = getSpawnPosition(piece.shape);
     setPieceX(spawnPos.x);
     setPieceY(spawnPos.y);
     setGhostFallActive(true);
@@ -481,7 +417,6 @@ export function ScndDropGame() {
 
     setBoard(newBoard);
     checkAndRotate();
-    // KEINE Game-Over-Prüfung mehr hier – spawnNewPiece macht das
     spawnNewPiece();
   };
 
@@ -638,12 +573,10 @@ export function ScndDropGame() {
     setIsSaving(false);
     setBlocksPlaced(0);
     setGhostFallActive(false);
-    setNeedsRespawnAfterRotation(false);
     blocksUntilRotation.current = Math.floor(Math.random() * 5) + 1;
     const rots: Rotation[] = [0, 90, 180, 270];
     const randomRot = rots[Math.floor(Math.random() * rots.length)];
     setRotation(randomRot);
-    if (canvasRef.current) canvasRef.current.style.transform = `rotate(${randomRot}deg)`;
     setRotationPending(false);
     spawnNewPiece();
     setIsPlaying(true);
@@ -689,7 +622,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen (unverändert, aus Platzgründen ausgelassen – füge deinen funktionierenden Zeichen-Code hier ein)
+  // Canvas zeichnen (keine Rotation mehr, daher kein transform)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -720,6 +653,7 @@ export function ScndDropGame() {
       ctx.lineTo(canvas.width, y * cellSize);
       ctx.stroke();
     }
+
     ctx.globalAlpha = 0.6;
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
@@ -750,6 +684,7 @@ export function ScndDropGame() {
       }
     }
     ctx.globalAlpha = 1;
+
     if (currentPiece && !gameOver && !freezeMode && !isPaused && !rotationPending) {
       const ghost = getGhostPosition();
       ctx.globalAlpha = 0.3;
@@ -796,10 +731,12 @@ export function ScndDropGame() {
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
     }
+
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
+
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
@@ -871,9 +808,8 @@ export function ScndDropGame() {
               style={{
                 width: '100%',
                 height: 'auto',
-                aspectRatio: `${BOARD_WIDTH} / ${BOARD_HEIGHT}`,
-                transform: `rotate(${rotation}deg)`,
-                transition: 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)'
+                aspectRatio: `${BOARD_WIDTH} / ${BOARD_HEIGHT}`
+                // KEIN transform: rotate mehr
               }}
             />
 
@@ -910,7 +846,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste */}
+        {/* Rechte Seitenleiste – unverändert */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
