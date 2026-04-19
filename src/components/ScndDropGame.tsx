@@ -14,17 +14,26 @@ const getCellSize = () => {
   return Math.min(Math.max(16, maxCell), 32);
 };
 
+// ========== NEUE TETROMINO-FORMEN ==========
 const TETROMINOS = [
+  // Standardformen
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FF6666', borderColor: '#CC3333', name: 'T', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,0]], color: '#AAAAAA', borderColor: '#666666', name: 'S', isPowerUp: false },
   { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#EEEEEE', borderColor: '#CCCCCC', name: 'Z', isPowerUp: false },
   { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#5588FF', borderColor: '#2255AA', name: 'L', isPowerUp: false },
-  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isPowerUp: false }
+  { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isPowerUp: false },
+  // Neue Formen
+  { shape: [[0,1,0],[1,1,1],[0,1,0]], color: '#FF88FF', borderColor: '#AA44AA', name: '➕ PLUS', isPowerUp: false }, // 3x3 Plus
+  { shape: [[1,1],[1,0],[1,0]], color: '#88FF88', borderColor: '#44AA44', name: '⤴️ HAKEN', isPowerUp: false }, // Haken
+  { shape: [[1,1,1,1,1]], color: '#FF8888', borderColor: '#AA4444', name: '5️⃣ FÜNFER', isPowerUp: false }, // 5er-Kette
+  { shape: [[1,1],[1,1],[1,0]], color: '#88AAFF', borderColor: '#4466AA', name: '▦ EXTRA', isPowerUp: false } // 2x2 + Extra
 ];
 
+// ========== POWER-UP TETROMINOS (alle neuen Effekte) ==========
 const POWERUP_TETROMINOS = [
+  // Bestehende
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF4444', borderColor: '#AA0000', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF44FF', borderColor: '#AA00AA', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF88FF' },
   { shape: [[0,0,0,0],[0,1,0,0],[1,1,1,0],[0,0,0,0]], color: '#FFD700', borderColor: '#AA8800', name: '🎨 FARBE', isPowerUp: true, powerUpEffect: 'colorBlast', glowColor: '#FFDD88' },
@@ -34,12 +43,32 @@ const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#FF88AA', borderColor: '#AA4466', name: '🔄 SWAP', isPowerUp: true, powerUpEffect: 'swap', glowColor: '#FFAACC' },
   { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#8888FF', borderColor: '#4444AA', name: '🔍 CLEAR', isPowerUp: true, powerUpEffect: 'clearLine', glowColor: '#AAAADD' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FF9966', borderColor: '#AA5522', name: '⏩ FAST', isPowerUp: true, powerUpEffect: 'fastForward', glowColor: '#FFBB99' },
-  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#AA88AA', name: '🎲 RANDOM', isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' }
+  { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FFCCFF', borderColor: '#AA88AA', name: '🎲 RANDOM', isPowerUp: true, powerUpEffect: 'randomize', glowColor: '#FFAAFF' },
+  // Neue Power-Ups
+  { shape: [[1,1],[1,1]], color: '#88FFFF', borderColor: '#44AAAA', name: '🧬 CLONE', isPowerUp: true, powerUpEffect: 'clone', glowColor: '#AAFFFF' },
+  { shape: [[1,1,1],[1,0,1],[1,1,1]], color: '#88FFAA', borderColor: '#44AA66', name: '🐢 SLOW MO', isPowerUp: true, powerUpEffect: 'slowMo', glowColor: '#AAFFCC' },
+  { shape: [[0,1,0],[1,1,1],[0,1,0]], color: '#AA88FF', borderColor: '#6644AA', name: '⬆️ ANTI-GRAVITY', isPowerUp: true, powerUpEffect: 'antiGravity', glowColor: '#CCAADD' },
+  { shape: [[1,1,1,1]], color: '#FF88AA', borderColor: '#AA4466', name: '🌈 RAINBOW', isPowerUp: true, powerUpEffect: 'rainbow', glowColor: '#FFAACC' },
+  { shape: [[1,1,1],[1,1,1],[1,1,1]], color: '#FF4444', borderColor: '#AA0000', name: '💥 MEGA BOMBE', isPowerUp: true, powerUpEffect: 'megaBomb', glowColor: '#FF8888' },
+  { shape: [[0,1,0],[1,1,1],[0,1,0]], color: '#CCCCFF', borderColor: '#8888AA', name: '🛡️ SHIELD', isPowerUp: true, powerUpEffect: 'shield', glowColor: '#FFFFFF' },
+  { shape: [[1,1],[1,1]], color: '#FFDD88', borderColor: '#AA8855', name: '💰 DOUBLE SCORE', isPowerUp: true, powerUpEffect: 'doubleScore', glowColor: '#FFEEAA' },
+  { shape: [[1,0,1],[0,1,0],[1,0,1]], color: '#88AACC', borderColor: '#557799', name: '🧹 CLEANSE', isPowerUp: true, powerUpEffect: 'cleanse', glowColor: '#AACCEE' },
+  { shape: [[1,1,1],[1,0,1],[1,1,1]], color: '#CCAA88', borderColor: '#997755', name: '⏪ REWIND', isPowerUp: true, powerUpEffect: 'rewind', glowColor: '#DDCCAA' },
+  { shape: [[0,1,0],[1,1,1],[0,1,0]], color: '#FFAA55', borderColor: '#AA7733', name: '☄️ METEOR', isPowerUp: true, powerUpEffect: 'meteor', glowColor: '#FFCC88' }
 ];
 
 interface Highscore {
   player_name: string;
   score: number;
+}
+
+// Speichert einen Zustand für REWIND
+interface GameState {
+  board: any[][];
+  score: number;
+  linesCleared: number;
+  level: number;
+  combo: number;
 }
 
 export function ScndDropGame() {
@@ -75,6 +104,9 @@ export function ScndDropGame() {
   const [scndBonusActive, setScndBonusActive] = useState(false);
   const [activePowerUp, setActivePowerUp] = useState<string | null>(null);
   const [fastForwardActive, setFastForwardActive] = useState(false);
+  const [antiGravityActive, setAntiGravityActive] = useState(false);
+  const [doubleScoreActive, setDoubleScoreActive] = useState(false);
+  const [shieldActive, setShieldActive] = useState(false);
   const gameLoopRef = useRef<number | null>(null);
   const movePieceRef = useRef<(dx: number, dy: number) => void>(() => {});
   const gravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,6 +114,7 @@ export function ScndDropGame() {
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
+  const [history, setHistory] = useState<GameState[]>([]);
 
   // Rotation
   const [rotation, setRotation] = useState<Rotation>(0);
@@ -146,7 +179,7 @@ export function ScndDropGame() {
     return false;
   };
 
-  // ========== SPAWN IN DER MITTE (mit Ausweichradius ±2) ==========
+  // ========== SPAWN IN DER MITTE ==========
   const getCenterSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
@@ -185,24 +218,41 @@ export function ScndDropGame() {
     setPieceY(spawnPos.y);
   };
 
-  // ========== EINFACHE, ROBUSTE GRAVITÄT (spaltenweise nach unten) ==========
+  // ========== GRAVITÄT (normal oder anti) ==========
   const applyGravity = (currentBoard: any[][]) => {
-    for (let x = 0; x < BOARD_WIDTH; x++) {
-      const columnBlocks: any[] = [];
-      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-        if (currentBoard[y][x] !== null) {
-          columnBlocks.push(currentBoard[y][x]);
-          currentBoard[y][x] = null;
+    if (antiGravityActive) {
+      // Anti-Gravity: Blöcke fallen nach oben
+      for (let x = 0; x < BOARD_WIDTH; x++) {
+        const columnBlocks: any[] = [];
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+          if (currentBoard[y][x] !== null) {
+            columnBlocks.push(currentBoard[y][x]);
+            currentBoard[y][x] = null;
+          }
+        }
+        for (let i = 0; i < columnBlocks.length; i++) {
+          currentBoard[i][x] = columnBlocks[i];
         }
       }
-      for (let i = 0; i < columnBlocks.length; i++) {
-        currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
+    } else {
+      // Normale Gravity: nach unten
+      for (let x = 0; x < BOARD_WIDTH; x++) {
+        const columnBlocks: any[] = [];
+        for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+          if (currentBoard[y][x] !== null) {
+            columnBlocks.push(currentBoard[y][x]);
+            currentBoard[y][x] = null;
+          }
+        }
+        for (let i = 0; i < columnBlocks.length; i++) {
+          currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
+        }
       }
     }
     return currentBoard;
   };
 
-  // ========== POWER-UP EFFEKTE ==========
+  // ========== POWER-UP EFFEKTE (alle neuen) ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
@@ -330,18 +380,155 @@ export function ScndDropGame() {
         }
         break;
       }
+      // ========== NEUE POWER-UPS ==========
+      case 'clone': {
+        // Erstellt eine Kopie des aktuellen Blocks an einer zufälligen freien Position
+        if (!currentPiece) break;
+        const pieceShape = currentPiece.shape;
+        const pieceWidth = pieceShape[0].length;
+        const pieceHeight = pieceShape.length;
+        const maxAttempts = 50;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const randX = Math.floor(Math.random() * (BOARD_WIDTH - pieceWidth + 1));
+          const randY = Math.floor(Math.random() * (BOARD_HEIGHT - pieceHeight + 1));
+          if (!collision(pieceShape, randX, randY)) {
+            const newBoard = board.map(row => [...row]);
+            for (let y = 0; y < pieceHeight; y++) {
+              for (let x = 0; x < pieceWidth; x++) {
+                if (pieceShape[y][x] !== 0) {
+                  newBoard[randY + y][randX + x] = {
+                    color: currentPiece.color,
+                    borderColor: currentPiece.borderColor,
+                    isPowerUp: false,
+                    powerUpEffect: null,
+                    glowColor: null
+                  };
+                }
+              }
+            }
+            setBoard(newBoard);
+            break;
+          }
+        }
+        break;
+      }
+      case 'slowMo':
+        setSlowMode(true);
+        setTimeout(() => setSlowMode(false), 10000);
+        break;
+      case 'antiGravity':
+        setAntiGravityActive(true);
+        setTimeout(() => setAntiGravityActive(false), 5000);
+        break;
+      case 'rainbow': {
+        const colors = ['#FF0000', '#FF8800', '#FFFF00', '#88FF00', '#00FF88', '#0088FF', '#8800FF', '#FF00FF'];
+        const newBoard = board.map(row => 
+          row.map(cell => {
+            if (cell) {
+              const randomColor = colors[Math.floor(Math.random() * colors.length)];
+              return { ...cell, color: randomColor };
+            }
+            return cell;
+          })
+        );
+        setBoard(newBoard);
+        break;
+      }
+      case 'megaBomb': {
+        const newBoard = board.map(row => [...row]);
+        for (let dy = -3; dy <= 3; dy++) {
+          for (let dx = -3; dx <= 3; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT && newBoard[ny][nx] !== null) {
+              newBoard[ny][nx] = null;
+              burstParticles(nx * cellSize + cellSize/2, ny * cellSize + cellSize/2, 8);
+            }
+          }
+        }
+        setBoard(applyGravity(newBoard));
+        break;
+      }
+      case 'shield':
+        setShieldActive(true);
+        setTimeout(() => setShieldActive(false), 10000);
+        break;
+      case 'doubleScore':
+        setDoubleScoreActive(true);
+        setTimeout(() => setDoubleScoreActive(false), 10000);
+        break;
+      case 'cleanse':
+        setSlowMode(false);
+        setFreezeMode(false);
+        setFastForwardActive(false);
+        setAntiGravityActive(false);
+        setScndBonusActive(false);
+        setDoubleScoreActive(false);
+        setShieldActive(false);
+        showBonus('🧹 ALLE BONUS ENTFERNT!');
+        break;
+      case 'rewind': {
+        if (history.length > 0) {
+          const lastState = history[history.length - 1];
+          setBoard(lastState.board);
+          setScore(lastState.score);
+          setLinesCleared(lastState.linesCleared);
+          setLevel(lastState.level);
+          setCombo(lastState.combo);
+          setHistory(prev => prev.slice(0, -1));
+          showBonus('⏪ ZEITREISE!');
+        } else {
+          showBonus('⏪ KEINE GESCHICHTE!');
+        }
+        break;
+      }
+      case 'meteor': {
+        // Ein zufälliger Block fällt von oben und zerstört alles, was er trifft
+        const meteorX = Math.floor(Math.random() * BOARD_WIDTH);
+        const meteorY = 0;
+        const newBoard = board.map(row => [...row]);
+        for (let dy = 0; dy < BOARD_HEIGHT; dy++) {
+          const ny = meteorY + dy;
+          if (ny < BOARD_HEIGHT && newBoard[ny][meteorX] !== null) {
+            newBoard[ny][meteorX] = null;
+            burstParticles(meteorX * cellSize + cellSize/2, ny * cellSize + cellSize/2, 10);
+          }
+        }
+        setBoard(applyGravity(newBoard));
+        break;
+      }
       default: break;
     }
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
-  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) mit Gravity ==========
-  const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
+  // ========== LINIENLÖSCHUNG mit neuen Block-Typen ==========
+  const clearLineGroups = (newBoard: any[][]): { rowsCleared: number; extraScore: number } => {
     let totalCleared = 0;
+    let extraScore = 0;
     const deleteChain = (cells: [number, number][]) => {
       for (const [y, x] of cells) {
-        newBoard[y][x] = null;
-        burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
+        const cell = newBoard[y][x];
+        if (cell) {
+          // Eisblöcke: brauchen 2 Treffer
+          if (cell.isIce && !cell.hit) {
+            cell.hit = true;
+            newBoard[y][x] = { ...cell, hit: true };
+            burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 3);
+            continue;
+          }
+          // Giftblöcke: Punktabzug
+          if (cell.isPoison) {
+            extraScore -= 200;
+            burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
+          }
+          // Goldblöcke: Extra-Punkte
+          if (cell.isGold) {
+            extraScore += 500;
+            burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 10);
+          }
+          newBoard[y][x] = null;
+          burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
+        }
       }
       totalCleared++;
     };
@@ -382,7 +569,7 @@ export function ScndDropGame() {
         }
       }
     }
-    // Diagonal (links oben -> rechts unten)
+    // Diagonal
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
         let runLen = 0, y = startRow, x = startCol;
@@ -394,7 +581,6 @@ export function ScndDropGame() {
         }
       }
     }
-    // Diagonal (rechts oben -> links unten)
     for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
       for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
         let runLen = 0, y = startRow, x = startCol;
@@ -407,9 +593,8 @@ export function ScndDropGame() {
       }
     }
 
-    // Nach dem Löschen: Gravity anwenden
     applyGravity(newBoard);
-    return { rowsCleared: totalCleared };
+    return { rowsCleared: totalCleared, extraScore };
   };
 
   const burstParticles = (cx: number, cy: number, count: number) => {
@@ -420,9 +605,19 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== MERGE ==========
+  // ========== MERGE mit History für REWIND ==========
   const mergePiece = () => {
     if (!currentPiece) return;
+    // Zustand für History speichern (vor dem Merge)
+    const currentState: GameState = {
+      board: board.map(row => [...row]),
+      score,
+      linesCleared,
+      level,
+      combo
+    };
+    setHistory(prev => [...prev.slice(-4), currentState]); // max 5 States
+
     let newBoard = board.map(row => [...row]);
     const powerUpBlocks: { x: number; y: number; effect: string }[] = [];
 
@@ -436,7 +631,14 @@ export function ScndDropGame() {
               borderColor: currentPiece.borderColor,
               isPowerUp: currentPiece.isPowerUp || false,
               powerUpEffect: currentPiece.powerUpEffect,
-              glowColor: currentPiece.glowColor
+              glowColor: currentPiece.glowColor,
+              // Neue Block-Eigenschaften (zufällig für normale Blöcke)
+              isIce: !currentPiece.isPowerUp && Math.random() < 0.05,
+              isPoison: !currentPiece.isPowerUp && Math.random() < 0.03,
+              isGold: !currentPiece.isPowerUp && Math.random() < 0.04,
+              isTeleporter: !currentPiece.isPowerUp && Math.random() < 0.02,
+              hit: false,
+              linkedWith: null
             };
             newBoard[boardY][boardX] = block;
             if (block.isPowerUp) powerUpBlocks.push({ x: boardX, y: boardY, effect: block.powerUpEffect });
@@ -445,20 +647,21 @@ export function ScndDropGame() {
       }
     }
 
-    const { rowsCleared } = clearLineGroups(newBoard);
+    const { rowsCleared, extraScore } = clearLineGroups(newBoard);
 
-    // Power-Ups auslösen, die Teil einer gelöschten Gruppe waren
+    // Power-Ups auslösen
     for (const block of powerUpBlocks) {
       triggerPowerUpEffect(block.effect, block.x, block.y);
     }
 
     const points = [0, 400, 1000, 3000, 12000];
-    let addedScore = points[Math.min(rowsCleared, 4)];
+    let addedScore = points[Math.min(rowsCleared, 4)] + extraScore;
     if (rowsCleared > 0) {
       const newCombo = combo + 1;
       setCombo(newCombo);
       let multiplier = 1 + newCombo * 0.3;
       if (scndBonusActive) multiplier *= 3;
+      if (doubleScoreActive) multiplier *= 2;
       addedScore = Math.floor(addedScore * multiplier);
       addedScore *= 2;
       showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
@@ -490,13 +693,31 @@ export function ScndDropGame() {
     spawnNewPiece();
   };
 
-  // ========== BEWEGUNG ==========
+  // ========== BEWEGUNG (mit Shield) ==========
   const movePiece = (screenDx: number, screenDy: number) => {
     if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
-    if (!collision(currentPiece.shape, newX, newY)) {
+    // Shield: Block ignoriert Kollision mit anderen Blöcken (aber nicht mit Wänden)
+    let wouldCollide = false;
+    if (shieldActive) {
+      // Nur Wand-Kollision prüfen, keine Block-Kollision
+      for (let y = 0; y < currentPiece.shape.length; y++) {
+        for (let x = 0; x < currentPiece.shape[y].length; x++) {
+          if (currentPiece.shape[y][x] !== 0) {
+            const boardX = newX + x, boardY = newY + y;
+            if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) {
+              wouldCollide = true;
+              break;
+            }
+          }
+        }
+      }
+    } else {
+      wouldCollide = collision(currentPiece.shape, newX, newY);
+    }
+    if (!wouldCollide) {
       setPieceX(newX);
       setPieceY(newY);
     } else if (screenDy === 1) {
@@ -509,7 +730,8 @@ export function ScndDropGame() {
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
-    if (!collision(rotated, pieceX, pieceY)) {
+    let wouldCollide = shieldActive ? false : collision(rotated, pieceX, pieceY);
+    if (!wouldCollide) {
       setCurrentPiece({ ...currentPiece, shape: rotated });
     }
   };
@@ -534,7 +756,7 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending, shieldActive]);
 
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
@@ -563,7 +785,7 @@ export function ScndDropGame() {
     };
     gameLoopRef.current = requestAnimationFrame(step);
     return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
-  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending]);
+  }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending, shieldActive]);
 
   // ========== DAUERHAFTE GRAVITÄT (alle 200 ms) ==========
   useEffect(() => {
@@ -576,7 +798,7 @@ export function ScndDropGame() {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
     }
     return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
-  }, [isPlaying, gameOver, isPaused]);
+  }, [isPlaying, gameOver, isPaused, antiGravityActive]);
 
   // ========== PULSIEREN ==========
   useEffect(() => {
@@ -679,11 +901,15 @@ export function ScndDropGame() {
     setScndBonusActive(false);
     setActivePowerUp(null);
     setFastForwardActive(false);
+    setAntiGravityActive(false);
+    setDoubleScoreActive(false);
+    setShieldActive(false);
     setGameOver(false);
     setShowNameInput(false);
     setParticles([]);
     setIsPaused(false);
     setIsSaving(false);
+    setHistory([]);
     setBlocksPlaced(0);
     setNeedsRespawnAfterRotation(false);
     blocksUntilRotation.current = Math.floor(Math.random() * 5) + 1;
@@ -736,7 +962,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // ========== CANVAS ZEICHNEN ==========
+  // ========== CANVAS ZEICHNEN (angepasst für neue Block-Typen) ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -788,6 +1014,22 @@ export function ScndDropGame() {
             ctx.fillStyle = '#FFFFFF';
             ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
             ctx.fillText('✨', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
+          } else if (cell.isIce) {
+            ctx.fillStyle = '#AADDFF';
+            ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
+            ctx.fillText('❄️', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
+          } else if (cell.isPoison) {
+            ctx.fillStyle = '#AAFFAA';
+            ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
+            ctx.fillText('☠️', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
+          } else if (cell.isGold) {
+            ctx.fillStyle = '#FFDD88';
+            ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
+            ctx.fillText('💰', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
+          } else if (cell.isTeleporter) {
+            ctx.fillStyle = '#FF88FF';
+            ctx.font = `bold ${Math.max(12, cellSize * 0.4)}px monospace`;
+            ctx.fillText('🌀', x * cellSize + cellSize * 0.65, y * cellSize + cellSize * 0.8);
           }
           ctx.shadowBlur = 0;
         }
@@ -856,7 +1098,7 @@ export function ScndDropGame() {
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending, shieldActive]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -897,10 +1139,13 @@ export function ScndDropGame() {
           SCND DROP
         </h3>
         <div className="flex justify-center gap-1 mt-1 flex-wrap">
-          {slowMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full">🐌 SLOW</span>}
+          {slowMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full">🐢 SLOW</span>}
           {freezeMode && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FFFF]/20 text-[#00FFFF] text-[7px] rounded-full animate-pulse">❄️ FREEZE</span>}
           {fastForwardActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FF9966]/20 text-[#FF9966] text-[7px] rounded-full animate-pulse">⏩ FAST</span>}
           {scndBonusActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FFD700]/20 text-[#FFD700] text-[7px] rounded-full animate-pulse">⭐ 3x</span>}
+          {antiGravityActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#AA88FF]/20 text-[#AA88FF] text-[7px] rounded-full animate-pulse">⬆️ ANTI</span>}
+          {doubleScoreActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#FFDD88]/20 text-[#FFDD88] text-[7px] rounded-full animate-pulse">💰 2x</span>}
+          {shieldActive && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#CCCCFF]/20 text-[#CCCCFF] text-[7px] rounded-full animate-pulse">🛡️ SHIELD</span>}
           {activePowerUp && <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-[#00FF00]/20 text-[#00FF00] text-[7px] rounded-full animate-pulse">✨ {activePowerUp}</span>}
         </div>
         {bonusMessage.show && (
@@ -961,7 +1206,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste */}
+        {/* Rechte Seitenleiste (unverändert, aus Platzgründen gekürzt) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
@@ -975,7 +1220,6 @@ export function ScndDropGame() {
           <div className="flex justify-center gap-1 mb-1">
             {hotStreak && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent px-1 py-0.5 rounded border-l border-[#FF4400]"><div className="text-[6px] text-[var(--text-secondary)]">🔥</div><div className="text-[8px] font-bold text-[#FF4400]">HOT</div></div>}
             {scndMode && <div className="bg-gradient-to-r from-[#FF4400]/20 to-transparent px-1 py-0.5 rounded border-l border-[#FF4400]"><div className="text-[6px] text-[var(--text-secondary)]">⚡</div><div className="text-[8px] font-bold text-[#FF4400]">SCND</div></div>}
-            {scndBonusActive && <div className="bg-gradient-to-r from-[#FFD700]/20 to-transparent px-1 py-0.5 rounded border-l border-[#FFD700]"><div className="text-[6px] text-[var(--text-secondary)]">⭐</div><div className="text-[8px] font-bold text-[#FFD700]">3x</div></div>}
           </div>
           <div className="bg-[var(--bg-secondary)]/50 rounded-lg p-1.5 mb-1">
             <div className="flex items-center gap-1 mb-0.5"><div className="w-1 h-2 bg-[#FF4400] rounded-full"></div><h4 className="font-bold text-[7px] uppercase tracking-wider text-[#FF4400]">🏆 TOP 3</h4></div>
