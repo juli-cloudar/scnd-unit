@@ -82,7 +82,6 @@ export function ScndDropGame() {
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
-  const [ghostFallActive, setGhostFallActive] = useState(false);
 
   // Rotation
   const [rotation, setRotation] = useState<Rotation>(0);
@@ -91,7 +90,6 @@ export function ScndDropGame() {
   const [rotationPending, setRotationPending] = useState(false);
   const [needsRespawnAfterRotation, setNeedsRespawnAfterRotation] = useState(false);
 
-  // ========== ROTATION MIT TIMEOUT (Animation abwarten) ==========
   const changeRotationRandom = () => {
     const rots: Rotation[] = [0, 90, 180, 270];
     let newRot = rots[Math.floor(Math.random() * rots.length)];
@@ -102,7 +100,6 @@ export function ScndDropGame() {
       canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
     }
     if (window.navigator.vibrate) window.navigator.vibrate(100);
-    // Warte 450 ms (etwas länger als Transition) und beende dann den Pending-Zustand
     setTimeout(() => {
       setRotationPending(false);
       if (needsRespawnAfterRotation) {
@@ -125,7 +122,6 @@ export function ScndDropGame() {
     });
   };
 
-  // ========== BEWEGUNGSUMRECHNUNG (für Pfeiltasten / Touch) ==========
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -136,7 +132,7 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== KOLLISION ==========
+  // Normale Kollision (ohne GhostFall)
   const collision = (shape: number[][], offsetX: number, offsetY: number) => {
     for (let y = 0; y < shape.length; y++) {
       for (let x = 0; x < shape[y].length; x++) {
@@ -150,101 +146,25 @@ export function ScndDropGame() {
     return false;
   };
 
-  const collisionWithGhost = (shape: number[][], offsetX: number, offsetY: number, ignoreBlocks: boolean) => {
-    for (let y = 0; y < shape.length; y++) {
-      for (let x = 0; x < shape[y].length; x++) {
-        if (shape[y][x] !== 0) {
-          const boardX = offsetX + x, boardY = offsetY + y;
-          if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
-          if (ignoreBlocks) continue;
-          if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
-        }
-      }
-    }
-    return false;
-  };
-
-  // ========== SPAWN MIT UNSICHTBAREM FIXPUNKT UND DISTANZSUCHE ==========
-  const getFixedScreenPoint = (canvas: HTMLCanvasElement) => {
-    const rect = canvas.getBoundingClientRect();
-    return { x: rect.width / 2, y: 0 };
-  };
-
-  const screenToBoard = (screenX: number, screenY: number, cs: number): { x: number; y: number } => {
-    const centerX = (BOARD_WIDTH * cs) / 2;
-    const centerY = (BOARD_HEIGHT * cs) / 2;
-    let dx = screenX - centerX;
-    let dy = screenY - centerY;
-    switch (rotation) {
-      case 90:  { const tmp = dx; dx = -dy; dy = tmp; break; }
-      case 180: dx = -dx; dy = -dy; break;
-      case 270: { const tmp = dx; dx = dy; dy = -tmp; break; }
-      default: break;
-    }
-    let boardX = (dx + centerX) / cs;
-    let boardY = (dy + centerY) / cs;
-    boardX = Math.min(Math.max(0, boardX), BOARD_WIDTH - 1);
-    boardY = Math.min(Math.max(0, boardY), BOARD_HEIGHT - 1);
-    return { x: Math.floor(boardX), y: Math.floor(boardY) };
-  };
-
-  const getBestSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
-    if (!canvasRef.current) return null;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const cs = rect.width / BOARD_WIDTH;
-    const fixedPoint = getFixedScreenPoint(canvas);
-    const targetBoard = screenToBoard(fixedPoint.x, fixedPoint.y, cs);
+  // Spawn immer in der Mitte des Grids
+  const getCenterSpawnPosition = (pieceShape: number[][]): { x: number; y: number } | null => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
-
-    let bestX = -1, bestY = -1;
-    let bestDist = Infinity;
-    for (let dy = -5; dy <= 5; dy++) {
-      for (let dx = -5; dx <= 5; dx++) {
-        let testX = targetBoard.x + dx;
-        let testY = targetBoard.y + dy;
-        testX = Math.min(Math.max(0, testX), BOARD_WIDTH - pieceWidth);
-        testY = Math.min(Math.max(0, testY), BOARD_HEIGHT - pieceHeight);
-        if (!collision(pieceShape, testX, testY)) {
-          const dist = Math.abs(dx) + Math.abs(dy);
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestX = testX;
-            bestY = testY;
-          }
+    const startX = Math.floor((BOARD_WIDTH - pieceWidth) / 2);
+    const startY = Math.floor((BOARD_HEIGHT - pieceHeight) / 2);
+    // Kleine Ausweichbewegung (±2 Zellen), falls die Mitte blockiert ist
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        const testX = startX + dx;
+        const testY = startY + dy;
+        if (testX >= 0 && testX + pieceWidth <= BOARD_WIDTH &&
+            testY >= 0 && testY + pieceHeight <= BOARD_HEIGHT &&
+            !collision(pieceShape, testX, testY)) {
+          return { x: testX, y: testY };
         }
       }
     }
-    if (bestX === -1) return null;
-    return { x: bestX, y: bestY };
-  };
-
-  const spawnWithDoubleCheck = (piece: any, retries = 2) => {
-    if (rotationPending) {
-      setNeedsRespawnAfterRotation(true);
-      return;
-    }
-    const spawnPos = getBestSpawnPosition(piece.shape);
-    if (!spawnPos) {
-      endGame();
-      return;
-    }
-    const doSpawn = () => {
-      // Doppelprüfung
-      if (!collision(piece.shape, spawnPos.x, spawnPos.y)) {
-        setCurrentPiece(piece);
-        setPieceX(spawnPos.x);
-        setPieceY(spawnPos.y);
-        setGhostFallActive(true);
-        setTimeout(() => setGhostFallActive(false), 600);
-      } else if (retries > 0) {
-        setTimeout(() => spawnWithDoubleCheck(piece, retries - 1), 50);
-      } else {
-        endGame();
-      }
-    };
-    requestAnimationFrame(() => setTimeout(doSpawn, 0));
+    return null;
   };
 
   const spawnNewPiece = () => {
@@ -256,10 +176,16 @@ export function ScndDropGame() {
     const pool = isPowerUpSpawn ? POWERUP_TETROMINOS : TETROMINOS;
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
-    spawnWithDoubleCheck(piece);
+    const spawnPos = getCenterSpawnPosition(piece.shape);
+    if (!spawnPos) {
+      endGame();
+      return;
+    }
+    setCurrentPiece(piece);
+    setPieceX(spawnPos.x);
+    setPieceY(spawnPos.y);
   };
 
-  // ========== GAME OVER ==========
   const endGame = () => {
     setGameOver(true);
     setFinalScore(score);
@@ -277,155 +203,6 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== GRAVITATION (rotationsabhängig) ==========
-  const applyGravityWithRotation = (currentBoard: any[][]) => {
-    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
-    const queue: [number, number][] = [];
-
-    for (let x = 0; x < BOARD_WIDTH; x++) {
-      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
-      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
-    }
-    for (let y = 0; y < BOARD_HEIGHT; y++) {
-      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
-      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
-    }
-
-    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    while (queue.length) {
-      const [y, x] = queue.shift()!;
-      for (const [dy, dx] of dirs) {
-        const ny = y + dy, nx = x + dx;
-        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
-          anchored[ny][nx] = true;
-          queue.push([ny, nx]);
-        }
-      }
-    }
-
-    const fallDir = translateMove(0, 1);
-    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
-
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const blocks: { y: number, x: number, block: any }[] = [];
-      for (let y = 0; y < BOARD_HEIGHT; y++) {
-        for (let x = 0; x < BOARD_WIDTH; x++) {
-          if (currentBoard[y][x] !== null && !anchored[y][x]) {
-            blocks.push({ y, x, block: currentBoard[y][x] });
-          }
-        }
-      }
-      if (fallDir.dy > 0) blocks.sort((a,b) => b.y - a.y);
-      else if (fallDir.dy < 0) blocks.sort((a,b) => a.y - b.y);
-      if (fallDir.dx > 0) blocks.sort((a,b) => b.x - a.x);
-      else if (fallDir.dx < 0) blocks.sort((a,b) => a.x - b.x);
-
-      for (const { y, x, block } of blocks) {
-        const newX = x + fallDir.dx;
-        const newY = y + fallDir.dy;
-        if (newX >= 0 && newX < BOARD_WIDTH && newY >= 0 && newY < BOARD_HEIGHT && currentBoard[newY][newX] === null) {
-          currentBoard[y][x] = null;
-          currentBoard[newY][newX] = block;
-          changed = true;
-        }
-      }
-    }
-    return currentBoard;
-  };
-
-  // ========== LINIENLÖSCHUNG (horizontal, vertikal, diagonal) ==========
-  const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
-    let totalCleared = 0;
-    const deleteChain = (cells: [number, number][]) => {
-      for (const [y, x] of cells) {
-        newBoard[y][x] = null;
-        burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
-      }
-      totalCleared++;
-    };
-
-    // Horizontal
-    for (let row = 0; row < BOARD_HEIGHT; row++) {
-      let runStart = -1, runLen = 0;
-      for (let x = 0; x <= BOARD_WIDTH; x++) {
-        const cell = (x < BOARD_WIDTH) ? newBoard[row][x] : null;
-        if (cell !== null) {
-          if (runStart === -1) runStart = x;
-          runLen++;
-        } else {
-          if (runLen >= 10) {
-            const cells: [number, number][] = [];
-            for (let i = runStart; i < runStart + runLen; i++) cells.push([row, i]);
-            deleteChain(cells);
-          }
-          runStart = -1; runLen = 0;
-        }
-      }
-    }
-    // Vertikal
-    for (let col = 0; col < BOARD_WIDTH; col++) {
-      let runStart = -1, runLen = 0;
-      for (let y = 0; y <= BOARD_HEIGHT; y++) {
-        const cell = (y < BOARD_HEIGHT) ? newBoard[y][col] : null;
-        if (cell !== null) {
-          if (runStart === -1) runStart = y;
-          runLen++;
-        } else {
-          if (runLen >= 10) {
-            const cells: [number, number][] = [];
-            for (let i = runStart; i < runStart + runLen; i++) cells.push([i, col]);
-            deleteChain(cells);
-          }
-          runStart = -1; runLen = 0;
-        }
-      }
-    }
-    // Diagonal (links oben -> rechts unten)
-    for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
-      for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
-        let runLen = 0, y = startRow, x = startCol;
-        while (y < BOARD_HEIGHT && x < BOARD_WIDTH && newBoard[y][x] !== null) { runLen++; y++; x++; }
-        if (runLen >= 10) {
-          const cells: [number, number][] = [];
-          for (let i = 0; i < runLen; i++) cells.push([startRow + i, startCol + i]);
-          deleteChain(cells);
-        }
-      }
-    }
-    // Diagonal (rechts oben -> links unten)
-    for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
-      for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
-        let runLen = 0, y = startRow, x = startCol;
-        while (y < BOARD_HEIGHT && x >= 0 && newBoard[y][x] !== null) { runLen++; y++; x--; }
-        if (runLen >= 10) {
-          const cells: [number, number][] = [];
-          for (let i = 0; i < runLen; i++) cells.push([startRow + i, startCol - i]);
-          deleteChain(cells);
-        }
-      }
-    }
-
-    applyGravityWithRotation(newBoard);
-    return { rowsCleared: totalCleared };
-  };
-
-  const burstParticles = (cx: number, cy: number, count: number) => {
-    for (let i = 0; i < count; i++) {
-      const offX = (Math.random() - 0.5) * cellSize * 3;
-      const offY = (Math.random() - 0.5) * cellSize * 3;
-      setParticles(prev => [...prev, { x: cx + offX, y: cy + offY, life: 1 }]);
-    }
-  };
-
-  const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
-    setActivePowerUp(effect.toUpperCase());
-    showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
-    setTimeout(() => setActivePowerUp(null), 2000);
-  };
-
-  // ========== MERGE (Block ins Board einfügen) ==========
   const mergePiece = () => {
     if (!currentPiece) return;
     let newBoard = board.map(row => [...row]);
@@ -487,13 +264,12 @@ export function ScndDropGame() {
     spawnNewPiece();
   };
 
-  // ========== BEWEGUNG UND ROTATION (mit GhostFall) ==========
-  const movePieceWithGhost = (screenDx: number, screenDy: number) => {
+  const movePiece = (screenDx: number, screenDy: number) => {
     if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
-    if (!collisionWithGhost(currentPiece.shape, newX, newY, ghostFallActive)) {
+    if (!collision(currentPiece.shape, newX, newY)) {
       setPieceX(newX);
       setPieceY(newY);
     } else if (screenDy === 1) {
@@ -501,25 +277,21 @@ export function ScndDropGame() {
     }
   };
 
-  const rotatePieceWithGhost = () => {
+  const rotatePiece = () => {
     if (!currentPiece || gameOver || freezeMode || isPaused || rotationPending) return;
     const rotated = currentPiece.shape[0].map((_: any, idx: number) => 
       currentPiece.shape.map((row: any[]) => row[idx]).reverse()
     );
-    if (!collisionWithGhost(rotated, pieceX, pieceY, ghostFallActive)) {
+    if (!collision(rotated, pieceX, pieceY)) {
       setCurrentPiece({ ...currentPiece, shape: rotated });
     }
   };
-
-  const movePiece = (screenDx: number, screenDy: number) => movePieceWithGhost(screenDx, screenDy);
-  const rotatePiece = () => rotatePieceWithGhost();
 
   const handleMoveLeft = () => movePiece(-1, 0);
   const handleMoveRight = () => movePiece(1, 0);
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
-  // ========== TASTATUR ==========
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -534,7 +306,7 @@ export function ScndDropGame() {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending, ghostFallActive]);
+  }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused, rotationPending]);
 
   const getFallDelay = () => {
     if (freezeMode) return Infinity;
@@ -544,7 +316,6 @@ export function ScndDropGame() {
     return delay;
   };
 
-  // ========== GAME LOOP (fallender Block) ==========
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -567,7 +338,149 @@ export function ScndDropGame() {
 
   useEffect(() => { movePieceRef.current = movePiece; }, [movePiece]);
 
-  // ========== DAUERHAFTE GRAVITATION (alle 200 ms) ==========
+  // Dauerhafte Schwerkraft (alle 200 ms)
+  const applyGravityWithRotation = (currentBoard: any[][]) => {
+    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
+    const queue: [number, number][] = [];
+
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
+      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
+    }
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
+      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
+    }
+
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    while (queue.length) {
+      const [y, x] = queue.shift()!;
+      for (const [dy, dx] of dirs) {
+        const ny = y + dy, nx = x + dx;
+        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
+          anchored[ny][nx] = true;
+          queue.push([ny, nx]);
+        }
+      }
+    }
+
+    const fallDir = translateMove(0, 1);
+    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const blocks: { y: number, x: number, block: any }[] = [];
+      for (let y = 0; y < BOARD_HEIGHT; y++) {
+        for (let x = 0; x < BOARD_WIDTH; x++) {
+          if (currentBoard[y][x] !== null && !anchored[y][x]) {
+            blocks.push({ y, x, block: currentBoard[y][x] });
+          }
+        }
+      }
+      if (fallDir.dy > 0) blocks.sort((a,b) => b.y - a.y);
+      else if (fallDir.dy < 0) blocks.sort((a,b) => a.y - b.y);
+      if (fallDir.dx > 0) blocks.sort((a,b) => b.x - a.x);
+      else if (fallDir.dx < 0) blocks.sort((a,b) => a.x - b.x);
+
+      for (const { y, x, block } of blocks) {
+        const newX = x + fallDir.dx;
+        const newY = y + fallDir.dy;
+        if (newX >= 0 && newX < BOARD_WIDTH && newY >= 0 && newY < BOARD_HEIGHT && currentBoard[newY][newX] === null) {
+          currentBoard[y][x] = null;
+          currentBoard[newY][newX] = block;
+          changed = true;
+        }
+      }
+    }
+    return currentBoard;
+  };
+
+  const clearLineGroups = (newBoard: any[][]): { rowsCleared: number } => {
+    let totalCleared = 0;
+    const deleteChain = (cells: [number, number][]) => {
+      for (const [y, x] of cells) {
+        newBoard[y][x] = null;
+        burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 5);
+      }
+      totalCleared++;
+    };
+
+    for (let row = 0; row < BOARD_HEIGHT; row++) {
+      let runStart = -1, runLen = 0;
+      for (let x = 0; x <= BOARD_WIDTH; x++) {
+        const cell = (x < BOARD_WIDTH) ? newBoard[row][x] : null;
+        if (cell !== null) {
+          if (runStart === -1) runStart = x;
+          runLen++;
+        } else {
+          if (runLen >= 10) {
+            const cells: [number, number][] = [];
+            for (let i = runStart; i < runStart + runLen; i++) cells.push([row, i]);
+            deleteChain(cells);
+          }
+          runStart = -1; runLen = 0;
+        }
+      }
+    }
+    for (let col = 0; col < BOARD_WIDTH; col++) {
+      let runStart = -1, runLen = 0;
+      for (let y = 0; y <= BOARD_HEIGHT; y++) {
+        const cell = (y < BOARD_HEIGHT) ? newBoard[y][col] : null;
+        if (cell !== null) {
+          if (runStart === -1) runStart = y;
+          runLen++;
+        } else {
+          if (runLen >= 10) {
+            const cells: [number, number][] = [];
+            for (let i = runStart; i < runStart + runLen; i++) cells.push([i, col]);
+            deleteChain(cells);
+          }
+          runStart = -1; runLen = 0;
+        }
+      }
+    }
+    for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
+      for (let startCol = 0; startCol < BOARD_WIDTH; startCol++) {
+        let runLen = 0, y = startRow, x = startCol;
+        while (y < BOARD_HEIGHT && x < BOARD_WIDTH && newBoard[y][x] !== null) { runLen++; y++; x++; }
+        if (runLen >= 10) {
+          const cells: [number, number][] = [];
+          for (let i = 0; i < runLen; i++) cells.push([startRow + i, startCol + i]);
+          deleteChain(cells);
+        }
+      }
+    }
+    for (let startRow = 0; startRow < BOARD_HEIGHT; startRow++) {
+      for (let startCol = BOARD_WIDTH - 1; startCol >= 0; startCol--) {
+        let runLen = 0, y = startRow, x = startCol;
+        while (y < BOARD_HEIGHT && x >= 0 && newBoard[y][x] !== null) { runLen++; y++; x--; }
+        if (runLen >= 10) {
+          const cells: [number, number][] = [];
+          for (let i = 0; i < runLen; i++) cells.push([startRow + i, startCol - i]);
+          deleteChain(cells);
+        }
+      }
+    }
+
+    applyGravityWithRotation(newBoard);
+    return { rowsCleared: totalCleared };
+  };
+
+  const burstParticles = (cx: number, cy: number, count: number) => {
+    for (let i = 0; i < count; i++) {
+      const offX = (Math.random() - 0.5) * cellSize * 3;
+      const offY = (Math.random() - 0.5) * cellSize * 3;
+      setParticles(prev => [...prev, { x: cx + offX, y: cy + offY, life: 1 }]);
+    }
+  };
+
+  const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
+    setActivePowerUp(effect.toUpperCase());
+    showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
+    setTimeout(() => setActivePowerUp(null), 2000);
+  };
+
   useEffect(() => {
     if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
@@ -580,7 +493,6 @@ export function ScndDropGame() {
     return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
   }, [isPlaying, gameOver, isPaused]);
 
-  // ========== PULSIEREN (für Glow-Effekt) ==========
   useEffect(() => {
     let animFrame: number;
     const step = () => {
@@ -591,7 +503,6 @@ export function ScndDropGame() {
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
-  // ========== PARTIKEL LEBENSDAUER ==========
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
@@ -600,7 +511,6 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
-  // ========== SCROLL-VERHALTEN ==========
   const isElementInViewport = (el: HTMLElement) => {
     const rect = el.getBoundingClientRect();
     return rect.top >= 0 && rect.bottom <= window.innerHeight;
@@ -617,7 +527,6 @@ export function ScndDropGame() {
     }
   }, [isPlaying, gameOver, isPaused]);
 
-  // ========== RESIZE & HIGHSCORES ==========
   useEffect(() => {
     const handleResize = () => setCellSize(getCellSize());
     handleResize();
@@ -650,7 +559,6 @@ export function ScndDropGame() {
     setTimeout(() => setBonusMessage({ show: false, text: '' }), 1500);
   };
 
-  // ========== START, PAUSE, AUFGABEN ==========
   const startGame = () => {
     setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null)));
     setScore(0);
@@ -671,8 +579,6 @@ export function ScndDropGame() {
     setIsPaused(false);
     setIsSaving(false);
     setBlocksPlaced(0);
-    setGhostFallActive(false);
-    setNeedsRespawnAfterRotation(false);
     blocksUntilRotation.current = Math.floor(Math.random() * 5) + 1;
     const rots: Rotation[] = [0, 90, 180, 270];
     const randomRot = rots[Math.floor(Math.random() * rots.length)];
@@ -710,7 +616,6 @@ export function ScndDropGame() {
   const handleRestart = () => { setIsPaused(false); startGame(); };
   const handleGiveUp = () => { setIsPaused(false); giveUp(); };
 
-  // ========== GHOST-POSITION (für Anzeige) ==========
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
@@ -724,7 +629,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // ========== CANVAS ZEICHNEN ==========
+  // Canvas zeichnen (mit CSS-Rotation)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -804,7 +709,7 @@ export function ScndDropGame() {
       ctx.globalAlpha = 1;
       const glowIntensity = 10 + 5 * Math.sin(pulseValue);
       ctx.shadowBlur = glowIntensity;
-      ctx.shadowColor = ghostFallActive ? '#FFFFFF' : 'white';
+      ctx.shadowColor = 'white';
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 4;
       for (let y = 0; y < currentPiece.shape.length; y++) {
@@ -844,7 +749,7 @@ export function ScndDropGame() {
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
     ctx.fillStyle = '#FF4400';
     ctx.fillRect(0, canvas.height - 5, progress, 4);
-  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending, ghostFallActive]);
+  }, [board, currentPiece, pieceX, pieceY, gameOver, flashRow, flashCol, combo, cellSize, hotStreak, scndMode, scndBonusActive, freezeMode, fastForwardActive, particles, linesCleared, activePowerUp, isPaused, pulseValue, rotation, rotationPending]);
 
   const saveHighscore = async () => {
     if (playerName.trim() === '') return;
@@ -949,7 +854,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste */}
+        {/* Rechte Seitenleiste (gekürzt, aber voll funktionsfähig) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
