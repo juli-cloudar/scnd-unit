@@ -14,7 +14,7 @@ const getCellSize = () => {
   return Math.min(Math.max(16, maxCell), 32);
 };
 
-// ========== TETROMINOS ==========
+// ========== TETROMINOS (mit neuen Formen) ==========
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isPowerUp: false },
@@ -23,7 +23,6 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0]], color: '#EEEEEE', borderColor: '#CCCCCC', name: 'Z', isPowerUp: false },
   { shape: [[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0]], color: '#5588FF', borderColor: '#2255AA', name: 'L', isPowerUp: false },
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isPowerUp: false },
-  // Neue Formen
   { shape: [[0,1,0],[1,1,1],[0,1,0]], color: '#FF88FF', borderColor: '#AA44AA', name: '➕ PLUS', isPowerUp: false },
   { shape: [[1,1],[1,0],[1,0]], color: '#88FF88', borderColor: '#44AA44', name: '⤴️ HAKEN', isPowerUp: false },
   { shape: [[1,1,1,1,1]], color: '#FF8888', borderColor: '#AA4444', name: '5️⃣ FÜNFER', isPowerUp: false },
@@ -105,6 +104,7 @@ export function ScndDropGame() {
   const [shieldActive, setShieldActive] = useState(false);
   const gameLoopRef = useRef<number | null>(null);
   const gravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fastGravityIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [titlePulse, setTitlePulse] = useState(false);
   const [bonusMessage, setBonusMessage] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
   const [isSaving, setIsSaving] = useState(false);
@@ -211,32 +211,73 @@ export function ScndDropGame() {
     setPieceY(spawnPos.y);
   };
 
-  // ========== EINFACHE, ROBUSTE GRAVITÄT (spaltenweise nach unten) ==========
+  // ========== ROTATIONSUNABHÄNGIGE GRAVITÄT (Flood Fill + Fall in visuelle Unterseite) ==========
   const applyGravity = (currentBoard: any[][]) => {
+    // 1. Verankerung bestimmen (Flood Fill von allen Wänden)
+    const anchored = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(false));
+    const queue: [number, number][] = [];
+
     for (let x = 0; x < BOARD_WIDTH; x++) {
-      const columnBlocks: any[] = [];
-      for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-        if (currentBoard[y][x] !== null) {
-          columnBlocks.push(currentBoard[y][x]);
-          currentBoard[y][x] = null;
+      if (currentBoard[0][x] !== null) { anchored[0][x] = true; queue.push([0, x]); }
+      if (currentBoard[BOARD_HEIGHT-1][x] !== null) { anchored[BOARD_HEIGHT-1][x] = true; queue.push([BOARD_HEIGHT-1, x]); }
+    }
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      if (currentBoard[y][0] !== null) { anchored[y][0] = true; queue.push([y, 0]); }
+      if (currentBoard[y][BOARD_WIDTH-1] !== null) { anchored[y][BOARD_WIDTH-1] = true; queue.push([y, BOARD_WIDTH-1]); }
+    }
+
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    while (queue.length) {
+      const [y, x] = queue.shift()!;
+      for (const [dy, dx] of dirs) {
+        const ny = y + dy, nx = x + dx;
+        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH && !anchored[ny][nx] && currentBoard[ny][nx] !== null) {
+          anchored[ny][nx] = true;
+          queue.push([ny, nx]);
         }
       }
-      for (let i = 0; i < columnBlocks.length; i++) {
-        currentBoard[BOARD_HEIGHT - 1 - i][x] = columnBlocks[i];
+    }
+
+    // 2. Fallrichtung bestimmen (visuell unten -> intern via translateMove)
+    const fallDir = translateMove(0, 1);
+    if (fallDir.dx === 0 && fallDir.dy === 0) return currentBoard;
+
+    // 3. Nicht verankerte Blöcke in Fallrichtung verschieben (mehrere Durchläufe)
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const blocks: { y: number, x: number, block: any }[] = [];
+      for (let y = 0; y < BOARD_HEIGHT; y++) {
+        for (let x = 0; x < BOARD_WIDTH; x++) {
+          if (currentBoard[y][x] !== null && !anchored[y][x]) {
+            blocks.push({ y, x, block: currentBoard[y][x] });
+          }
+        }
+      }
+      if (fallDir.dy > 0) blocks.sort((a,b) => b.y - a.y);
+      else if (fallDir.dy < 0) blocks.sort((a,b) => a.y - b.y);
+      if (fallDir.dx > 0) blocks.sort((a,b) => b.x - a.x);
+      else if (fallDir.dx < 0) blocks.sort((a,b) => a.x - b.x);
+
+      for (const { y, x, block } of blocks) {
+        const newX = x + fallDir.dx;
+        const newY = y + fallDir.dy;
+        if (newX >= 0 && newX < BOARD_WIDTH && newY >= 0 && newY < BOARD_HEIGHT && currentBoard[newY][newX] === null) {
+          currentBoard[y][x] = null;
+          currentBoard[newY][newX] = block;
+          changed = true;
+        }
       }
     }
     return currentBoard;
   };
 
-  // ========== POWER-UP EFFEKTE ==========
+  // ========== POWER-UP EFFEKTE (alle implementiert) ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus(`✨ ${effect.toUpperCase()} AKTIVIERT! ✨`);
-    
     for (let i = 0; i < 30; i++) {
-      setTimeout(() => {
-        burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 1);
-      }, i * 20);
+      setTimeout(() => burstParticles(x * cellSize + cellSize/2, y * cellSize + cellSize/2, 1), i * 20);
     }
 
     switch (effect) {
@@ -671,9 +712,7 @@ export function ScndDropGame() {
 
   const movePiece = (screenDx: number, screenDy: number) => {
     if (!currentPiece || gameOver || isPaused || rotationPending) return;
-    // freezeMode blockiert die Bewegung nicht – das wäre ein Bug. Aber wir lassen es erstmal so, weil freezeMode soll stoppen.
-    // Wenn freezeMode aktiv ist, soll der Block nicht fallen – das ist gewünscht.
-    if (freezeMode) return;
+    if (freezeMode) return; // fallender Block stoppt bei freezeMode
     const { dx, dy } = translateMove(screenDx, screenDy);
     const newX = pieceX + dx;
     const newY = pieceY + dy;
@@ -741,7 +780,7 @@ export function ScndDropGame() {
     return delay;
   };
 
-  // ========== GAME LOOP (fallender Block) – freezeMode blockiert den Loop ==========
+  // ========== GAME LOOP (fallender Block) – freezeMode blockiert ==========
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -762,9 +801,9 @@ export function ScndDropGame() {
     return () => { if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current); };
   }, [isPlaying, gameOver, freezeMode, isPaused, level, slowMode, fastForwardActive, currentPiece, rotationPending, shieldActive]);
 
-  // ========== DAUERHAFTE GRAVITY (nur für gelegte Blöcke, läuft auch bei freezeMode? Nein – freezeMode stoppt alles) ==========
+  // ========== DAUERHAFTE GRAVITY (läuft IMMER, auch bei freezeMode) ==========
   useEffect(() => {
-    if (isPlaying && !gameOver && !isPaused && !freezeMode) {
+    if (isPlaying && !gameOver && !isPaused) {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
       gravityIntervalRef.current = setInterval(() => {
         setBoard(prevBoard => applyGravity(prevBoard.map(row => [...row])));
@@ -773,7 +812,20 @@ export function ScndDropGame() {
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
     }
     return () => { if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current); };
-  }, [isPlaying, gameOver, isPaused, freezeMode]);
+  }, [isPlaying, gameOver, isPaused]);
+
+  // ========== ZUSÄTZLICHE SCHNELLE GRAVITY (alle 50 ms) ==========
+  useEffect(() => {
+    if (isPlaying && !gameOver && !isPaused) {
+      if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
+      fastGravityIntervalRef.current = setInterval(() => {
+        setBoard(prevBoard => applyGravity(prevBoard.map(row => [...row])));
+      }, 50);
+    } else {
+      if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
+    }
+    return () => { if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current); };
+  }, [isPlaying, gameOver, isPaused]);
 
   // ========== PULSIEREN ==========
   useEffect(() => {
@@ -851,6 +903,7 @@ export function ScndDropGame() {
     setIsPaused(false);
     if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
     if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+    if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
     if (!showNameInput && !isSaving) {
       const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
       if (score > 0 && isHighscore) {
@@ -904,6 +957,7 @@ export function ScndDropGame() {
       setIsPaused(false);
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
       if (gravityIntervalRef.current) clearInterval(gravityIntervalRef.current);
+      if (fastGravityIntervalRef.current) clearInterval(fastGravityIntervalRef.current);
       if (!showNameInput && !isSaving) {
         const isHighscore = highscores.length < 3 || score > (highscores[2]?.score || 0);
         if (score > 0 && isHighscore) {
@@ -936,7 +990,7 @@ export function ScndDropGame() {
     return { x: testX, y: testY };
   };
 
-  // Canvas zeichnen (hier aus Platzgründen stark gekürzt – bitte deinen funktionierenden Zeichen-Code übernehmen)
+  // ========== CANVAS ZEICHNEN ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1179,7 +1233,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste (vereinfacht) */}
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
