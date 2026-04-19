@@ -17,7 +17,7 @@ const getCellSize = () => {
   return Math.min(Math.max(cell, 16), 28);
 };
 
-// Normale Tetrominos (Formen bleiben, aber das Board ist breiter)
+// Normale Tetrominos
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isBrand: true, isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isBrand: false, isPowerUp: false },
@@ -92,8 +92,6 @@ export function ScndDropGame() {
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
 
-  const getRotationAngle = (r: Rotation) => r;
-
   const changeRotationRandom = () => {
     const rots: Rotation[] = [0, 90, 180, 270];
     let newRot = rots[Math.floor(Math.random() * rots.length)];
@@ -119,7 +117,9 @@ export function ScndDropGame() {
     });
   };
 
-  // Bewegungsumrechnung: Bildschirmrichtung (links/rechts/oben/unten) → interne Richtung
+  // ========== KERNMECHANIK: FALLRICHTUNG IMMER NACH UNTEN (BILDSCHIRM) ==========
+  // Übersetzt Bildschirmbewegung (dx, dy) in interne Board-Koordinaten.
+  // Für Fallen: rufe translateMove(0,1) auf – das gibt die interne Richtung.
   const translateMove = (dx: number, dy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx, dy };
@@ -143,7 +143,26 @@ export function ScndDropGame() {
     }
   };
 
-  // Ghost-Position (wo der Block landen würde – immer nach unten im Bildschirm)
+  // Findet eine gültige Spawn-Position, indem der Block in Fallrichtung (nach unten) verschoben wird, bis kein Konflikt mehr besteht.
+  // Gibt null zurück, wenn überhaupt kein Platz im Board ist (Game Over).
+  const findValidSpawnPosition = (piece: any, startX: number, startY: number) => {
+    let testX = startX;
+    let testY = startY;
+    const maxSteps = BOARD_HEIGHT * BOARD_WIDTH;
+    for (let step = 0; step < maxSteps; step++) {
+      if (!collision(piece.shape, testX, testY)) {
+        return { x: testX, y: testY };
+      }
+      // Verschiebe in Fallrichtung (visuell nach unten)
+      const { dx, dy } = translateMove(0, 1);
+      testX += dx;
+      testY += dy;
+      if (testX < 0 || testX >= BOARD_WIDTH || testY < 0 || testY >= BOARD_HEIGHT) break;
+    }
+    return null;
+  };
+
+  // Ghost-Position (wo der Block landen würde, wenn er nach unten fällt)
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
@@ -182,7 +201,7 @@ export function ScndDropGame() {
     return { rowsCleared, clearedRows };
   };
 
-  // ========== SCROLL & LAYOUT (unverändert) ==========
+  // ========== SCROLL & LAYOUT ==========
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
@@ -329,7 +348,7 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== PARTIKEL & POWER‑UP EFFEKTE (wie gehabt, hier nur Platzhalter – im Original vollständig) ==========
+  // ========== PARTIKEL & POWER‑UP EFFEKTE (hier stark gekürzt, aber in deinem echten Code vollständig) ==========
   const burstParticles = (cx: number, cy: number, count: number) => {
     for (let i = 0; i < count; i++) {
       const offX = (Math.random() - 0.5) * cellSize * 3;
@@ -348,10 +367,7 @@ export function ScndDropGame() {
     const h = canvas.height;
     const cs = cellSize;
 
-    // Power‑Up‑Effekte (bomb, laser, colorBlast, scndBonus, freeze, gravity, swap, clearLine, fastForward, randomize)
-    // Aus Platzgründen hier stark gekürzt – in deinem funktionierenden Code sind sie vollständig enthalten.
-    // Der folgende Code ist ein Platzhalter, den du durch deine vollständige Implementierung ersetzen kannst.
-    // Für die Funktionalität des Spiels sind sie nicht kritisch.
+    // Aus Platzgründen nur ein Platzhalter – ersetze durch deine vollständigen Effekte
     switch (effect) {
       case 'bomb': {
         for (let i = 0; i < 3; i++) {
@@ -388,7 +404,7 @@ export function ScndDropGame() {
         setTimeout(() => setActivePowerUp(null), 2000);
         break;
       }
-      // Weitere Effekte analog zu deinem alten Code – hier nicht ausgeführt, um die Länge zu begrenzen.
+      // Weitere Effekte (laser, colorBlast, ...) hier einfügen
       default: break;
     }
   };
@@ -400,10 +416,14 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const { x, y } = getSpawnPosition(piece.shape);
-    setPieceX(x);
-    setPieceY(y);
-    if (collision(piece.shape, x, y)) endGame();
+    const { x: startX, y: startY } = getSpawnPosition(piece.shape);
+    const validPos = findValidSpawnPosition(piece, startX, startY);
+    if (validPos) {
+      setPieceX(validPos.x);
+      setPieceY(validPos.y);
+    } else {
+      endGame(); // Kein Platz mehr → Game Over
+    }
   };
 
   const endGame = () => {
@@ -460,17 +480,17 @@ export function ScndDropGame() {
       }
     }
 
-    // Linien löschen (ab 5 Blöcken)
+    // Linien löschen
     const { rowsCleared, clearedRows } = checkAndClearLines(newBoard);
 
-    // Power‑Up‑Effekte auslösen (für Blöcke in gelöschten Reihen)
+    // Power‑Up‑Effekte auslösen
     for (const block of powerUpBlocks) {
       if (clearedRows.includes(block.y)) {
         triggerPowerUpEffect(block.effect, block.x, block.y);
       }
     }
 
-    // Punkteberechnung (angepasst an 5er‑Linien)
+    // Punkteberechnung
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[Math.min(rowsCleared, 4)];
     let hasBrandBlock = false;
@@ -484,8 +504,7 @@ export function ScndDropGame() {
       let multiplier = 1 + newCombo * 0.15;
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
-      // Bonus für Orange+Grau (vereinfacht)
-      addedScore *= 2;
+      addedScore *= 2; // Orange+Grau Bonus
       showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
@@ -524,7 +543,7 @@ export function ScndDropGame() {
     if (!collision(currentPiece.shape, newX, newY)) {
       setPieceX(newX);
       setPieceY(newY);
-    } else if (dy === 1) { // Fallbewegung auf dem Bildschirm
+    } else if (dy === 1) { // Fallbewegung auf dem Bildschirm → Block setzen
       mergePiece();
     }
   };
@@ -560,6 +579,7 @@ export function ScndDropGame() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [currentPiece, pieceX, pieceY, board, gameOver, freezeMode, isPaused]);
 
+  // Game Loop (requestAnimationFrame)
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -586,7 +606,7 @@ export function ScndDropGame() {
     movePieceRef.current = movePiece;
   }, [movePiece]);
 
-  // ========== CANVAS ZEICHNEN (mit Rotation und visuellen Verbesserungen) ==========
+  // ========== CANVAS ZEICHNEN (mit Rotation, Transparenz, Glow, Schatten, Pulsieren) ==========
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -705,7 +725,7 @@ export function ScndDropGame() {
       ctx.shadowOffsetY = 0;
     }
 
-    // Effekte (Schatten, Partikel, Fortschrittsbalken, Texte)
+    // Effekte
     ctx.fillStyle = 'rgba(0,0,0,0.06)';
     for (let i = 0; i < canvas.height; i += 2) ctx.fillRect(0, i, canvas.width, 1);
     const gradient = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width / 2);
@@ -802,7 +822,7 @@ export function ScndDropGame() {
     <div className="min-h-screen md:my-6 md:min-h-0 bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-primary)] rounded-2xl border-2 border-[#FF4400]/40 shadow-2xl transition-all flex flex-col">
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FF4400] via-[#FFD700] to-[#FF4400] rounded-t-2xl z-10"></div>
 
-      {/* Header mit Rotationsanzeige */}
+      {/* Header */}
       <div className="pt-2 pb-1 px-2 text-center">
         <button onClick={scrollToGame} className="cursor-pointer">
           <h3 className={'text-xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-[#FF4400] to-[#FF6600] bg-clip-text text-transparent transition-all duration-300 hover:scale-105 ' + (titlePulse && isPlaying ? 'scale-110' : '')}>
@@ -879,7 +899,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste (unverändert) */}
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
