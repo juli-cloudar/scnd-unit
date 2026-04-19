@@ -553,17 +553,24 @@ export function ScndDropGame(){
     if(scoreRef.current>0&&isHS)setShowName(true);
   },[scores]);
 
-  // ── fall speed: level1=2000ms → max level=120ms ───────────────────────
-  const getFallMs=useCallback(():number=>{
-    if(freezeRef.current)return Infinity;
-    const lv=levelRef.current;
-    // smooth curve: 2000ms at lv1, ~120ms at lv~10
-    let ms=Math.max(120,2000-(lv-1)*210);
-    if(slowRef.current)ms*=2;
-    if(fastRef.current)ms/=2;
-    return ms;
-  },[]);
-
+  // ── fall speed:Hyperbel: 2000 ms bei lv=1, 120 ms bei lv=100
+  const getFallMs = useCallback((): number => {
+  if (freezeRef.current) return Infinity;
+  const lv = levelRef.current;
+  
+  // Hyperbel: 2000 ms bei lv=1, 120 ms bei lv=100
+  const A = 2000;          // Startwert
+  const B = 120;           // Endwert
+  const maxLv = 100;       // Level, bei dem B erreicht wird
+  const a = (A / B - 1) / (maxLv - 1); // ≈ 0.15825
+  
+  let ms = A / (1 + a * (lv - 1));
+  ms = Math.max(B, ms);    // Sicherheitshalber nicht unter B fallen
+  
+  if (slowRef.current) ms *= 2;
+  if (fastRef.current) ms /= 2;
+  return ms;
+}, []);
   // ── DRAW ─────────────────────────────────────────────────────────────
   const draw=useCallback(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
