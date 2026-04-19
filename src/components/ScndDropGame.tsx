@@ -8,7 +8,6 @@ const BOARD_HEIGHT = 20;
 
 type Rotation = 0 | 90 | 180 | 270;
 
-// Adaptive Zellengröße
 const getCellSize = () => {
   if (typeof window === 'undefined') return 24;
   const height = window.innerHeight;
@@ -17,7 +16,6 @@ const getCellSize = () => {
   return Math.min(Math.max(cell, 16), 28);
 };
 
-// Normale Tetrominos (ohne isBrand)
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isPowerUp: false },
@@ -28,7 +26,6 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isPowerUp: false }
 ];
 
-// Power‑Up‑Tetrominos
 const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
@@ -88,7 +85,7 @@ export function ScndDropGame() {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
 
-  // ========== ROTATION (nur visuell, keine Auswirkung auf Logik) ==========
+  // ========== ROTATION ==========
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
@@ -117,13 +114,8 @@ export function ScndDropGame() {
     });
   };
 
-  // ========== BEWEGUNG (Pfeiltasten / Touch) ==========
-  // Wandelt Bildschirmrichtung (dx, dy) in interne Board-Richtung um.
-  // Die Fallrichtung (nach unten auf dem Bildschirm) muss immer (0,1) intern ergeben.
+  // Bewegungsumrechnung (Bildschirm -> intern)
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
-    // screenDy = 1 bedeutet "nach unten auf dem Bildschirm"
-    // Wir wollen, dass diese Bewegung intern immer (0,1) ergibt.
-    // Also müssen wir die Rotation berücksichtigen.
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
       case 90:  return { dx: -screenDy, dy: screenDx };
@@ -133,15 +125,10 @@ export function ScndDropGame() {
     }
   };
 
-  // Spawn-Position: immer an der visuell oberen Seite (abhängig von Rotation)
+  // Spawn-Position (immer an der visuell oberen Seite)
   const getSpawnPosition = (pieceShape: number[][]) => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
-    // Interne Koordinaten: (0,0) ist oben links im internen Board.
-    // Bei Rotation 0: oben ist y=0.
-    // Bei Rotation 90: oben ist x=BOARD_WIDTH-1 (rechte Seite).
-    // Bei Rotation 180: oben ist y=BOARD_HEIGHT-1 (unten).
-    // Bei Rotation 270: oben ist x=0 (linke Seite).
     switch (rotation) {
       case 0:   return { x: Math.floor((BOARD_WIDTH - pieceWidth) / 2), y: 0 };
       case 90:  return { x: BOARD_WIDTH - pieceWidth, y: Math.floor((BOARD_HEIGHT - pieceHeight) / 2) };
@@ -151,58 +138,47 @@ export function ScndDropGame() {
     }
   };
 
-  // Versucht, den Block nach unten (intern) zu verschieben, bis er einen freien Platz findet
-  const findValidSpawnPosition = (piece: any, startX: number, startY: number) => {
-    let testX = startX, testY = startY;
-    // Nach unten bewegen (intern y+1)
-    while (!collision(piece.shape, testX, testY + 1)) {
-      testY++;
-      if (testY >= BOARD_HEIGHT) break;
+  // Kollisionsprüfung
+  const collision = (shape: number[][], offsetX: number, offsetY: number) => {
+    for (let y = 0; y < shape.length; y++) {
+      for (let x = 0; x < shape[y].length; x++) {
+        if (shape[y][x] !== 0) {
+          const boardX = offsetX + x, boardY = offsetY + y;
+          if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
+          if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
+        }
+      }
     }
-    if (!collision(piece.shape, testX, testY)) {
-      return { x: testX, y: testY };
-    }
-    return null;
+    return false;
   };
 
-  // ========== LINIENLÖSCHUNG (horizontal und vertikal, jeweils mindestens 10 Blöcke) ==========
+  // Linienlöschung (horizontal + vertikal, jeweils >= 10)
   const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
     const clearedRows: number[] = [];
     const clearedCols: number[] = [];
 
-    // Horizontale Linien
     for (let row = 0; row < BOARD_HEIGHT; row++) {
       const nonEmpty = newBoard[row].filter(cell => cell !== null).length;
-      if (nonEmpty >= 10) {
-        clearedRows.push(row);
-      }
+      if (nonEmpty >= 10) clearedRows.push(row);
     }
-    // Vertikale Linien
     for (let col = 0; col < BOARD_WIDTH; col++) {
       let nonEmpty = 0;
       for (let row = 0; row < BOARD_HEIGHT; row++) {
         if (newBoard[row][col] !== null) nonEmpty++;
       }
-      if (nonEmpty >= 10) {
-        clearedCols.push(col);
-      }
+      if (nonEmpty >= 10) clearedCols.push(col);
     }
 
-    // Löschen der horizontalen Linien
+    // Horizontale Linien löschen
     for (const row of clearedRows.sort((a,b) => b-a)) {
       newBoard.splice(row, 1);
       newBoard.unshift(Array(BOARD_WIDTH).fill(null));
     }
-    // Löschen der vertikalen Linien (nach horizontalem Löschen, da sich Zeilen verschoben haben)
-    // Wir müssen die vertikalen Linien in der aktuellen Board-Darstellung löschen.
-    // Einfacher: Wir markieren die Zellen in diesen Spalten als null und lassen dann alle Blöcke nach unten fallen (wie bei Gravity).
-    // Aber um die Logik einfach zu halten, iterieren wir über alle Zeilen und setzen die Zellen in den Spalten auf null.
-    // Dann verschieben wir die verbleibenden Blöcke nach unten (pro Spalte).
+    // Vertikale Linien löschen (nach horizontalem Löschen)
     for (const col of clearedCols) {
       for (let row = 0; row < BOARD_HEIGHT; row++) {
         newBoard[row][col] = null;
       }
-      // Spalte komprimieren: Blöcke nach unten fallen lassen
       const columnBlocks: any[] = [];
       for (let row = BOARD_HEIGHT - 1; row >= 0; row--) {
         if (newBoard[row][col] !== null) {
@@ -219,20 +195,7 @@ export function ScndDropGame() {
     return { rowsCleared, clearedRows, clearedCols };
   };
 
-  // ========== HILFSFUNKTIONEN ==========
-  const collision = (shape: number[][], offsetX: number, offsetY: number) => {
-    for (let y = 0; y < shape.length; y++) {
-      for (let x = 0; x < shape[y].length; x++) {
-        if (shape[y][x] !== 0) {
-          const boardX = offsetX + x, boardY = offsetY + y;
-          if (boardX < 0 || boardX >= BOARD_WIDTH || boardY >= BOARD_HEIGHT || boardY < 0) return true;
-          if (boardY >= 0 && board[boardY]?.[boardX] !== null) return true;
-        }
-      }
-    }
-    return false;
-  };
-
+  // ========== POWER‑UP & PARTIKEL ==========
   const burstParticles = (cx: number, cy: number, count: number) => {
     for (let i = 0; i < count; i++) {
       const offX = (Math.random() - 0.5) * cellSize * 3;
@@ -241,11 +204,9 @@ export function ScndDropGame() {
     }
   };
 
-  // ========== POWER‑UP EFFEKTE (vereinfacht, aber funktional) ==========
   const triggerPowerUpEffect = async (effect: string, x: number, y: number) => {
     setActivePowerUp(effect.toUpperCase());
     showBonus('✨ ' + effect.toUpperCase() + ' AKTIVIERT! ✨');
-    // Hier könnten die aufwändigen Animationen folgen – aus Platzgründen nur kurze Verzögerung
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
@@ -256,14 +217,12 @@ export function ScndDropGame() {
     const random = Math.floor(Math.random() * pool.length);
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
-    const { x: spawnX, y: spawnY } = getSpawnPosition(piece.shape);
-    const validPos = findValidSpawnPosition(piece, spawnX, spawnY);
-    if (!validPos) {
-      endGame();
-      return;
+    const { x, y } = getSpawnPosition(piece.shape);
+    setPieceX(x);
+    setPieceY(y);
+    if (collision(piece.shape, x, y)) {
+      endGame(); // sofort Game Over, kein Verschieben
     }
-    setPieceX(validPos.x);
-    setPieceY(validPos.y);
   };
 
   const endGame = () => {
@@ -306,17 +265,14 @@ export function ScndDropGame() {
       }
     }
 
-    // Linien löschen (horizontal & vertikal)
     const { rowsCleared, clearedRows, clearedCols } = clearLines(newBoard);
 
-    // Power‑Up‑Effekte auslösen (für Blöcke in gelöschten Reihen/Spalten)
     for (const block of powerUpBlocks) {
       if (clearedRows.includes(block.y) || clearedCols.includes(block.x)) {
         triggerPowerUpEffect(block.effect, block.x, block.y);
       }
     }
 
-    // Punkteberechnung
     const points = [0, 40, 100, 300, 1200];
     let addedScore = points[Math.min(rowsCleared, 4)];
     if (rowsCleared > 0) {
@@ -325,7 +281,7 @@ export function ScndDropGame() {
       let multiplier = 1 + newCombo * 0.15;
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
-      addedScore *= 2; // Bonus für Orange+Grau
+      addedScore *= 2;
       showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
@@ -363,7 +319,7 @@ export function ScndDropGame() {
     if (!collision(currentPiece.shape, newX, newY)) {
       setPieceX(newX);
       setPieceY(newY);
-    } else if (screenDy === 1) { // Fallbewegung auf dem Bildschirm
+    } else if (screenDy === 1) {
       mergePiece();
     }
   };
@@ -383,7 +339,7 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
-  // ========== TASTATUR & GAME LOOP ==========
+  // Tastatur & Game Loop (unverändert, korrekt)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -434,7 +390,7 @@ export function ScndDropGame() {
     movePieceRef.current = movePiece;
   }, [movePiece]);
 
-  // ========== PULSIEREN FÜR FALLENDEN BLOCK ==========
+  // Pulsieren
   useEffect(() => {
     let animFrame: number;
     const step = () => {
@@ -447,7 +403,7 @@ export function ScndDropGame() {
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
-  // ========== PARTIKEL LEBENSDAUER ==========
+  // Partikel-Lebensdauer
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
@@ -456,7 +412,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
-  // ========== SCROLL & RESIZE (unverändert) ==========
+  // Scroll & Layout
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
@@ -582,7 +538,7 @@ export function ScndDropGame() {
     giveUp();
   };
 
-  // ========== CANVAS ZEICHNEN (mit Rotation, aber Texte außerhalb) ==========
+  // Canvas zeichnen (mit Rotation, aber ohne zusätzliche Logik)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -697,13 +653,13 @@ export function ScndDropGame() {
       ctx.shadowOffsetY = 0;
     }
 
-    // Partikel (werden über das gesamte Board gezeichnet)
+    // Partikel
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
 
-    // Fortschrittsbalken (Level)
+    // Fortschrittsbalken
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
@@ -815,7 +771,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* Rechte Seitenleiste (fest, rotiert nicht) */}
+        {/* Rechte Seitenleiste (fest) */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
