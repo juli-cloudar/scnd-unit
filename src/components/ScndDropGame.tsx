@@ -16,6 +16,7 @@ const getCellSize = () => {
   return Math.min(Math.max(cell, 16), 28);
 };
 
+// Normale Tetrominos
 const TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF8844', borderColor: '#CC5500', name: 'I', isPowerUp: false },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFDD44', borderColor: '#CCAA00', name: 'O', isPowerUp: false },
@@ -26,6 +27,7 @@ const TETROMINOS = [
   { shape: [[0,0,0,0],[0,0,1,0],[1,1,1,0],[0,0,0,0]], color: '#55DD88', borderColor: '#229955', name: 'J', isPowerUp: false }
 ];
 
+// Power‑Up‑Tetrominos (vereinfacht)
 const POWERUP_TETROMINOS = [
   { shape: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], color: '#FF9999', borderColor: '#FF4444', name: '💣 BOMBE', isPowerUp: true, powerUpEffect: 'bomb', glowColor: '#FF6666' },
   { shape: [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]], color: '#FFAAFF', borderColor: '#FF55FF', name: '⚡ LASER', isPowerUp: true, powerUpEffect: 'laser', glowColor: '#FF66FF' },
@@ -84,6 +86,8 @@ export function ScndDropGame() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [pulseValue, setPulseValue] = useState(0);
+
+  // Rotation
   const [rotation, setRotation] = useState<Rotation>(0);
   const [blocksPlaced, setBlocksPlaced] = useState(0);
   const blocksUntilRotation = useRef<number>(Math.floor(Math.random() * 5) + 1);
@@ -115,6 +119,7 @@ export function ScndDropGame() {
     });
   };
 
+  // Bewegungsumrechnung (Bildschirm -> intern)
   const translateMove = (screenDx: number, screenDy: number): { dx: number; dy: number } => {
     switch (rotation) {
       case 0:   return { dx: screenDx, dy: screenDy };
@@ -125,6 +130,7 @@ export function ScndDropGame() {
     }
   };
 
+  // Spawn-Position (immer visuell oben)
   const getSpawnPosition = (pieceShape: number[][]) => {
     const pieceWidth = pieceShape[0].length;
     const pieceHeight = pieceShape.length;
@@ -137,6 +143,7 @@ export function ScndDropGame() {
     }
   };
 
+  // Ghost-Position (wo der Block landen würde)
   const getGhostPosition = () => {
     let testX = pieceX, testY = pieceY;
     while (true) {
@@ -163,6 +170,7 @@ export function ScndDropGame() {
     return false;
   };
 
+  // Linien löschen (horizontal & vertikal, ab 10 Blöcken)
   const clearLines = (newBoard: any[][]): { rowsCleared: number; clearedRows: number[]; clearedCols: number[] } => {
     const clearedRows: number[] = [];
     const clearedCols: number[] = [];
@@ -179,10 +187,12 @@ export function ScndDropGame() {
       if (nonEmpty >= 10) clearedCols.push(col);
     }
 
+    // Horizontale Linien löschen
     for (const row of clearedRows.sort((a,b) => b-a)) {
       newBoard.splice(row, 1);
       newBoard.unshift(Array(BOARD_WIDTH).fill(null));
     }
+    // Vertikale Linien löschen (Spalte leeren und komprimieren)
     for (const col of clearedCols) {
       for (let row = 0; row < BOARD_HEIGHT; row++) {
         newBoard[row][col] = null;
@@ -216,6 +226,7 @@ export function ScndDropGame() {
     setTimeout(() => setActivePowerUp(null), 2000);
   };
 
+  // Spiel-Logik
   const spawnNewPiece = () => {
     if (rotationPending) {
       setTimeout(() => spawnNewPiece(), 100);
@@ -227,6 +238,7 @@ export function ScndDropGame() {
     const piece = JSON.parse(JSON.stringify(pool[random]));
     setCurrentPiece(piece);
     const { x, y } = getSpawnPosition(piece.shape);
+    // Klassische Tetris-Regel: Wenn sofort Kollision, Game Over
     if (collision(piece.shape, x, y)) {
       endGame();
       return;
@@ -291,7 +303,7 @@ export function ScndDropGame() {
       let multiplier = 1 + newCombo * 0.15;
       if (scndBonusActive) multiplier *= 3;
       addedScore = Math.floor(addedScore * multiplier);
-      addedScore *= 2;
+      addedScore *= 2; // Bonus
       showBonus('🎨 ORANGE + GRAU = 2x PUNKTE!');
       if (newCombo >= 5 && !hotStreak) setHotStreak(true);
       if (newCombo >= 10 && !scndMode) {
@@ -349,6 +361,7 @@ export function ScndDropGame() {
   const handleMoveDown = () => movePiece(0, 1);
   const handleRotate = () => rotatePiece();
 
+  // Tastatur
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (gameOver) return;
@@ -373,6 +386,7 @@ export function ScndDropGame() {
     return delay;
   };
 
+  // Game Loop
   useEffect(() => {
     if (!isPlaying || gameOver || freezeMode || isPaused || !currentPiece || rotationPending) {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -399,6 +413,7 @@ export function ScndDropGame() {
     movePieceRef.current = movePiece;
   }, [movePiece]);
 
+  // Pulsieren
   useEffect(() => {
     let animFrame: number;
     const step = () => {
@@ -411,6 +426,7 @@ export function ScndDropGame() {
     return () => cancelAnimationFrame(animFrame);
   }, [isPlaying, gameOver, isPaused]);
 
+  // Partikel Lebensdauer
   useEffect(() => {
     if (particles.length === 0) return;
     const interval = setInterval(() => {
@@ -419,6 +435,7 @@ export function ScndDropGame() {
     return () => clearInterval(interval);
   }, [particles]);
 
+  // Scroll-Verhalten (nur wenn nötig)
   const centerCanvasInView = () => {
     if (gameContainerRef.current) {
       const rect = gameContainerRef.current.getBoundingClientRect();
@@ -579,6 +596,7 @@ export function ScndDropGame() {
       ctx.stroke();
     }
 
+    // Liegende Blöcke halbtransparent
     ctx.globalAlpha = 0.6;
     for (let y = 0; y < BOARD_HEIGHT; y++) {
       for (let x = 0; x < BOARD_WIDTH; x++) {
@@ -610,6 +628,7 @@ export function ScndDropGame() {
     }
     ctx.globalAlpha = 1;
 
+    // Ghost und aktueller Block
     if (currentPiece && !gameOver && !freezeMode && !isPaused && !rotationPending) {
       const ghost = getGhostPosition();
       ctx.globalAlpha = 0.3;
@@ -658,11 +677,13 @@ export function ScndDropGame() {
       ctx.shadowOffsetY = 0;
     }
 
+    // Partikel
     for (const p of particles) {
       ctx.fillStyle = `rgba(255, 68, 0, ${p.life})`;
       ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
     }
 
+    // Fortschrittsbalken
     const progress = ((linesCleared % 8) / 8) * canvas.width;
     ctx.fillStyle = '#1A1A1A';
     ctx.fillRect(0, canvas.height - 5, canvas.width, 4);
@@ -772,6 +793,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
+        {/* Rechte Seitenleiste */}
         <div className="bg-gradient-to-br from-[var(--bg-primary)] to-[#0D0D0D] rounded-xl border border-[#FF4400]/30 p-2 min-w-[160px] md:min-w-[180px] w-auto shadow-xl">
           <div className="text-center mb-1 pb-1 border-b border-[#FF4400]/20">
             <div className="text-[7px] text-[var(--text-secondary)] uppercase tracking-wider">PUNKTE</div>
