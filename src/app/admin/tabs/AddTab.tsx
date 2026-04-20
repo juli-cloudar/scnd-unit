@@ -108,7 +108,7 @@ export function AddTab({ user, toast, onProductAdded }: { user: Employee | null,
           <input value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} placeholder="Marke" className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3 text-sm"/>
           <div className="grid grid-cols-2 gap-4">
             <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3 text-sm">
-              <option>Jacken</option><option>Pullover</option><option>Sweatshirts</option><option>Tops</option><option>Sonstiges</option>
+              <option>Jacken</option><option>Pullover</option><option>Sweatshirts</option><option>Tops</option><option>Hemden</option><option>Headwear</option><option>Taschen</option><option>Sonstiges</option>
             </select>
             <input value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="Preis" className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3 text-sm"/>
           </div>
