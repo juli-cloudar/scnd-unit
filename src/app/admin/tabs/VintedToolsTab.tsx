@@ -88,7 +88,11 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
 
           let category = 'Sonstiges';
           const titleLower = title.toLowerCase();
-          if (titleLower.includes('jacke') || titleLower.includes('jacket') || titleLower.includes('weste')) category = 'Jacken';
+
+          if (titleLower.includes('hemd') || titleLower.includes('bluse')) category = 'Hemden';
+          else if (titleLower.includes('cap') || titleLower.includes('hat') || titleLower.includes('mütze') || titleLower.includes('kopf') || titleLower.includes('headwear'))  category = 'Headwear';
+          else if (titleLower.includes('tasche') || titleLower.includes('bag') || titleLower.includes('rucksack') || titleLower.includes('tote'))  category = 'Taschen';
+          else if (titleLower.includes('jacke') || titleLower.includes('jacket') || titleLower.includes('weste')) category = 'Jacken';
           else if (titleLower.includes('pullover') || titleLower.includes('sweater') || titleLower.includes('fleece')) category = 'Pullover';
           else if (titleLower.includes('sweatshirt') || titleLower.includes('crewneck') || titleLower.includes('hoodie')) category = 'Sweatshirts';
           else if (titleLower.includes('top') || titleLower.includes('shirt') || titleLower.includes('polo')) category = 'Tops';
