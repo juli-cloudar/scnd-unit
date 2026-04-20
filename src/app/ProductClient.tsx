@@ -12,7 +12,7 @@ import { type ViewMode } from '@/components/ViewToggle';
 import { ProductView } from '@/components/ProductView';
 import { useProductCleaner } from '@/hooks/useProductCleaner';
 import { Navigation } from '@/components/Navigation';
-import { ScndDropGame } from '@/components/ScndDropGame';  // ← SPIEL IMPORT
+
 
 interface Product {
   id: number;
