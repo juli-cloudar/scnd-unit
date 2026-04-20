@@ -79,6 +79,7 @@ interface Cell {
   isPowerUp?:boolean; effect?:string; glow?:string;
   symbol?:string; pulse?:string; accent?:string;
   isIce?:boolean; isGold?:boolean;
+  name?:string; 
 }
 interface Piece {
   shape:number[][]; color:string; border:string; name:string;
