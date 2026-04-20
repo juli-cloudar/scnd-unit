@@ -32,7 +32,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
 
   const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
   const allBrands = ["Alle", ...brandList];
-  const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Sonstiges'];
+  const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Hemden', 'Headwear', 'Taschen', 'Sonstiges'];
   const allCategories = ["Alle", ...fixedCategories];
   
   const filtered = products.filter(p => {
