@@ -122,6 +122,7 @@ interface Cell {
   isPowerUp?:boolean; effect?:string; glow?:string;
   symbol?:string; pulse?:string; accent?:string;
   isIce?:boolean; isGold?:boolean;
+  name?:string;  // ← ADD THIS LINE
 }
 interface Piece {
   shape:number[][]; color:string; border:string; name:string;
@@ -581,6 +582,7 @@ export function ScndDropGame() {
       nb[by][bx]={
         color:p.color,border:p.border,isPowerUp:p.isPowerUp,
         effect:p.effect,glow:p.glow,symbol:p.symbol,pulse:p.pulse,accent:p.accent,
+        name: p.name,
         isIce:  !p.isPowerUp&&Math.random()<0.05,
         isGold: !p.isPowerUp&&Math.random()<0.04,
       };
