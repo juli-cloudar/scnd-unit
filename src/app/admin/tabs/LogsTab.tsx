@@ -13,23 +13,16 @@ export function LogsTab({ toast, confirm }: { toast: (msg: string, type?: ToastT
   const [autoDeleteDays, setAutoDeleteDays] = useState(3);
 
   const loadLogs = useCallback(async () => {
-    // Alte Logs automatisch löschen
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - autoDeleteDays);
     await supabase.from('activity_logs').delete().lt('timestamp', cutoff.toISOString());
-    
-    // Neue Logs laden
-    const { data } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(500);
+    const { data } = await supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(500);
     if (data) setLogs(data);
   }, [autoDeleteDays]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 
-  // Erweiterte Farbzuordnung für alle Aktionen
+  // Farben für verschiedene Aktionen (nur die, die noch vorkommen können)
   const actionColors: Record<string, string> = {
     'Eingeloggt': 'border-green-500 text-green-400',
     'Ausgeloggt': 'border-gray-500 text-gray-400',
@@ -37,19 +30,10 @@ export function LogsTab({ toast, confirm }: { toast: (msg: string, type?: ToastT
     'Produkt bearbeitet': 'border-blue-500 text-blue-400',
     'Produkt gelöscht': 'border-red-500 text-red-400',
     'Produkt verkauft': 'border-yellow-400 text-yellow-400',
-    'Bulk Import': 'border-green-500 text-green-400',
-    'Status Check': 'border-blue-500 text-blue-400',
-    // Neue Aktionen
-    'JSON Import': 'border-green-500 text-green-400',
-    'Einzelprüfung': 'border-blue-500 text-blue-400',
-    'JSON Merge': 'border-purple-500 text-purple-400',
-    'Auto Clean': 'border-red-500 text-red-400',
-    'Als verkauft markiert (Auto Clean)': 'border-yellow-400 text-yellow-400',
-    'Gelöscht (Auto Clean)': 'border-red-500 text-red-400',
-    'Merge Datei heruntergeladen': 'border-purple-500 text-purple-400'
   };
   
-  const allActions = ['Alle', ...Object.keys(actionColors)];
+  // Dynamisch die Aktionen aus den vorhandenen Logs ermitteln
+  const availableActions = ['Alle', ...new Set(logs.map(l => l.action))];
   const filteredLogs = filter === 'Alle' ? logs : logs.filter(l => l.action === filter);
 
   return (
@@ -99,7 +83,7 @@ export function LogsTab({ toast, confirm }: { toast: (msg: string, type?: ToastT
       </div>
       
       <div className="flex flex-wrap gap-2">
-        {allActions.map(action => (
+        {availableActions.map(action => (
           <button key={action} onClick={() => setFilter(action)}
             className={`px-2 py-1 text-xs uppercase font-bold transition-colors ${filter === action ? 'bg-purple-500 text-white' : 'border border-purple-500/30 text-gray-500 hover:text-purple-400'}`}>
             {action}
