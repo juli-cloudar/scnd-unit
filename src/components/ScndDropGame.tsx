@@ -203,22 +203,20 @@ function settle(board: (Cell|null)[][], rot: Rot): (Cell|null)[][] {
 }
 
 
-
 // ─── LINE CLEAR: only horizontal or vertical lines of ≥ CLEAR_MIN blocks ─────
 // Returns: deleted cell coords + which of those were power-ups
 function findLines(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boolean; puCells:{y:number;x:number;effect:string;name:string}[] }[] {
   const groups: { cells:[number,number][]; hasPU:boolean; puCells:{y:number;x:number;effect:string;name:string}[] }[] = [];
   const used = Array.from({length:BH}, () => Array(BW).fill(false));
 
-  // Horizontale Reihen
+  // Horizontale Reihen — egal welche Farbe, nur Blöcke zählen
   for (let y=0; y<BH; y++) {
     let x = 0;
     while (x < BW) {
       if (!board[y][x] || used[y][x]) { x++; continue; }
-      const color = board[y][x]!.color;
       const cells: [number,number][] = [];
       const puCells: {y:number;x:number;effect:string;name:string}[] = [];
-      while (x < BW && board[y][x] && !used[y][x] && board[y][x]!.color === color) {
+      while (x < BW && board[y][x] && !used[y][x]) {
         cells.push([y,x]);
         const cell = board[y][x]!;
         if (cell.isPowerUp && cell.effect) puCells.push({y,x,effect:cell.effect,name:cell.name??''});
@@ -231,15 +229,14 @@ function findLines(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boo
     }
   }
 
-  // Vertikale Reihen
+  // Vertikale Reihen — egal welche Farbe, nur Blöcke zählen
   for (let x=0; x<BW; x++) {
     let y = 0;
     while (y < BH) {
       if (!board[y][x] || used[y][x]) { y++; continue; }
-      const color = board[y][x]!.color;
       const cells: [number,number][] = [];
       const puCells: {y:number;x:number;effect:string;name:string}[] = [];
-      while (y < BH && board[y][x] && !used[y][x] && board[y][x]!.color === color) {
+      while (y < BH && board[y][x] && !used[y][x]) {
         cells.push([y,x]);
         const cell = board[y][x]!;
         if (cell.isPowerUp && cell.effect) puCells.push({y,x,effect:cell.effect,name:cell.name??''});
@@ -254,6 +251,7 @@ function findLines(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boo
 
   return groups;
 }
+
 
 // Returns cleared cells and power-up triggers found in cleared cells
 function clearGroups(
