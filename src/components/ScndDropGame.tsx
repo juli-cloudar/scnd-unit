@@ -565,7 +565,32 @@ export function ScndDropGame() {
     }
     setTimeout(()=>setPuName(''),2500);
   },[burst,showBonus,updFlags]);
-
+  
+  // ===== doRot (Board-Rotation) =====
+    const doRot=useCallback(()=>{
+    const rots:Rot[]=[0,90,180,270];
+    let next=rots[Math.floor(Math.random()*4)] as Rot;
+    while(next===rotRef.current) next=rots[Math.floor(Math.random()*4)] as Rot;
+    rotRef.current=next;
+    if(canvasRef.current){
+      canvasRef.current.style.transform=`rotate(${next}deg)`;
+      canvasRef.current.style.transition='transform 0.4s cubic-bezier(0.2,0.9,0.4,1.1)';
+    }
+    if(typeof window!=='undefined'&&window.navigator.vibrate) window.navigator.vibrate(80);
+  },[]);
+  
+  // ===== endGame =====
+  const endGame=useCallback(()=>{
+    playRef.current=false;goRef.current=true;
+    cancelAnimationFrame(rafRef.current);cancelAnimationFrame(gravRaf.current);
+    setPlaying(false);setGameOver(true);setFinalSc(scoreRef.current);setIsNewRecord(false);
+    if(scoreRef.current>0){
+      const pb=loadPersonalBest();
+      if(!pb||scoreRef.current>pb.score) setShowName(true);
+    }
+    fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
+  },[]);
+  
   // ── merge (mit Schleife für wiederholtes Löschen) ─────────────────────
   const merge = useCallback(() => {
     const p = pieceRef.current; if (!p) return;
@@ -658,28 +683,6 @@ export function ScndDropGame() {
     if(!hits(r,pxRef.current,pyRef.current)) pieceRef.current={...p,shape:r};
   },[hits]);
 
-  const doRot=useCallback(()=>{
-    const rots:Rot[]=[0,90,180,270];
-    let next=rots[Math.floor(Math.random()*4)] as Rot;
-    while(next===rotRef.current) next=rots[Math.floor(Math.random()*4)] as Rot;
-    rotRef.current=next;
-    if(canvasRef.current){
-      canvasRef.current.style.transform=`rotate(${next}deg)`;
-      canvasRef.current.style.transition='transform 0.4s cubic-bezier(0.2,0.9,0.4,1.1)';
-    }
-    if(typeof window!=='undefined'&&window.navigator.vibrate) window.navigator.vibrate(80);
-  },[]);
-
-  const endGame=useCallback(()=>{
-    playRef.current=false;goRef.current=true;
-    cancelAnimationFrame(rafRef.current);cancelAnimationFrame(gravRaf.current);
-    setPlaying(false);setGameOver(true);setFinalSc(scoreRef.current);setIsNewRecord(false);
-    if(scoreRef.current>0){
-      const pb=loadPersonalBest();
-      if(!pb||scoreRef.current>pb.score) setShowName(true);
-    }
-    fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
-  },[]);
 
   const getFallMs=useCallback(():number=>{
     if(freezeRef.current) return Infinity;
