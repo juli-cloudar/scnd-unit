@@ -12,6 +12,10 @@ const BW = 15, BH = 15;
 // Minimum connected line length to clear (horizontal or vertical)
 const CLEAR_MIN = 10;
 
+// ─── Game over condition: central 3x3 area max 50% filled ────────────────────
+const CRITICAL_ZONE_SIZE = 3;
+const CRITICAL_ZONE_MAX_FILL = 0.5;
+
 // ─── Theme ────────────────────────────────────────────────────────────────────
 function getTheme(isDark: boolean) {
   return {
@@ -136,6 +140,17 @@ function savePersonalBest(e: LocalHS): boolean {
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 const emptyBoard = (): (Cell|null)[][] => Array.from({ length: BH }, () => Array(BW).fill(null));
 
+function getCriticalZoneFill(board: (Cell|null)[][]): number {
+  const start = Math.floor((BW - CRITICAL_ZONE_SIZE) / 2);
+  let occupied = 0;
+  for (let dy = 0; dy < CRITICAL_ZONE_SIZE; dy++) {
+    for (let dx = 0; dx < CRITICAL_ZONE_SIZE; dx++) {
+      if (board[start + dy][start + dx] !== null) occupied++;
+    }
+  }
+  return occupied / (CRITICAL_ZONE_SIZE * CRITICAL_ZONE_SIZE);
+}
+
 function rotateCW(s: number[][]): number[][] {
   const r = s.length, c = s[0].length;
   return Array.from({ length: c }, (_, ci) => Array.from({ length: r }, (_, ri) => s[r-1-ri][ci]));
@@ -210,14 +225,6 @@ function settle(board: (Cell|null)[][], rot: Rot): (Cell|null)[][] {
 }
 
 // ─── LINE CLEAR: horizontal or vertical runs of ≥ CLEAR_MIN touching blocks ──
-//
-// FIX: The old scan stopped at used[] cells instead of skipping them,
-// causing valid line extensions to be missed.
-// New approach: two independent passes (H then V), each scanning ALL cells
-// ignoring the used[] map while building runs, then marking used[] only
-// AFTER a complete qualifying run is found.  This way a cell can be counted
-// in both a horizontal AND a vertical line if it qualifies for both.
-//
 interface LineGroup {
   cells: [number,number][];
   puCells: { y:number; x:number; effect:string; name:string }[];
@@ -237,7 +244,6 @@ function findLines(board: (Cell|null)[][]): LineGroup[] {
         if (runStart === -1) runStart = x;
         runLen++;
       } else {
-        // End of a run
         if (runLen >= CLEAR_MIN) {
           const cells: [number,number][] = [];
           const puCells: LineGroup['puCells'] = [];
@@ -268,14 +274,12 @@ function findLines(board: (Cell|null)[][]): LineGroup[] {
           const cells: [number,number][] = [];
           const puCells: LineGroup['puCells'] = [];
           for (let i = runStart; i < runStart + runLen; i++) {
-            // Only add if not already scheduled for deletion (avoid double-counting PUs)
             if (!toDelete.has(i * BW + x)) {
               cells.push([i, x]);
               toDelete.add(i * BW + x);
               const cell = board[i][x]!;
               if (cell.isPowerUp && cell.effect) puCells.push({ y:i, x, effect:cell.effect, name:cell.name??'' });
             }
-            // Still add to cells for visual highlight even if already in toDelete
           }
           if (cells.length > 0) groups.push({ cells, puCells });
         }
@@ -287,9 +291,6 @@ function findLines(board: (Cell|null)[][]): LineGroup[] {
   return groups;
 }
 
-// Apply one round of line-clearing.
-// FIX: Returns both the cleared count AND whether any clearing happened,
-// so callers can cascade (settle → recheck) until stable.
 function applyLineClear(
   board: (Cell|null)[][],
   cs: number,
@@ -315,8 +316,6 @@ function applyLineClear(
   return { board: next, cleared, powerUps };
 }
 
-// FIX: Full cascade: settle → clear → settle → clear … until stable.
-// This ensures that blocks falling after a clear can themselves form new lines.
 function settleAndClear(
   board: (Cell|null)[][],
   rot: Rot,
@@ -328,15 +327,12 @@ function settleAndClear(
   const allPowerUps: { y:number; x:number; effect:string; name:string }[] = [];
 
   for (let pass = 0; pass < 20; pass++) {
-    // 1. Settle all loose blocks
     current = settle(current, rot);
-    // 2. Check for clearable lines
     const { board: afterClear, cleared, powerUps } = applyLineClear(current, cs, burst);
-    if (cleared === 0) break; // stable
+    if (cleared === 0) break;
     current = afterClear;
     totalCleared += cleared;
     allPowerUps.push(...powerUps);
-    // Loop: settle again after the clear, then recheck
   }
 
   return { board: current, totalCleared, allPowerUps };
@@ -518,9 +514,7 @@ export function ScndDropGame() {
     return { x: gx, y: gy };
   }, [hits]);
 
-  // ── FIX: centered spawn ───────────────────────────────────────────────
-  // Search outward from the true center in a spiral-like pattern,
-  // prioritizing positions closest to the board center.
+  // ── centered spawn ────────────────────────────────────────────────────
   const spawn = useCallback((): boolean => {
     const isPU = Math.random() < 0.14;
     const pool = isPU ? POWERUPS : TETROMINOS;
@@ -537,24 +531,17 @@ export function ScndDropGame() {
 
     const pw = piece.shape[0].length;
     const ph = piece.shape.length;
-
-    // Ideal center position
     const idealX = Math.floor((BW - pw) / 2);
     const idealY = Math.floor((BH - ph) / 2);
-
-    // Search in expanding rings around the ideal center
     const maxR = Math.max(BW, BH);
     for (let r = 0; r <= maxR; r++) {
-      // Generate all candidate offsets at Manhattan distance ≤ r, sorted by distance
       const candidates: [number,number][] = [];
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.abs(dx) + Math.abs(dy) === r) candidates.push([dx, dy]);
         }
       }
-      // Sort by Euclidean distance to ideal center (closest first within same ring)
       candidates.sort((a, b) => a[0]*a[0]+a[1]*a[1] - b[0]*b[0]-b[1]*b[1]);
-
       for (const [dx, dy] of candidates) {
         const tx = idealX + dx, ty = idealY + dy;
         if (tx >= 0 && tx+pw <= BW && ty >= 0 && ty+ph <= BH && !hits(piece.shape, tx, ty)) {
@@ -565,7 +552,7 @@ export function ScndDropGame() {
         }
       }
     }
-    return false; // board full
+    return false;
   }, [hits]);
 
   // ── power-up trigger ──────────────────────────────────────────────────
@@ -699,9 +686,15 @@ export function ScndDropGame() {
     }
 
     const cs = csRef.current;
-    // FIX: Use cascading settle+clear so newly-formed lines after gravity are caught
     const { board: afterAll, totalCleared, allPowerUps } = settleAndClear(nb, rotRef.current, cs, burst);
     boardRef.current = afterAll;
+
+    // ✨ Critical zone check – Game Over if too full
+    const fillPercent = getCriticalZoneFill(boardRef.current);
+    if (fillPercent >= CRITICAL_ZONE_MAX_FILL) {
+      endGame();
+      return;
+    }
 
     let added = 0;
     if (totalCleared > 0) {
@@ -727,6 +720,17 @@ export function ScndDropGame() {
     }
     if (!spawn()) endGame();
   }, [burst, spawn, triggerPU]);
+
+  const endGame = useCallback(() => {
+    playRef.current=false; goRef.current=true;
+    cancelAnimationFrame(rafRef.current); cancelAnimationFrame(gravRaf.current);
+    setPlaying(false); setGameOver(true); setFinalSc(scoreRef.current); setIsNewRecord(false);
+    if (scoreRef.current > 0) {
+      const pb = loadPersonalBest();
+      if (!pb || scoreRef.current > pb.score) setShowName(true);
+    }
+    fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
+  }, []);
 
   // ── movement ──────────────────────────────────────────────────────────
   const move = useCallback((sdx: number, sdy: number) => {
@@ -755,17 +759,6 @@ export function ScndDropGame() {
       canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2,0.9,0.4,1.1)';
     }
     if (typeof window !== 'undefined' && window.navigator.vibrate) window.navigator.vibrate(80);
-  }, []);
-
-  const endGame = useCallback(() => {
-    playRef.current=false; goRef.current=true;
-    cancelAnimationFrame(rafRef.current); cancelAnimationFrame(gravRaf.current);
-    setPlaying(false); setGameOver(true); setFinalSc(scoreRef.current); setIsNewRecord(false);
-    if (scoreRef.current > 0) {
-      const pb = loadPersonalBest();
-      if (!pb || scoreRef.current > pb.score) setShowName(true);
-    }
-    fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
   }, []);
 
   const getFallMs = useCallback((): number => {
@@ -865,11 +858,24 @@ export function ScndDropGame() {
     }
     ctx.globalAlpha = 1;
 
+    // ── Visual warning for critical zone ─────────────────────────────────
+    const fill = getCriticalZoneFill(boardRef.current);
+    if (fill >= 0.3) {
+      const start = Math.floor((BW - CRITICAL_ZONE_SIZE) / 2);
+      const intensity = Math.min(0.5, (fill - 0.3) / 0.2);
+      ctx.fillStyle = `rgba(255, 68, 0, ${intensity * 0.5})`;
+      for (let dy = 0; dy < CRITICAL_ZONE_SIZE; dy++) {
+        for (let dx = 0; dx < CRITICAL_ZONE_SIZE; dx++) {
+          ctx.fillRect((start + dx) * cs, (start + dy) * cs, cs, cs);
+        }
+      }
+    }
+
     // Progress bar
     const blocksPerLevel = 40;
     const prog = ((linesRef.current % blocksPerLevel) / blocksPerLevel) * cw;
-    ctx.fillStyle=T.progressTrack; ctx.fillRect(0,ch-3,cw,3);
-    ctx.fillStyle=BRAND; ctx.fillRect(0,ch-3,prog,3);
+    ctx.fillStyle = T.progressTrack; ctx.fillRect(0,ch-3,cw,3);
+    ctx.fillStyle = BRAND; ctx.fillRect(0,ch-3,prog,3);
   }, [ghost]);
 
   // ── game loop ─────────────────────────────────────────────────────────
@@ -882,7 +888,7 @@ export function ScndDropGame() {
     rafRef.current = requestAnimationFrame(gameLoop);
   }, [getFallMs, move, draw]);
 
-  // ── FIX: gravity loop now uses settleAndClear for cascades ────────────
+  // ── gravity loop with cascading ───────────────────────────────────────
   const gravLoop = useCallback((now: number) => {
     if (!playRef.current||goRef.current||pauseRef.current||freezeRef.current) {
       gravRaf.current = requestAnimationFrame(gravLoop); return;
@@ -890,7 +896,6 @@ export function ScndDropGame() {
     if (now - lastGravRef.current >= 180) {
       const { board: stepped, moved } = stepGrav(boardRef.current, rotRef.current);
       if (moved) {
-        // FIX: after gravity step, run full cascading settle+clear
         const cs = csRef.current;
         const { board: afterAll, totalCleared, allPowerUps } = settleAndClear(stepped, rotRef.current, cs, burst);
         boardRef.current = afterAll;
