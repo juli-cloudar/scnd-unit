@@ -8,11 +8,11 @@ const BRAND_DIM = '#CC3300';
 
 type Rot = 0 | 90 | 180 | 270;
 
-// ─── Adaptive board dimensions ────────────────────────────────────────────────
-// On mobile (width < 600) we use 15×15 with smaller pieces (max 3-cell wide).
-// On desktop we keep 20×20.
-function getBoardDims(isMobile: boolean) {
-  return isMobile ? { W: 15, H: 15 } : { W: 20, H: 20 };
+// ─── Board dimensions ─────────────────────────────────────────────────────────
+// Fixed 15×15 for all screen sizes – better overview, larger playfield per pixel.
+// Mobile gets the same grid but with smaller 3-cell pieces.
+function getBoardDims(_isMobile: boolean) {
+  return { W: 15, H: 15 };
 }
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -136,17 +136,20 @@ interface LocalHS   { name:string; score:number; date:string; }
 interface SavedState { board:(Cell|null)[][]; score:number; lines:number; level:number; combo:number; }
 interface Particle  { x:number; y:number; vx:number; vy:number; life:number; color:string; size:number; }
 
-// ─── Local highscore storage ──────────────────────────────────────────────────
-const LOCAL_KEY = 'scnd_drop_local_hs';
-function loadLocalHS(): LocalHS[] {
-  if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) ?? '[]'); } catch { return []; }
+// ─── Personal best (localStorage, single entry) ───────────────────────────────
+const LOCAL_KEY = 'scnd_drop_personal_best';
+function loadPersonalBest(): LocalHS | null {
+  if (typeof window === 'undefined') return null;
+  try { const raw = localStorage.getItem(LOCAL_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
-function saveLocalHS(entry: LocalHS) {
-  const list = loadLocalHS();
-  list.push(entry);
-  list.sort((a, b) => b.score - a.score);
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(list.slice(0, 5)));
+function savePersonalBest(entry: LocalHS) {
+  const current = loadPersonalBest();
+  // Only overwrite if new score is higher (or no entry yet)
+  if (!current || entry.score > current.score) {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(entry));
+    return true; // new record
+  }
+  return false;
 }
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
@@ -233,14 +236,14 @@ function calcCellSize(containerW: number, containerH: number, BW: number, BH: nu
 }
 
 // ─── S-curve speed function ───────────────────────────────────────────────────
-// Level 1 = 2200ms, plateau around level 5-8, then eases to ~280ms at level 20+
+// Level 1 = 2200ms (very relaxed), Level 100 = 450ms (~2 blocks/s, still playable)
+// S-curve: slow ramp at start, gentle middle, flat end – no sudden jumps
 function getFallMsForLevel(level: number): number {
-  // Sigmoid-ish: slow start, gentle middle, soft end
-  const t = Math.min(level - 1, 25) / 25; // normalise 0..1 over 25 levels
-  // S-curve: ease-in-out cubic
-  const s = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
-  // Map s=0 → 2200ms, s=1 → 280ms
-  return Math.round(2200 - s * (2200 - 280));
+  const t = Math.min(level - 1, 99) / 99; // 0..1 over 99 levels
+  // Cubic ease-in-out S-curve
+  const s = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+  // s=0 → 2200ms, s=1 → 450ms
+  return Math.round(2200 - s * (2200 - 450));
 }
 
 // ─── Canvas symbol drawing ────────────────────────────────────────────────────
@@ -354,15 +357,15 @@ export function ScndDropGame() {
   const [puName,    setPuName]    = useState('');
   const [flags,     setFlags]     = useState({ freeze:false,slow:false,fast:false,shield:false,double:false,scnd:false });
   const [globalHS,  setGlobalHS]  = useState<GlobalHS[]>([]);
-  const [localHS,   setLocalHS]   = useState<LocalHS[]>([]);
+  const [personalBest, setPersonalBest] = useState<LocalHS | null>(null);
+  const [isNewRecord,  setIsNewRecord]  = useState(false);
   const [showName,  setShowName]  = useState(false);
   const [pname,     setPname]     = useState('');
   const [saving,    setSaving]    = useState(false);
   const [csize,     setCsize]     = useState({ w: 200, h: 200 });
-  const [hsTab,     setHsTab]     = useState<'local'|'global'>('local');
 
-  // Load local highscores on mount
-  useEffect(() => { setLocalHS(loadLocalHS()); }, []);
+  // Load personal best on mount
+  useEffect(() => { setPersonalBest(loadPersonalBest()); }, []);
 
   // ── Adaptive sizing ──────────────────────────────────────────────────
   const recalc = useCallback(() => {
@@ -584,9 +587,13 @@ export function ScndDropGame() {
     playRef.current = false; goRef.current = true;
     cancelAnimationFrame(rafRef.current); cancelAnimationFrame(gravRaf.current);
     setPlaying(false); setGameOver(true); setFinalSc(scoreRef.current);
-    // Local highscore check — always prompt for name if score > 0
-    if (scoreRef.current > 0) setShowName(true);
-    // Global
+    setIsNewRecord(false);
+    // Only prompt for name entry if this score beats the personal best (or no entry yet)
+    if (scoreRef.current > 0) {
+      const pb = loadPersonalBest();
+      if (!pb || scoreRef.current > pb.score) setShowName(true);
+    }
+    // Reload global
     fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
   }, []);
 
@@ -731,7 +738,7 @@ export function ScndDropGame() {
     rotRef.current = rots[Math.floor(Math.random()*4)];
     if (canvasRef.current) canvasRef.current.style.transform = `rotate(${rotRef.current}deg)`;
     setUiScore(0); setUiLevel(1); setUiLines(0); setUiCombo(0);
-    setGameOver(false); setPaused(false); setPuName(''); setBonus(''); setShowName(false); updFlags();
+    setGameOver(false); setPaused(false); setPuName(''); setBonus(''); setShowName(false); setIsNewRecord(false); updFlags();
     recalc();
     spawn(); setPlaying(true);
     const now = performance.now(); lastFallRef.current=now; lastGravRef.current=now;
@@ -772,14 +779,14 @@ export function ScndDropGame() {
     fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
   }, []);
 
-  // save highscore (local + optionally global)
+  // save highscore (local personal best + global)
   const saveHS = async () => {
     if (!pname.trim()||saving) return;
     setSaving(true);
-    // Always save locally
     const entry: LocalHS = { name: pname.trim(), score: finalSc, date: new Date().toLocaleDateString('de-DE') };
-    saveLocalHS(entry);
-    setLocalHS(loadLocalHS());
+    const wasNew = savePersonalBest(entry);
+    setPersonalBest(loadPersonalBest());
+    setIsNewRecord(wasNew);
     // Try global
     try {
       await fetch('/api/game-highscores', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({playerName:pname,score:finalSc}) });
@@ -787,6 +794,7 @@ export function ScndDropGame() {
       if (Array.isArray(d)) setGlobalHS(d);
     } catch { /* global save failed silently */ }
     setSaving(false); setShowName(false); setPname('');
+    // isNewRecord stays true until next game starts
   };
 
   // ── Derived theme ─────────────────────────────────────────────────────
@@ -904,37 +912,53 @@ export function ScndDropGame() {
             </div>
           </div>
 
-          {/* highscore panel with tabs */}
-          <div className="flex-1 md:flex-none rounded p-2" style={panelStyle}>
-            {/* tabs */}
-            <div className="flex mb-1.5 rounded overflow-hidden" style={{ border:`1px solid ${BRAND}40` }}>
-              {(['local','global'] as const).map(tab => (
-                <button key={tab} onClick={() => setHsTab(tab)}
-                  style={{
-                    flex:1, background: hsTab===tab ? BRAND : 'transparent',
-                    color: hsTab===tab ? T.canvasBg : T.textMuted,
-                  }}
-                  className="text-[6px] font-bold uppercase py-0.5 tracking-widest transition-colors">
-                  {tab==='local' ? 'LOKAL' : 'GLOBAL'}
-                </button>
-              ))}
+          {/* highscore panel */}
+          <div className="flex-1 md:flex-none rounded overflow-hidden" style={panelStyle}>
+            {/* ── Personal best – big and prominent ── */}
+            <div className="px-2 pt-2 pb-2" style={{ background: isNewRecord ? `${BRAND}18` : 'transparent', borderBottom:`1px solid ${T.panelBorder}` }}>
+              <div className="flex items-center justify-between mb-1">
+                <div style={{ color:T.textMuted }} className="text-[6px] uppercase tracking-widest">Dein Rekord</div>
+                {isNewRecord && (
+                  <span style={{ color:'#FFDC71', background:`#FFDC7122`, border:`1px solid #FFDC7155` }}
+                    className="text-[6px] font-black px-1.5 py-0.5 rounded tracking-wider animate-pulse">
+                    ★ NEU
+                  </span>
+                )}
+              </div>
+              {personalBest ? (
+                <>
+                  <div style={{ color: isNewRecord ? BRAND : T.textPrimary }}
+                    className="text-2xl font-black tabular-nums leading-none tracking-tight">
+                    {personalBest.score.toLocaleString()}
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span style={{ color:T.textPrimary }} className="text-[8px] font-bold truncate max-w-[80px]">
+                      {personalBest.name}
+                    </span>
+                    <span style={{ color:T.textMuted }} className="text-[7px]">{personalBest.date}</span>
+                  </div>
+                  {/* Progress bar: current session vs best */}
+                  {!gameOver && uiScore > 0 && (
+                    <div className="mt-1.5">
+                      <div className="h-1 rounded-full overflow-hidden" style={{ background: T.progressTrack }}>
+                        <div className="h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.round((uiScore / personalBest.score) * 100))}%`, background: BRAND }} />
+                      </div>
+                      <div style={{ color:T.textMuted }} className="text-[5px] mt-0.5 text-right">
+                        {Math.round((uiScore / personalBest.score) * 100)}% des Rekords
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ color:T.textMuted }} className="text-[8px] italic py-1">Spiel & schreibe Geschichte!</div>
+              )}
             </div>
 
-            {hsTab === 'local' ? (
-              localHS.length === 0
-                ? <div style={{ color:T.textMuted }} className="text-[7px] italic text-center">Noch keine Einträge</div>
-                : localHS.map((hs, i) => (
-                  <div key={i} className="mb-0.5">
-                    <div className="flex justify-between items-center">
-                      <span style={{ color:BRAND }} className="text-[7px] font-bold">{i+1}.</span>
-                      <span style={{ color:T.textPrimary }} className="text-[7px] font-bold truncate mx-1 flex-1">{hs.name}</span>
-                      <span style={{ color:BRAND }} className="text-[7px] font-black tabular-nums">{hs.score.toLocaleString()}</span>
-                    </div>
-                    <div style={{ color:T.textMuted }} className="text-[5px] text-right">{hs.date}</div>
-                  </div>
-                ))
-            ) : (
-              globalHS.length === 0
+            {/* ── Global top 3 ── */}
+            <div className="px-2 pt-1.5 pb-2">
+              <div style={{ color:BRAND }} className="text-[6px] uppercase tracking-widest font-bold mb-1">Global Top 3</div>
+              {globalHS.length === 0
                 ? <div style={{ color:T.textMuted }} className="text-[7px] italic text-center">— keine —</div>
                 : globalHS.map((hs, i) => (
                   <div key={i} className="flex justify-between items-center mb-0.5">
@@ -943,7 +967,8 @@ export function ScndDropGame() {
                     <span style={{ color:T.textPrimary }} className="text-[7px] font-bold tabular-nums">{hs.score.toLocaleString()}</span>
                   </div>
                 ))
-            )}
+              }
+            </div>
           </div>
 
           {/* controls desktop */}
@@ -1004,7 +1029,9 @@ export function ScndDropGame() {
           <div className="rounded-xl p-5 max-w-sm w-full shadow-2xl"
             style={{ background: T.panelBg, border:`2px solid ${BRAND}` }}>
             <h3 style={{ color:BRAND }} className="text-base font-black tracking-wider mb-0.5">HIGHSCORE</h3>
-            <p style={{ color:T.textMuted }} className="text-[10px] mb-1">Wird lokal + global gespeichert</p>
+            <p style={{ color:T.textMuted }} className="text-[10px] mb-1">
+              {personalBest && finalSc > personalBest.score ? '🏆 Neuer persönlicher Rekord!' : 'Lokal + global gespeichert'}
+            </p>
             <p style={{ color:T.textMuted }} className="text-xs mb-3">
               Punktzahl: <span style={{ color:BRAND }} className="font-black text-base">{finalSc.toLocaleString()}</span>
             </p>
