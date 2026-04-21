@@ -9,8 +9,8 @@ type Rot = 0 | 90 | 180 | 270;
 
 // ─── Board: fixed 15×15 ───────────────────────────────────────────────────────
 const BW = 15, BH = 15;
-// Minimum connected group size to clear
-const CLEAR_MIN = 5;
+// Minimum connected line length to clear (horizontal or vertical)
+const CLEAR_MIN = 10;
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 function getTheme(isDark: boolean) {
@@ -122,7 +122,7 @@ interface Cell {
   isPowerUp?:boolean; effect?:string; glow?:string;
   symbol?:string; pulse?:string; accent?:string;
   isIce?:boolean; isGold?:boolean;
-  name?:string;  // ← ADD THIS LINE
+  name?:string;
 }
 interface Piece {
   shape:number[][]; color:string; border:string; name:string;
@@ -202,34 +202,58 @@ function settle(board: (Cell|null)[][], rot: Rot): (Cell|null)[][] {
   return cur;
 }
 
-// ─── FLOOD-FILL CLEAR: only connected groups of ≥ CLEAR_MIN blocks ──────────
+// ─── LINE CLEAR: only horizontal or vertical lines of ≥ CLEAR_MIN blocks ─────
 // Returns: deleted cell coords + which of those were power-ups
-function findConnectedGroups(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boolean; puCells:{y:number;x:number;effect:string;name:string}[] }[] {
-  const visited = Array.from({length:BH}, () => Array(BW).fill(false));
+function findLines(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boolean; puCells:{y:number;x:number;effect:string;name:string}[] }[] {
   const groups: { cells:[number,number][]; hasPU:boolean; puCells:{y:number;x:number;effect:string;name:string}[] }[] = [];
+  const used = Array.from({length:BH}, () => Array(BW).fill(false));
 
-  for (let sy=0;sy<BH;sy++) for (let sx=0;sx<BW;sx++) {
-    if (visited[sy][sx] || !board[sy][sx]) continue;
-    // BFS flood fill
-    const q: [number,number][] = [[sy,sx]];
-    const cells: [number,number][] = [];
-    const puCells: {y:number;x:number;effect:string;name:string}[] = [];
-    visited[sy][sx] = true;
-    while (q.length) {
-      const [cy,cx] = q.shift()!;
-      cells.push([cy,cx]);
-      const cell = board[cy][cx]!;
-      if (cell.isPowerUp && cell.effect) puCells.push({y:cy,x:cx,effect:cell.effect,name:cell.name??''});
-      for (const [ny,nx] of [[cy-1,cx],[cy+1,cx],[cy,cx-1],[cy,cx+1]] as [number,number][]) {
-        if (ny>=0&&ny<BH&&nx>=0&&nx<BW&&!visited[ny][nx]&&board[ny][nx]) {
-          visited[ny][nx]=true; q.push([ny,nx]);
+  // Horizontale Reihen
+  for (let y=0; y<BH; y++) {
+    let x = 0;
+    while (x < BW) {
+      if (!board[y][x]) { x++; continue; }
+      const color = board[y][x]!.color;
+      const cells: [number,number][] = [];
+      const puCells: {y:number;x:number;effect:string;name:string}[] = [];
+      while (x < BW && board[y][x] && board[y][x]!.color === color) {
+        cells.push([y,x]);
+        const cell = board[y][x]!;
+        if (cell.isPowerUp && cell.effect) puCells.push({y,x,effect:cell.effect,name:cell.name??''});
+        x++;
+      }
+      if (cells.length >= CLEAR_MIN) {
+        for (const [cy,cx] of cells) used[cy][cx] = true;
+        groups.push({ cells, hasPU: puCells.length > 0, puCells });
+      }
+    }
+  }
+
+  // Vertikale Reihen
+  for (let x=0; x<BW; x++) {
+    let y = 0;
+    while (y < BH) {
+      if (!board[y][x]) { y++; continue; }
+      const color = board[y][x]!.color;
+      const cells: [number,number][] = [];
+      const puCells: {y:number;x:number;effect:string;name:string}[] = [];
+      while (y < BH && board[y][x] && board[y][x]!.color === color) {
+        cells.push([y,x]);
+        const cell = board[y][x]!;
+        if (cell.isPowerUp && cell.effect) puCells.push({y,x,effect:cell.effect,name:cell.name??''});
+        y++;
+      }
+      if (cells.length >= CLEAR_MIN) {
+        // Nur hinzufügen wenn Zelle noch nicht in horizontaler Reihe verwendet
+        const newCells = cells.filter(([cy,cx]) => !used[cy][cx]);
+        const newPU = puCells.filter(p => !used[p.y][p.x]);
+        if (newCells.length > 0) {
+          groups.push({ cells: newCells, hasPU: newPU.length > 0, puCells: newPU });
         }
       }
     }
-    if (cells.length >= CLEAR_MIN) {
-      groups.push({ cells, hasPU: puCells.length > 0, puCells });
-    }
   }
+
   return groups;
 }
 
@@ -239,7 +263,7 @@ function clearGroups(
   cs: number,
   burst: (x:number,y:number,n?:number)=>void
 ): { board:(Cell|null)[][]; cleared:number; powerUps:{y:number;x:number;effect:string;name:string}[] } {
-  const groups = findConnectedGroups(board);
+  const groups = findLines(board);
   if (!groups.length) return { board, cleared:0, powerUps:[] };
 
   const next = board.map(r=>[...r]) as (Cell|null)[][];
@@ -250,7 +274,7 @@ function clearGroups(
     for (const [y,x] of grp.cells) {
       if (next[y][x]) { burst(x*cs+cs/2, y*cs+cs/2, 6); next[y][x]=null; cleared++; }
     }
-    // Only collect power-up triggers from cells that were IN the cleared group
+    // Only collect power-up triggers from cells that were IN the cleared line
     for (const pu of grp.puCells) powerUps.push(pu);
   }
   return { board:next, cleared, powerUps };
@@ -589,7 +613,7 @@ export function ScndDropGame() {
     }
 
     const cs=csRef.current;
-    // Find and clear connected groups ≥ CLEAR_MIN; collect power-ups IN cleared groups
+    // Find and clear horizontal/vertical lines ≥ CLEAR_MIN; collect power-ups IN cleared lines
     const {board:afterClear,cleared,powerUps}=clearGroups(nb,cs,burst);
     nb=settle(afterClear,rotRef.current);
     boardRef.current=nb;
@@ -609,7 +633,7 @@ export function ScndDropGame() {
     setUiScore(scoreRef.current);setUiLines(linesRef.current);
     setUiLevel(levelRef.current);setUiCombo(comboRef.current);
 
-    // Trigger power-ups that were found inside cleared groups
+    // Trigger power-ups that were found inside cleared lines
     for(const pu of powerUps) triggerPU(pu.effect,pu.x,pu.y,pu.name,true);
 
     bpRef.current++;
@@ -680,8 +704,8 @@ export function ScndDropGame() {
     for(let y=0;y<=BH;y++){ctx.beginPath();ctx.moveTo(0,y*cs);ctx.lineTo(cw,y*cs);ctx.stroke();}
     ctx.strokeStyle=BRAND; ctx.lineWidth=2; ctx.strokeRect(1,1,cw-2,ch-2);
 
-    // Highlight connected groups ≥ CLEAR_MIN with subtle glow
-    const groups=findConnectedGroups(boardRef.current);
+    // Highlight horizontal/vertical lines ≥ CLEAR_MIN with subtle glow
+    const groups=findLines(boardRef.current);
     for(const grp of groups){
       ctx.fillStyle=`rgba(255,68,0,0.08)`;
       for(const [y,x] of grp.cells) ctx.fillRect(x*cs,y*cs,cs-1,cs-1);
@@ -929,14 +953,14 @@ export function ScndDropGame() {
                 <OBtn label="WEITER"   onClick={togglePause} bg={BRAND}        fg={T.canvasBg}/>
                 <OBtn label="NEUSTART" onClick={startGame}   outline={BRAND}   fg={BRAND}/>
                 <OBtn label="AUFGEBEN" onClick={giveUp}      outline="#C45B63" fg="#C45B63"/>
-              </div>
+                              </div>
             )}
             {!playing&&!gameOver&&(
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded"
                 style={{background:T.overlayBg,backdropFilter:'blur(4px)'}}>
                 <div style={{color:BRAND,letterSpacing:'0.2em'}} className="text-xl font-black">SCND DROP</div>
                 <div style={{color:T.textMuted}} className="text-[9px] text-center px-4">
-                  15×15 · Gruppen ≥ {CLEAR_MIN} löschen
+                  15×15 · Reihen ≥ {CLEAR_MIN} löschen
                 </div>
                 <OBtn label="START" onClick={startGame} bg={BRAND} fg={T.canvasBg}/>
               </div>
