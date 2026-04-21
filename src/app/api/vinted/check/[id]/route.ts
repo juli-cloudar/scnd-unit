@@ -1,4 +1,3 @@
-// app/api/vinted/check/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
@@ -6,7 +5,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: itemId } = await params;
-  const RENDER_API_URL = process.env.RENDER_API_URL; // Deine Render-URL als Umgebungsvariable
+  const RENDER_API_URL = process.env.RENDER_API_URL;
 
   if (!RENDER_API_URL) {
     console.error('RENDER_API_URL ist nicht gesetzt!');
@@ -17,13 +16,10 @@ export async function GET(
   }
 
   try {
-    // Leite die Anfrage an deine neue FastAPI auf Render weiter
     const response = await fetch(`${RENDER_API_URL}/check/${itemId}`);
-
     if (!response.ok) {
       throw new Error(`Render API error: ${response.status}`);
     }
-
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
