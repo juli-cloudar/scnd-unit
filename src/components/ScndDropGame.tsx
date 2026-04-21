@@ -584,26 +584,26 @@ export function ScndDropGame() {
           if (nx>=0&&nx<BW&&ny>=0&&ny<BH&&b[ny][nx]) { burst(nx*cs+cs/2,ny*cs+cs/2,4); b[ny][nx]=null; cnt++; }
         }
         boardRef.current = settle(b, rotRef.current);
-        puScore = cnt*80; break;
+        puScore = cnt*300; break;
       }
       case 'laser': {
         let cnt = 0;
         for (let x=0;x<BW;x++) if(b[py][x]){burst(x*cs+cs/2,py*cs+cs/2,4);b[py][x]=null;cnt++;}
         for (let y=0;y<BH;y++) if(b[y][px]){burst(px*cs+cs/2,y*cs+cs/2,4);b[y][px]=null;cnt++;}
         boardRef.current = settle(b, rotRef.current);
-        puScore = cnt*100; break;
+        puScore = cnt*450; break;
       }
       case 'scndBonus':
         scndRef.current=true; updFlags();
         setTimeout(()=>{scndRef.current=false;updFlags();},20000);
-        puScore=500; break;
+        puScore=1000; break;
       case 'freeze':
         freezeRef.current=true; updFlags();
         setTimeout(()=>{freezeRef.current=false;updFlags();},4000);
-        puScore=200; break;
+        puScore=300; break;
       case 'gravity':
         boardRef.current = settle(b, rotRef.current);
-        puScore=150; break;
+        puScore=250; break;
       case 'clearColor': {
         const freq: Record<string,number> = {};
         for (let y=0;y<BH;y++) for (let x=0;x<BW;x++) if(b[y][x]&&!b[y][x]!.isPowerUp) {
@@ -615,16 +615,16 @@ export function ScndDropGame() {
           burst(x*cs+cs/2,y*cs+cs/2,3); b[y][x]=null; cnt++;
         }
         boardRef.current = settle(b, rotRef.current);
-        puScore=cnt*90; break;
+        puScore=cnt*300; break;
       }
       case 'doubleScore':
         doubleRef.current=true; updFlags();
         setTimeout(()=>{doubleRef.current=false;updFlags();},15000);
-        puScore=300; break;
+        puScore=500; break;
       case 'shield':
         shieldRef.current=true; updFlags();
         setTimeout(()=>{shieldRef.current=false;updFlags();},12000);
-        puScore=250; break;
+        puScore=850; break;
       case 'megaBomb': {
         let cnt = 0;
         for (let dy=-3;dy<=3;dy++) for (let dx=-3;dx<=3;dx++) {
@@ -632,14 +632,14 @@ export function ScndDropGame() {
           if (nx>=0&&nx<BW&&ny>=0&&ny<BH&&b[ny][nx]) { burst(nx*cs+cs/2,ny*cs+cs/2,6); b[ny][nx]=null; cnt++; }
         }
         boardRef.current = settle(b, rotRef.current);
-        puScore=cnt*120; break;
+        puScore=cnt*750; break;
       }
       case 'meteor': {
         const cols = Array.from({length:BW},(_,i)=>i).sort(()=>Math.random()-.5).slice(0,3);
         let cnt = 0;
         for (const col of cols) for (let y=0;y<BH;y++) if(b[y][col]){burst(col*cs+cs/2,y*cs+cs/2,4);b[y][col]=null;cnt++;}
         boardRef.current = settle(b, rotRef.current);
-        puScore=cnt*110; break;
+        puScore=cnt*500; break;
       }
       case 'rewind':
         if (histRef.current.length > 0) {
@@ -663,7 +663,7 @@ export function ScndDropGame() {
           boardRef.current = b;
           burst(px*cs+cs/2, py*cs+cs/2, 20);
         }
-        puScore=200; break;
+        puScore=500; break;
       }
       default: break;
     }
@@ -708,7 +708,7 @@ export function ScndDropGame() {
       comboRef.current += 1;
       let m = 1 + comboRef.current*0.25;
       if (scndRef.current) m*=3; if (doubleRef.current) m*=2;
-      added = Math.floor(totalCleared*50*m*(1+totalCleared/10));
+      added = Math.floor(totalCleared*150*m*(1+totalCleared/10));
     } else comboRef.current = 0;
 
     scoreRef.current += added;
