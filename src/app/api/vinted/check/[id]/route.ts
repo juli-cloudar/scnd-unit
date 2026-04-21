@@ -1,52 +1,50 @@
-// src/app/api/vinted/check/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id: itemId } = await params;
+  const url = `https://www.vinted.de/items/${itemId}`;
+
   try {
-    const { id } = await params;
-    
-    if (!id) {
-      return NextResponse.json({ status: 'error', exists: false, error: 'Keine ID angegeben' }, { status: 400 });
-    }
-    
-    const vintedUrl = `https://www.vinted.de/api/v2/items/${id}`;
-    
-    const response = await fetch(vintedUrl, {
+    const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'de-DE,de;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8',
+        'Referer': 'https://www.vinted.de/',
+        'Cache-Control': 'no-cache',
       },
-      next: { revalidate: 0 }
     });
-    
-    if (response.status === 404) {
-      return NextResponse.json({ status: 'not_found', exists: false, isSold: false });
+
+    if (response.status === 404 || response.status === 410) {
+      return NextResponse.json({ exists: false, status: 'deleted' });
     }
-    
+
     if (!response.ok) {
-      return NextResponse.json({ status: 'error', exists: false, isSold: false, error: `HTTP ${response.status}` });
+      return NextResponse.json(
+        { exists: true, isSold: false, error: `HTTP ${response.status}` },
+        { status: response.status }
+      );
     }
-    
-    const data = await response.json();
-    const isSold = data?.item?.status === 'sold' || data?.status === 'sold';
-    
+
+    const html = await response.text();
+    const isSold = html.includes('item__sold-badge') ||
+                   html.includes('Artikel ist verkauft') ||
+                   html.includes('sold-badge') ||
+                   html.includes('Dieser Artikel ist bereits verkauft');
+
     return NextResponse.json({
-      status: isSold ? 'sold' : 'available',
       exists: true,
       isSold: isSold,
+      status: isSold ? 'sold' : 'active',
     });
-    
   } catch (error) {
-    console.error('Vinted API error:', error);
-    return NextResponse.json({ 
-      status: 'error', 
-      exists: false, 
-      isSold: false, 
-      error: String(error) 
-    });
+    console.error('[Check-API] Fehler:', error);
+    return NextResponse.json(
+      { exists: true, isSold: false, error: 'Network error' },
+      { status: 500 }
+    );
   }
 }
