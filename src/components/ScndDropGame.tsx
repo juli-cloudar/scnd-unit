@@ -9,8 +9,7 @@ type Rot = 0 | 90 | 180 | 270;
 
 // ─── Board: fixed 15×15 ───────────────────────────────────────────────────────
 const BW = 15, BH = 15;
-// Minimum connected line length to clear (horizontal or vertical)
-const CLEAR_MIN = 10;
+const CLEAR_MIN = 10; // mindestens 10 verbundene Blöcke in einer Reihe (horizontal oder vertikal)
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 function getTheme(isDark: boolean) {
@@ -66,54 +65,30 @@ interface PUDef {
   glow:string;symbol:string;pulse:string;accent:string;desc:string;
 }
 const POWERUPS: PUDef[] = [
-  // BOMBE: clears 3×3 area around landing position
   { shape:[[1,1,1]], color:'#FF3A1A',border:'#991200',name:'BOMBE',
-    effect:'bomb',       glow:'#FF6040',symbol:'circle',  pulse:'flicker',accent:'#FFD0C0',
-    desc:'Löscht 3×3 Bereich' },
-  // LASER: clears entire row at landing position (board coords)
+    effect:'bomb',       glow:'#FF6040',symbol:'circle',  pulse:'flicker',accent:'#FFD0C0', desc:'Löscht 3×3 Bereich' },
   { shape:[[1,1],[1,0]], color:'#1E3A6E',border:'#080E1F',name:'LASER',
-    effect:'laser',      glow:'#4080FF',symbol:'bolt',    pulse:'spin',   accent:'#80B0FF',
-    desc:'Löscht eine Reihe' },
-  // 3x: multiplies all score for 20 seconds
+    effect:'laser',      glow:'#4080FF',symbol:'bolt',    pulse:'spin',   accent:'#80B0FF', desc:'Löscht eine Reihe' },
   { shape:[[0,1,0],[1,1,1]], color:'#FFC27A',border:'#B07020',name:'3×',
-    effect:'scndBonus',  glow:'#FFD060',symbol:'star',    pulse:'breathe',accent:'#FFF0A0',
-    desc:'3× Punkte für 20s' },
-  // FREEZE: stops the falling piece for 4 seconds
+    effect:'scndBonus',  glow:'#FFD060',symbol:'star',    pulse:'breathe',accent:'#FFF0A0', desc:'3× Punkte für 20s' },
   { shape:[[1,1,0],[0,1,1]], color:'#58D1C6',border:'#1A8A80',name:'FREEZE',
-    effect:'freeze',     glow:'#88EEFF',symbol:'diamond', pulse:'ripple', accent:'#CCFFFF',
-    desc:'Stoppt Zeit für 4s' },
-  // GRAVITY: all loose blocks fall toward current gravity direction immediately
+    effect:'freeze',     glow:'#88EEFF',symbol:'diamond', pulse:'ripple', accent:'#CCFFFF', desc:'Stoppt Zeit für 4s' },
   { shape:[[1,0],[1,1],[0,1]], color:'#4D8A70',border:'#1E5040',name:'GRAV',
-    effect:'gravity',    glow:'#76C662',symbol:'arc',     pulse:'bounce', accent:'#B7D354',
-    desc:'Lose Blöcke fallen' },
-  // CLEAR: clears all blocks of the most common color on the board
+    effect:'gravity',    glow:'#76C662',symbol:'arc',     pulse:'bounce', accent:'#B7D354', desc:'Lose Blöcke fallen' },
   { shape:[[1,1,1],[1,0,0]], color:'#9B70B8',border:'#5A2880',name:'CLEAR',
-    effect:'clearColor', glow:'#C080FF',symbol:'wave',    pulse:'flicker',accent:'#E8D0FF',
-    desc:'Löscht häufigste Farbe' },
-  // 2x: doubles score for 15 seconds
+    effect:'clearColor', glow:'#C080FF',symbol:'wave',    pulse:'flicker',accent:'#E8D0FF', desc:'Löscht häufigste Farbe' },
   { shape:[[1,1],[1,1]], color:'#FFDC71',border:'#C8A800',name:'2×',
-    effect:'doubleScore',glow:'#FFD700',symbol:'square',  pulse:'breathe',accent:'#FFFACC',
-    desc:'2× Punkte für 15s' },
-  // SHIELD: next piece placement cannot trigger game-over, piece can overlap
+    effect:'doubleScore',glow:'#FFD700',symbol:'square',  pulse:'breathe',accent:'#FFFACC', desc:'2× Punkte für 15s' },
   { shape:[[0,1,0],[1,1,1],[0,1,0]], color:'#E5E0D8',border:'#C8C0B0',name:'SHIELD',
-    effect:'shield',     glow:'#FFFFFF',symbol:'ring',    pulse:'ripple', accent:'#538BB9',
-    desc:'Schutz vor Game-Over' },
-  // MEGA: clears 5×5 area
+    effect:'shield',     glow:'#FFFFFF',symbol:'ring',    pulse:'ripple', accent:'#538BB9', desc:'Schutz vor Game-Over' },
   { shape:[[1,1,1],[1,1,1]], color:'#C45B63',border:'#7A2030',name:'MEGA',
-    effect:'megaBomb',   glow:'#FF4060',symbol:'triangle',pulse:'flicker',accent:'#FFB0B8',
-    desc:'Löscht 5×5 Bereich' },
-  // METEOR: clears a random full column
+    effect:'megaBomb',   glow:'#FF4060',symbol:'triangle',pulse:'flicker',accent:'#FFB0B8', desc:'Löscht 5×5 Bereich' },
   { shape:[[0,1,0],[1,1,1]], color:'#EA8E77',border:'#A84830',name:'METEOR',
-    effect:'meteor',     glow:'#FF8C00',symbol:'spark',   pulse:'bounce', accent:'#FFD0A0',
-    desc:'Löscht eine Spalte' },
-  // REWIND: restores board state from 3 moves ago
+    effect:'meteor',     glow:'#FF8C00',symbol:'spark',   pulse:'bounce', accent:'#FFD0A0', desc:'Löscht eine Spalte' },
   { shape:[[1,1,1],[1,0,1]], color:'#355D68',border:'#102830',name:'REWIND',
-    effect:'rewind',     glow:'#58D1C6',symbol:'dot',     pulse:'spin',   accent:'#A0EEFF',
-    desc:'Zeitreise: 3 Züge zurück' },
-  // SWAP: exchanges positions of all blocks of two random colors
+    effect:'rewind',     glow:'#58D1C6',symbol:'dot',     pulse:'spin',   accent:'#A0EEFF', desc:'Zeitreise: 3 Züge zurück' },
   { shape:[[1,0],[1,1]], color:'#814566',border:'#481A38',name:'SWAP',
-    effect:'swap',       glow:'#C080A0',symbol:'cross',   pulse:'spin',   accent:'#F0C0D8',
-    desc:'Tauscht 2 Farben' },
+    effect:'swap',       glow:'#C080A0',symbol:'cross',   pulse:'spin',   accent:'#F0C0D8', desc:'Tauscht 2 Farben' },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -202,14 +177,13 @@ function settle(board: (Cell|null)[][], rot: Rot): (Cell|null)[][] {
   return cur;
 }
 
-
 // ─── LINE CLEAR: only horizontal or vertical lines of ≥ CLEAR_MIN blocks ─────
 // Returns: deleted cell coords + which of those were power-ups
 function findLines(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boolean; puCells:{y:number;x:number;effect:string;name:string}[] }[] {
   const groups: { cells:[number,number][]; hasPU:boolean; puCells:{y:number;x:number;effect:string;name:string}[] }[] = [];
   const used = Array.from({length:BH}, () => Array(BW).fill(false));
 
-  // Horizontale Reihen — egal welche Farbe, nur Blöcke zählen
+  // Horizontale Reihen
   for (let y=0; y<BH; y++) {
     let x = 0;
     while (x < BW) {
@@ -229,7 +203,7 @@ function findLines(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boo
     }
   }
 
-  // Vertikale Reihen — egal welche Farbe, nur Blöcke zählen
+  // Vertikale Reihen
   for (let x=0; x<BW; x++) {
     let y = 0;
     while (y < BH) {
@@ -252,8 +226,6 @@ function findLines(board: (Cell|null)[][]): { cells:[number,number][]; hasPU:boo
   return groups;
 }
 
-
-// Returns cleared cells and power-up triggers found in cleared cells
 function clearGroups(
   board: (Cell|null)[][],
   cs: number,
@@ -270,7 +242,6 @@ function clearGroups(
     for (const [y,x] of grp.cells) {
       if (next[y][x]) { burst(x*cs+cs/2, y*cs+cs/2, 6); next[y][x]=null; cleared++; }
     }
-    // Only collect power-up triggers from cells that were IN the cleared line
     for (const pu of grp.puCells) powerUps.push(pu);
   }
   return { board:next, cleared, powerUps };
@@ -280,7 +251,6 @@ function calcCellSize(cw: number, ch: number): number {
   return Math.min(Math.max(8, Math.min(Math.floor((cw-4)/BW), Math.floor((ch-4)/BH))), 64);
 }
 
-// ─── S-curve speed: Level1=2200ms, Level100=450ms ────────────────────────────
 function getFallMsForLevel(level: number): number {
   const t = Math.min(level-1, 99) / 99;
   const s = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
@@ -311,7 +281,6 @@ function drawSym(ctx: CanvasRenderingContext2D, sym: string, cx: number, cy: num
   ctx.restore();
 }
 
-// ─── Draw pause icon (two rectangles, no emoji) ───────────────────────────────
 function drawPauseIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, col: string) {
   const w = size * 0.22, h = size * 0.5, gap = size * 0.14;
   ctx.fillStyle = col;
@@ -319,7 +288,6 @@ function drawPauseIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, si
   ctx.beginPath(); ctx.roundRect(cx + gap,      cy - h/2, w, h, 2); ctx.fill();
 }
 
-// ─── Detect dark/mobile ───────────────────────────────────────────────────────
 function useIsDark(): boolean {
   const [v,set] = useState(true);
   useEffect(()=>{
@@ -357,7 +325,7 @@ export function ScndDropGame() {
   const rotRef      = useRef<Rot>(0);
   const scoreRef    = useRef(0);
   const levelRef    = useRef(1);
-  const linesRef    = useRef(0);   // groups cleared (for level)
+  const linesRef    = useRef(0);
   const comboRef    = useRef(0);
   const playRef     = useRef(false);
   const pauseRef    = useRef(false);
@@ -401,7 +369,6 @@ export function ScndDropGame() {
 
   useEffect(()=>{ setPersonalBest(loadPersonalBest()); },[]);
 
-  // ── sizing ────────────────────────────────────────────────────────────
   const recalc = useCallback(()=>{
     if(!areaRef.current) return;
     const r=areaRef.current.getBoundingClientRect();
@@ -449,30 +416,47 @@ export function ScndDropGame() {
     return{x:gx,y:gy};
   },[hits]);
 
-  // ── spawn ─────────────────────────────────────────────────────────────
-  const spawn=useCallback(():boolean=>{
-    const isPU=Math.random()<0.14;
-    const pool=isPU?POWERUPS:TETROMINOS;
-    const src=pool[Math.floor(Math.random()*pool.length)];
-    const piece:Piece={
-      shape:src.shape.map(r=>[...r]),color:src.color,border:src.border,name:src.name,isPowerUp:isPU,
-      effect:isPU?(src as PUDef).effect:undefined,glow:isPU?(src as PUDef).glow:undefined,
-      symbol:isPU?(src as PUDef).symbol:undefined,pulse:isPU?(src as PUDef).pulse:undefined,
-      accent:isPU?(src as PUDef).accent:undefined,
+  // ── spawn (verbessert: zentriert, sucht nach oben) ────────────────────
+  const spawn = useCallback((): boolean => {
+    const isPU = Math.random() < 0.14;
+    const pool = isPU ? POWERUPS : TETROMINOS;
+    const src = pool[Math.floor(Math.random() * pool.length)];
+    const piece: Piece = {
+      shape: src.shape.map(r => [...r]), color: src.color, border: src.border, name: src.name, isPowerUp: isPU,
+      effect: isPU ? (src as PUDef).effect : undefined, glow: isPU ? (src as PUDef).glow : undefined,
+      symbol: isPU ? (src as PUDef).symbol : undefined, pulse: isPU ? (src as PUDef).pulse : undefined,
+      accent: isPU ? (src as PUDef).accent : undefined,
     };
-    const pw=piece.shape[0].length,ph=piece.shape.length;
-    const cx=Math.floor((BW-pw)/2),cy=Math.floor((BH-ph)/2);
-    for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){
-      const tx=cx+dx,ty=cy+dy;
-      if(tx>=0&&tx+pw<=BW&&ty>=0&&ty+ph<=BH&&!hits(piece.shape,tx,ty)){
-        pieceRef.current=piece;pxRef.current=tx;pyRef.current=ty;return true;
+    const pw = piece.shape[0].length, ph = piece.shape.length;
+    const cx = Math.floor((BW - pw) / 2);
+    const cy = Math.floor((BH - ph) / 2);
+    // Versuche zuerst die Mitte, dann nach oben
+    for (let offset = 0; offset <= cy; offset++) {
+      const testY = cy - offset;
+      if (testY >= 0 && !hits(piece.shape, cx, testY)) {
+        pieceRef.current = piece;
+        pxRef.current = cx;
+        pyRef.current = testY;
+        return true;
       }
     }
-    return false;
-  },[hits]);
+    // Fallback: kleiner Bereich um die Mitte
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        const tx = cx + dx, ty = cy + dy;
+        if (tx >= 0 && tx + pw <= BW && ty >= 0 && ty + ph <= BH && !hits(piece.shape, tx, ty)) {
+          pieceRef.current = piece;
+          pxRef.current = tx;
+          pyRef.current = ty;
+          return true;
+        }
+      }
+    }
+    return false; // Game Over
+  }, [hits]);
 
-  // ── POWER-UP TRIGGER — all with full effects + scoring ────────────────
-  const triggerPU=useCallback((effect:string,px:number,py:number,name:string,fromClear=false)=>{
+  // ── POWER-UP TRIGGER (unverändert) ────────────────────────────────────
+  const triggerPU = useCallback((effect:string,px:number,py:number,name:string,fromClear=false)=>{
     setPuName(name); showBonus(`${name}!`);
     const cs=csRef.current;
     burst(px*cs+cs/2,py*cs+cs/2,30);
@@ -490,7 +474,6 @@ export function ScndDropGame() {
         puScore=cnt*80; break;
       }
       case'laser': {
-        // Laser clears the entire row AND column through landing position
         let cnt=0;
         for(let x=0;x<BW;x++) if(b[py][x]){burst(x*cs+cs/2,py*cs+cs/2,4);b[py][x]=null;cnt++;}
         for(let y=0;y<BH;y++) if(b[y][px]){burst(px*cs+cs/2,y*cs+cs/2,4);b[y][px]=null;cnt++;}
@@ -509,7 +492,6 @@ export function ScndDropGame() {
         boardRef.current=settle(b,rotRef.current);
         puScore=150; break;
       case'clearColor': {
-        // Find most common color and delete all blocks of that color
         const freq: Record<string,number>={};
         for(let y=0;y<BH;y++) for(let x=0;x<BW;x++) if(b[y][x]&&!b[y][x]!.isPowerUp) {
           const c=b[y][x]!.color; freq[c]=(freq[c]||0)+1;
@@ -542,7 +524,6 @@ export function ScndDropGame() {
         puScore=cnt*120; break;
       }
       case'meteor': {
-        // Clears 3 random columns
         const cols=Array.from({length:BW},(_,i)=>i).sort(()=>Math.random()-.5).slice(0,3);
         let cnt=0;
         for(const col of cols) for(let y=0;y<BH;y++) if(b[y][col]){burst(col*cs+cs/2,y*cs+cs/2,4);b[y][col]=null;cnt++;}
@@ -559,7 +540,6 @@ export function ScndDropGame() {
         }
         puScore=0; break;
       case'swap': {
-        // Swap positions of all blocks of two different random colors
         const colorSet=new Set<string>();
         for(let y=0;y<BH;y++) for(let x=0;x<BW;x++) if(b[y][x]&&!b[y][x]!.isPowerUp) colorSet.add(b[y][x]!.color);
         const cols2=Array.from(colorSet).sort(()=>Math.random()-.5);
@@ -577,7 +557,6 @@ export function ScndDropGame() {
       default: break;
     }
 
-    // Award score from power-up
     let mult=1;
     if(scndRef.current) mult*=3; if(doubleRef.current) mult*=2;
     puScore=Math.floor(puScore*mult);
@@ -587,55 +566,80 @@ export function ScndDropGame() {
     setTimeout(()=>setPuName(''),2500);
   },[burst,showBonus,updFlags]);
 
-  // ── merge ─────────────────────────────────────────────────────────────
-  const merge=useCallback(()=>{
-    const p=pieceRef.current; if(!p) return;
-    histRef.current=[...histRef.current.slice(-4),{
-      board:boardRef.current.map(r=>[...r]),score:scoreRef.current,
-      lines:linesRef.current,level:levelRef.current,combo:comboRef.current,
+  // ── merge (mit Schleife für wiederholtes Löschen) ─────────────────────
+  const merge = useCallback(() => {
+    const p = pieceRef.current; if (!p) return;
+    histRef.current = [...histRef.current.slice(-4), {
+      board: boardRef.current.map(r => [...r]),
+      score: scoreRef.current,
+      lines: linesRef.current,
+      level: levelRef.current,
+      combo: comboRef.current,
     }];
-    let nb=boardRef.current.map(r=>[...r]) as (Cell|null)[][];
-    for(let y=0;y<p.shape.length;y++) for(let x=0;x<p.shape[y].length;x++){
-      if(!p.shape[y][x]) continue;
-      const bx=pxRef.current+x,by=pyRef.current+y;
-      if(bx<0||bx>=BW||by<0||by>=BH) continue;
-      nb[by][bx]={
-        color:p.color,border:p.border,isPowerUp:p.isPowerUp,
-        effect:p.effect,glow:p.glow,symbol:p.symbol,pulse:p.pulse,accent:p.accent,
-        name: p.name,
-        isIce:  !p.isPowerUp&&Math.random()<0.05,
-        isGold: !p.isPowerUp&&Math.random()<0.04,
-      };
+
+    let nb = boardRef.current.map(r => [...r]) as (Cell|null)[][];
+    for (let y = 0; y < p.shape.length; y++) {
+      for (let x = 0; x < p.shape[y].length; x++) {
+        if (!p.shape[y][x]) continue;
+        const bx = pxRef.current + x, by = pyRef.current + y;
+        if (bx < 0 || bx >= BW || by < 0 || by >= BH) continue;
+        nb[by][bx] = {
+          color: p.color, border: p.border, isPowerUp: p.isPowerUp,
+          effect: p.effect, glow: p.glow, symbol: p.symbol, pulse: p.pulse, accent: p.accent,
+          name: p.name,
+          isIce: !p.isPowerUp && Math.random() < 0.05,
+          isGold: !p.isPowerUp && Math.random() < 0.04,
+        };
+      }
     }
 
-    const cs=csRef.current;
-    // Find and clear horizontal/vertical lines ≥ CLEAR_MIN; collect power-ups IN cleared lines
-    const {board:afterClear,cleared,powerUps}=clearGroups(nb,cs,burst);
-    nb=settle(afterClear,rotRef.current);
-    boardRef.current=nb;
+    const cs = csRef.current;
+    let totalCleared = 0;
+    let totalPowerUps: { y: number; x: number; effect: string; name: string }[] = [];
 
-    // Score for cleared blocks
-    let added=0;
-    if(cleared>0){
-      comboRef.current+=1;
-      let m=1+comboRef.current*0.25;
-      if(scndRef.current) m*=3; if(doubleRef.current) m*=2;
-      // Base: 50 per block cleared, bonus for larger groups
-      added=Math.floor(cleared*50*m*(1+cleared/10));
-    } else comboRef.current=0;
+    let board = nb;
+    let changed = true;
+    while (changed) {
+      const { board: afterClear, cleared, powerUps } = clearGroups(board, cs, burst);
+      if (cleared === 0) break;
+      totalCleared += cleared;
+      totalPowerUps.push(...powerUps);
+      board = settle(afterClear, rotRef.current);
+      // continue loop
+    }
+    boardRef.current = board;
 
-    scoreRef.current+=added; linesRef.current+=cleared;
-    levelRef.current=Math.floor(linesRef.current/40)+1;  // 40 blocks = next level
-    setUiScore(scoreRef.current);setUiLines(linesRef.current);
-    setUiLevel(levelRef.current);setUiCombo(comboRef.current);
+    if (totalCleared > 0) {
+      comboRef.current += 1;
+      let multiplier = 1 + comboRef.current * 0.25;
+      if (scndRef.current) multiplier *= 3;
+      if (doubleRef.current) multiplier *= 2;
+      const added = Math.floor(totalCleared * 50 * multiplier * (1 + totalCleared / 20));
+      scoreRef.current += added;
+      linesRef.current += totalCleared;
+      levelRef.current = Math.floor(linesRef.current / 40) + 1;
+      setUiScore(scoreRef.current);
+      setUiLines(linesRef.current);
+      setUiLevel(levelRef.current);
+      setUiCombo(comboRef.current);
+    } else {
+      comboRef.current = 0;
+      setUiCombo(0);
+    }
 
-    // Trigger power-ups that were found inside cleared lines
-    for(const pu of powerUps) triggerPU(pu.effect,pu.x,pu.y,pu.name,true);
+    for (const pu of totalPowerUps) {
+      triggerPU(pu.effect, pu.x, pu.y, pu.name, true);
+    }
 
     bpRef.current++;
-    if(bpRef.current>=bpLimRef.current){bpRef.current=0;bpLimRef.current=Math.floor(Math.random()*5)+3;doRot();}
-    if(!spawn()) endGame();
-  },[burst,spawn,triggerPU]);
+    if (bpRef.current >= bpLimRef.current) {
+      bpRef.current = 0;
+      bpLimRef.current = Math.floor(Math.random() * 5) + 3;
+      doRot();
+    }
+
+    if (!spawn()) endGame();
+  }, [burst, spawn, triggerPU, doRot, endGame]);
 
   // ── movement ──────────────────────────────────────────────────────────
   const move=useCallback((sdx:number,sdy:number)=>{
@@ -684,7 +688,7 @@ export function ScndDropGame() {
     return ms;
   },[]);
 
-  // ── DRAW ──────────────────────────────────────────────────────────────
+  // ── DRAW (unverändert) ─────────────────────────────────────────────────
   const draw=useCallback(()=>{
     const canvas=canvasRef.current; if(!canvas) return;
     const ctx=canvas.getContext('2d'); if(!ctx) return;
@@ -700,7 +704,6 @@ export function ScndDropGame() {
     for(let y=0;y<=BH;y++){ctx.beginPath();ctx.moveTo(0,y*cs);ctx.lineTo(cw,y*cs);ctx.stroke();}
     ctx.strokeStyle=BRAND; ctx.lineWidth=2; ctx.strokeRect(1,1,cw-2,ch-2);
 
-    // Highlight horizontal/vertical lines ≥ CLEAR_MIN with subtle glow
     const groups=findLines(boardRef.current);
     for(const grp of groups){
       ctx.fillStyle=`rgba(255,68,0,0.08)`;
@@ -772,7 +775,6 @@ export function ScndDropGame() {
     }
     ctx.globalAlpha=1;
 
-    // Progress bar toward next level (every 40 cleared blocks)
     const blocksPerLevel=40;
     const prog=((linesRef.current%blocksPerLevel)/blocksPerLevel)*cw;
     ctx.fillStyle=T.progressTrack; ctx.fillRect(0,ch-3,cw,3);
@@ -797,7 +799,6 @@ export function ScndDropGame() {
       const {board:next,moved}=stepGrav(boardRef.current,rotRef.current);
       if(moved){
         boardRef.current=next;
-        // Check for new clears after gravity
         const cs=csRef.current;
         const {board:afterClear,cleared,powerUps}=clearGroups(next,cs,burst);
         if(cleared>0){
@@ -814,7 +815,6 @@ export function ScndDropGame() {
     gravRaf.current=requestAnimationFrame(gravLoop);
   },[burst,triggerPU]);
 
-  // ── start ─────────────────────────────────────────────────────────────
   const startGame=useCallback(()=>{
     cancelAnimationFrame(rafRef.current);cancelAnimationFrame(gravRaf.current);
     boardRef.current=emptyBoard();scoreRef.current=0;levelRef.current=1;
@@ -878,11 +878,9 @@ export function ScndDropGame() {
       const d=await(await fetch('/api/game-highscores')).json();
       if(Array.isArray(d))setGlobalHS(d);
     }catch{}
-    // isNewRecord stays true until next game starts
     setSaving(false);setShowName(false);setPname('');
   };
 
-  // ── Derived theme ─────────────────────────────────────────────────────
   const T=getTheme(isDark);
   const panelStyle={background:T.panelBg,border:`1px solid ${T.panelBorder}`};
 
@@ -895,17 +893,14 @@ export function ScndDropGame() {
     {on:flags.scnd,  label:'3×',    col:'#FFC27A'},
   ].filter(f=>f.on);
 
-  // Mobile button size: adaptive to screen width
   const mbSize=isMobile?Math.min(Math.max(54,Math.floor((typeof window!=='undefined'?window.innerWidth:360)-80)/5),82):52;
 
-  // ─── render ──────────────────────────────────────────────────────────
   return(
     <div style={{background:T.wrapperBg,borderColor:`${BRAND}35`}}
       className="w-full h-screen md:h-auto md:min-h-[600px] md:my-4 rounded-2xl border-2 flex flex-col overflow-hidden transition-colors duration-300">
 
       <div style={{background:`linear-gradient(90deg,${BRAND_DIM},${BRAND},${BRAND_DIM})`}} className="h-0.5 flex-shrink-0"/>
 
-      {/* header */}
       <div className="flex-shrink-0 py-1 px-3 text-center">
         <h3 style={{color:BRAND,letterSpacing:'0.18em'}} className="text-lg md:text-xl font-black uppercase">SCND DROP</h3>
         {activeBadges.length>0&&(
@@ -924,10 +919,8 @@ export function ScndDropGame() {
         )}
       </div>
 
-      {/* main */}
       <div className="flex-1 flex flex-col md:flex-row gap-2 px-2 pb-1 min-h-0">
 
-        {/* canvas */}
         <div ref={areaRef} className="flex-1 min-h-0 flex items-center justify-center relative">
           <div className="relative" style={{width:csize.w,height:csize.h}}>
             <div className="absolute -inset-1 rounded pointer-events-none"
@@ -975,9 +968,7 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* sidebar */}
         <div className="flex-shrink-0 flex flex-row md:flex-col gap-2 md:w-40 pb-1">
-          {/* score */}
           <div className="flex-1 md:flex-none rounded p-2" style={panelStyle}>
             <div style={{color:T.textMuted}} className="text-[6px] uppercase tracking-widest text-center mb-0.5">PUNKTE</div>
             <div style={{color:BRAND}} className="text-xl font-black tabular-nums text-center leading-none">
@@ -993,7 +984,6 @@ export function ScndDropGame() {
             </div>
           </div>
 
-          {/* highscore */}
           <div className="flex-1 md:flex-none rounded overflow-hidden" style={panelStyle}>
             <div className="px-2 pt-2 pb-2" style={{background:isNewRecord?`${BRAND}18`:'transparent',borderBottom:`1px solid ${T.panelBorder}`}}>
               <div className="flex items-center justify-between mb-1">
@@ -1044,7 +1034,6 @@ export function ScndDropGame() {
             </div>
           </div>
 
-          {/* controls desktop */}
           <div className="hidden md:block rounded p-2" style={panelStyle}>
             <div style={{color:T.textMuted}} className="text-[5px] uppercase tracking-widest mb-1">Steuerung</div>
             {([['←→','Seite'],['↓','Fall'],['↑','Dreh'],['ESC','Pause']] as [string,string][]).map(([k,v])=>(
@@ -1066,26 +1055,21 @@ export function ScndDropGame() {
         </div>
       </div>
 
-      {/* ── Mobile controls ── */}
       {playing&&!gameOver&&!paused&&(
         <div style={{background:T.panelBg,borderTopColor:T.panelBorder}}
           className="md:hidden flex-shrink-0 border-t py-3 px-4">
           <div className="flex items-center justify-between w-full max-w-sm mx-auto">
-            {/* Movement: ◀ ▼ ▶ in a row */}
             <div className="flex gap-2">
               <MB label="◀" fn={()=>move(-1,0)} size={mbSize} col={BRAND} bg={T.panelBg}/>
               <MB label="▼" fn={()=>move(0,1)}  size={mbSize} col={BRAND} bg={T.panelBg}/>
               <MB label="▶" fn={()=>move(1,0)}  size={mbSize} col={BRAND} bg={T.panelBg}/>
             </div>
-            {/* Right side: Rotate (with drawn icon) + Pause (with drawn icon) */}
             <div className="flex gap-2">
               <MBCanvas size={mbSize} col={BRAND} bg={T.panelBg} fn={rotPiece}
                 draw={(ctx,cx,cy,sz)=>{
-                  // Draw rotation arrow (circular arrow)
                   const r=sz*0.28;
                   ctx.strokeStyle=BRAND; ctx.lineWidth=Math.max(2,sz*0.1); ctx.lineCap='round';
                   ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI*0.15,Math.PI*1.85); ctx.stroke();
-                  // arrowhead
                   const ax=cx+Math.cos(Math.PI*1.85)*r, ay=cy+Math.sin(Math.PI*1.85)*r;
                   ctx.beginPath();
                   ctx.moveTo(ax+sz*0.08,ay-sz*0.12);
@@ -1105,7 +1089,6 @@ export function ScndDropGame() {
         </div>
       )}
 
-      {/* name modal */}
       {showName&&(
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
           style={{background:T.overlayBg,backdropFilter:'blur(8px)'}}>
@@ -1144,7 +1127,7 @@ export function ScndDropGame() {
   );
 }
 
-// ─── UI Helpers ───────────────────────────────────────────────────────────────
+// ─── UI Helpers (unverändert) ─────────────────────────────────────────────────
 function OBtn({label,onClick,bg,fg,outline}:{label:string;onClick:()=>void;bg?:string;fg?:string;outline?:string}){
   return(
     <button onClick={onClick}
@@ -1155,7 +1138,6 @@ function OBtn({label,onClick,bg,fg,outline}:{label:string;onClick:()=>void;bg?:s
   );
 }
 
-// Text label mobile button
 function MB({label,fn,size,col,bg,filled}:{label:string;fn:()=>void;size:number;col:string;bg:string;filled?:boolean}){
   return(
     <button onTouchStart={e=>{e.preventDefault();fn();}}
@@ -1175,7 +1157,6 @@ function MB({label,fn,size,col,bg,filled}:{label:string;fn:()=>void;size:number;
   );
 }
 
-// Canvas-drawn icon mobile button (for rotate + pause)
 function MBCanvas({size,col,bg,fn,draw,filled}:{
   size:number;col:string;bg:string;fn:()=>void;
   draw:(ctx:CanvasRenderingContext2D,cx:number,cy:number,sz:number)=>void;
