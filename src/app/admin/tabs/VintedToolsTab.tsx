@@ -12,7 +12,6 @@ interface Employee {
 
 export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
   const [activeSubTab, setActiveSubTab] = useState<'import' | 'status' | 'merge' | 'clean'>('import');
-  const [autoRemove, setAutoRemove] = useState(false);
   
   // JSON Import States
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -20,8 +19,6 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
   const [importResult, setImportResult] = useState<any>(null);
   const [singleUrl, setSingleUrl] = useState('');
   const [statusLoading, setStatusLoading] = useState(false);
-  const [statusProgress, setStatusProgress] = useState({ current: 0, total: 0 });
-  const [statusResult, setStatusResult] = useState<any>(null);
   const [singleResult, setSingleResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,7 +27,7 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
   const [mergedResult, setMergedResult] = useState<{ totalItems: number; uniqueItems: number; duplicates: number; mergedFile?: any } | null>(null);
   const mergeFileInputRef = useRef<HTMLInputElement>(null);
 
-  // ========== JSON IMPORT (vollständig) ==========
+  // ========== JSON IMPORT ==========
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setUploadedFile(file);
@@ -141,7 +138,7 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
     } finally { setImportLoading(false); }
   };
 
-  // ========== STATUS CHECK ==========
+  // ========== STATUS CHECK (nur Einzelprüfung) ==========
   const checkSingleItem = async () => {
     if (!singleUrl) { toast('Bitte URL eingeben', 'error'); return; }
     setStatusLoading(true);
@@ -153,29 +150,6 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
       else if (data.status === 'available') toast('Item ist verfügbar', 'success');
     } catch (e) { toast('Fehler', 'error'); }
     finally { setStatusLoading(false); }
-  };
-
-  const checkAllStatus = async () => {
-    setStatusLoading(true);
-    try {
-      const { data: products } = await supabase.from('products').select('*').eq('sold', false);
-      if (!products || products.length === 0) { toast('Keine aktiven Produkte', 'info'); setStatusLoading(false); return; }
-      setStatusProgress({ current: 0, total: products.length });
-      const soldItems: any[] = [];
-      for (let i = 0; i < products.length; i++) {
-        const product = products[i];
-        try {
-          const res = await fetch('/api/vinted', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'single', url: product.vinted_url }) });
-          const data = await res.json();
-          if (data.status === 'sold') { soldItems.push(product); if (autoRemove) await supabase.from('products').update({ sold: true }).eq('id', product.id); }
-        } catch (err) {}
-        setStatusProgress(prev => ({ ...prev, current: i + 1 }));
-        await new Promise(r => setTimeout(r, 500));
-      }
-      setStatusResult({ summary: { total: products.length, available: products.length - soldItems.length, sold: soldItems.length }, soldItems: soldItems.map(s => ({ name: s.name, url: s.vinted_url })) });
-      toast(`Fertig: ${soldItems.length} verkauft`, 'success');
-    } catch (e) { toast('Fehler', 'error'); }
-    finally { setStatusLoading(false); setStatusProgress({ current: 0, total: 0 }); }
   };
 
   // ========== JSON MERGE ==========
@@ -274,15 +248,12 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
     <div className="space-y-6">
       <div className="flex gap-2 border-b border-[#FF4400]/30 pb-4">
         <button onClick={() => setActiveSubTab('import')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'import' ? 'bg-green-600 text-white' : 'border border-green-600/30 text-green-500'}`}><Upload className="w-4 h-4 inline mr-1"/>JSON Import</button>
-        <button onClick={() => setActiveSubTab('status')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'status' ? 'bg-blue-600 text-white' : 'border border-blue-600/30 text-blue-500'}`}><RefreshCw className="w-4 h-4 inline mr-1"/>Status Check</button>
+        <button onClick={() => setActiveSubTab('status')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'status' ? 'bg-blue-600 text-white' : 'border border-blue-600/30 text-blue-500'}`}><Search className="w-4 h-4 inline mr-1"/>Status Check</button>
         <button onClick={() => setActiveSubTab('merge')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'merge' ? 'bg-purple-600 text-white' : 'border border-purple-600/30 text-purple-500'}`}><Merge className="w-4 h-4 inline mr-1"/>JSON Merge</button>
         <button onClick={() => setActiveSubTab('clean')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'clean' ? 'bg-red-600 text-white' : 'border border-red-600/30 text-red-500'}`}><AlertTriangle className="w-4 h-4 inline mr-1"/>Auto Clean</button>
       </div>
 
-      <div className="bg-[#111] border border-red-500/30 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3"><AlertTriangle className="w-5 h-5 text-red-500"/><div><p className="text-sm font-bold text-red-400">Auto-Remove Modus</p><p className="text-xs text-gray-500">Verkaufte Items automatisch als verkauft markieren</p></div></div>
-        <label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={autoRemove} onChange={e => setAutoRemove(e.target.checked)} className="sr-only peer"/><div className="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"/></label>
-      </div>
+      {/* Auto-Remove Modus wurde entfernt, da nicht mehr benötigt */}
 
       {/* JSON IMPORT TAB */}
       {activeSubTab === 'import' && (
@@ -297,20 +268,20 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
         </div>
       )}
 
-      {/* STATUS CHECK TAB */}
+      {/* STATUS CHECK TAB (nur Einzelprüfung) */}
       {activeSubTab === 'status' && (
-        <div className="space-y-4">
-          <div className="bg-[#111] border border-blue-500/30 p-6 space-y-3">
-            <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2"><Search className="w-5 h-5"/>Einzelnes Item prüfen</h3>
-            <div className="flex gap-2"><input type="text" placeholder="https://www.vinted.de/items/..." value={singleUrl} onChange={e => setSingleUrl(e.target.value)} className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"/><button onClick={checkSingleItem} disabled={statusLoading} className="px-5 py-3 bg-blue-600 text-white text-xs font-bold uppercase">🔍 Check</button></div>
-            {singleResult && (<div className={`p-4 border text-sm rounded ${singleResult.status === 'available' ? 'border-green-500/50 bg-green-950/20' : 'border-red-500/50 bg-red-950/20'}`}><span className="px-2 py-0.5 text-xs font-bold uppercase rounded bg-green-500 text-white">{singleResult.status}</span>{singleResult.name && <span className="ml-2">{singleResult.name}</span>}</div>)}
+        <div className="bg-[#111] border border-blue-500/30 p-6 space-y-3">
+          <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2"><Search className="w-5 h-5"/>Einzelnes Item prüfen</h3>
+          <div className="flex gap-2">
+            <input type="text" placeholder="https://www.vinted.de/items/..." value={singleUrl} onChange={e => setSingleUrl(e.target.value)} className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"/>
+            <button onClick={checkSingleItem} disabled={statusLoading} className="px-5 py-3 bg-blue-600 text-white text-xs font-bold uppercase">🔍 Check</button>
           </div>
-          <div className="bg-[#111] border border-blue-500/30 p-6 space-y-3">
-            <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2"><RefreshCw className="w-5 h-5"/>Alle Produkte prüfen</h3>
-            <button onClick={checkAllStatus} disabled={statusLoading} className="w-full py-4 bg-blue-600 text-white text-sm font-bold uppercase flex items-center justify-center gap-2"><RefreshCw className={`w-5 h-5 ${statusLoading && statusProgress.total ? 'animate-spin' : ''}`}/>{statusLoading && statusProgress.total ? `Prüfe ${statusProgress.current}/${statusProgress.total}` : 'Alle Produkte checken'}</button>
-            {statusLoading && statusProgress.total > 0 && (<div className="w-full bg-gray-800 rounded-full h-2"><div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${(statusProgress.current / statusProgress.total) * 100}%` }}/></div>)}
-            {statusResult && <ResultDisplay result={statusResult} />}
-          </div>
+          {singleResult && (
+            <div className={`p-4 border text-sm rounded ${singleResult.status === 'available' ? 'border-green-500/50 bg-green-950/20' : 'border-red-500/50 bg-red-950/20'}`}>
+              <span className="px-2 py-0.5 text-xs font-bold uppercase rounded bg-green-500 text-white">{singleResult.status}</span>
+              {singleResult.name && <span className="ml-2">{singleResult.name}</span>}
+            </div>
+          )}
         </div>
       )}
 
