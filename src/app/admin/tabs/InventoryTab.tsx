@@ -13,6 +13,12 @@ interface Employee {
   permissions: { canAddProducts: boolean; canEditProducts: boolean; canDeleteProducts: boolean; canViewStats: boolean; canManageEmployees: boolean; };
 }
 
+// Zentrale Kategorienliste (inkl. aller gewünschten Kategorien)
+const PRODUCT_CATEGORIES = [
+  'Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Hemden', 
+  'Headwear', 'Polos', 'Taschen', 'Sonstiges'
+];
+
 export function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +38,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
 
   const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
   const allBrands = ["Alle", ...brandList];
-  const fixedCategories = ['Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Hemden', 'Headwear', 'Taschen', 'Sonstiges'];
-  const allCategories = ["Alle", ...fixedCategories];
+  const allCategories = ["Alle", ...PRODUCT_CATEGORIES];
   
   const filtered = products.filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false;
@@ -57,10 +62,21 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
       <h3 className="text-lg font-bold text-[#FF4400] mb-4">Produkt bearbeiten</h3>
       <div className="space-y-4">
         <input value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Name"/>
-        <div className="grid grid-cols-2 gap-4"><input value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Preis"/><input value={editingProduct.size} onChange={e => setEditingProduct({...editingProduct, size: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Größe"/></div>
-        <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3"><option>Jacken</option><option>Pullover</option><option>Sweatshirts</option><option>Tops</option><option>Sonstiges</option></select>
+        <div className="grid grid-cols-2 gap-4">
+          <input value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Preis"/>
+          <input value={editingProduct.size} onChange={e => setEditingProduct({...editingProduct, size: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Größe"/>
+        </div>
+        {/* Kategorien-Auswahl jetzt mit allen Kategorien aus PRODUCT_CATEGORIES */}
+        <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3">
+          {PRODUCT_CATEGORIES.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
         <input value={editingProduct.vinted_url} onChange={e => setEditingProduct({...editingProduct, vinted_url: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Vinted URL"/>
-        <div className="flex gap-2"><button onClick={() => { supabase.from('products').update(editingProduct).eq('id', editingProduct.id).then(() => { setEditingProduct(null); toast('Produkt gespeichert'); loadProducts(); }); }} className="flex-1 py-3 bg-[#FF4400] text-white font-bold uppercase"><Save className="w-4 h-4 inline mr-2"/>Speichern</button><button onClick={() => setEditingProduct(null)} className="flex-1 py-3 border border-gray-600 text-gray-400 uppercase">Abbrechen</button></div>
+        <div className="flex gap-2">
+          <button onClick={() => { supabase.from('products').update(editingProduct).eq('id', editingProduct.id).then(() => { setEditingProduct(null); toast('Produkt gespeichert'); loadProducts(); }); }} className="flex-1 py-3 bg-[#FF4400] text-white font-bold uppercase"><Save className="w-4 h-4 inline mr-2"/>Speichern</button>
+          <button onClick={() => setEditingProduct(null)} className="flex-1 py-3 border border-gray-600 text-gray-400 uppercase">Abbrechen</button>
+        </div>
       </div>
     </div>
   );
@@ -89,13 +105,12 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
                 </button>
               ))}
             </div>
-            {/* Gradient für Scroll-Indikator */}
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0A0A0A] to-transparent pointer-events-none"></div>
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#0A0A0A] to-transparent pointer-events-none"></div>
           </div>
         </div>
         
-        {/* Kategorien Filter - horizontal scrollbar */}
+        {/* Kategorien Filter - horizontal scrollbar (jetzt mit allen Kategorien) */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 bg-[#FF4400]"></div>
