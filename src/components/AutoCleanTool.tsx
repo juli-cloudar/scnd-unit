@@ -58,31 +58,38 @@ const checkSingleItem = async (url: string, retryCount = 0): Promise<{ exists: b
     if (!itemMatch) return { exists: false, isSold: false, error: 'Ungültige URL' };
     
     const itemId = itemMatch[1];
-    const res = await fetch(`/api/vinted/check/${itemId}`);
+    // Öffentlicher CORS-Proxy (kostenlos, kein API-Key)
+    const proxyUrl = `https://api.allorigins.win/raw?url=https://www.vinted.de/items/${itemId}`;
+    const res = await fetch(proxyUrl);
     
-    // Rate limiting - warten und wiederholen
-    if (res.status === 429 && retryCount < 3) {
+    // Bei Fehlern des Proxys (z.B. Timeout) – wiederholen
+    if (!res.ok && retryCount < 2) {
       const waitTime = 2000 * (retryCount + 1);
-      console.log(`Rate Limited! Warte ${waitTime}ms und wiederhole...`);
+      console.log(`Proxy-Fehler (${res.status}), wiederhole in ${waitTime}ms...`);
       await new Promise(r => setTimeout(r, waitTime));
       return checkSingleItem(url, retryCount + 1);
     }
     
-    if (res.status === 404) {
-      return { exists: false, isSold: false };
-    }
+    if (!res.ok) return { exists: false, isSold: false, error: `HTTP ${res.status}` };
     
-    const data = await res.json();
+    const html = await res.text();
+    const isSold = html.includes('item__sold-badge') ||
+                   html.includes('Artikel ist verkauft') ||
+                   html.includes('sold-badge') ||
+                   html.includes('Dieser Artikel ist bereits verkauft');
     
-    if (data.status === 'sold') {
-      return { exists: true, isSold: true };
-    }
-    
-    return { exists: true, isSold: false };
+    return { exists: true, isSold };
   } catch (error) {
+    // Netzwerkfehler – noch ein Versuch
+    if (retryCount < 2) {
+      console.log(`Netzwerkfehler, wiederhole...`);
+      await new Promise(r => setTimeout(r, 2000));
+      return checkSingleItem(url, retryCount + 1);
+    }
     return { exists: true, isSold: false, error: 'Netzwerkfehler' };
   }
 };
+  
 
     const deleteProduct = async (id: number) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
