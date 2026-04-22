@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { 
   Instagram, MessageCircle, ArrowRight, MapPin,
   Clock, Shield, ExternalLink, Search,
@@ -288,8 +289,8 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           </motion.div>
         </div>
       </section>
-
-      {/* Footer */}
+      
+          {/* Footer */}
       <footer className="border-t border-[var(--border-color)] py-12 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-2xl font-bold tracking-tighter">
@@ -298,6 +299,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           <div className="flex gap-6 text-sm uppercase tracking-widest text-[var(--text-secondary)]">
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="hover:text-[#FF4400] transition-colors">Vinted</a>
             <a href="https://www.instagram.com/scnd.unit" target="_blank" className="hover:text-[#FF4400] transition-colors">Instagram</a>
+            <Link href="/impressum" className="hover:text-[#FF4400] transition-colors">Impressum</Link>  {/* ← NEU */}
           </div>
           <p className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">© 2025 SCND UNIT • Bad Kreuznach</p>
         </div>
