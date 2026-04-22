@@ -14,12 +14,12 @@
 
 /* ========== LIGHT MODE ========== */
 html.light {
-  --bg-primary: #FFFFFF !important;
-  --bg-secondary: #F5F5F5 !important;
-  --text-primary: #111111 !important;
-  --text-secondary: #666666 !important;
-  --border-color: #E5E5E5 !important;
-  --gradient-start: #FFFFFF !important;
+  --bg-primary: #FDF8F0 !important;
+  --bg-secondary: #F5EFE6 !important;
+  --text-primary: #2C2418 !important;
+  --text-secondary: #6B5E4A !important;
+  --border-color: #E5DCD0 !important;
+  --gradient-start: #FDF8F0 !important;
 }
 
 /* ========== DARK MODE (wenn dark Klasse) ========== */
