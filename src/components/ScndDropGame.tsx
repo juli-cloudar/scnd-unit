@@ -9,7 +9,6 @@ type Rot = 0 | 90 | 180 | 270;
 
 // ─── Board: fixed 15×15 ───────────────────────────────────────────────────────
 const BW = 15, BH = 15;
-// Minimum connected line length to clear (horizontal or vertical)
 const CLEAR_MIN = 10;
 
 // ─── Game over condition: central 3x3 area max 50% filled ────────────────────
@@ -108,6 +107,17 @@ const POWERUPS: PUDef[] = [
     desc:'Tauscht 2 Farben' },
 ];
 
+// ─── Power-up Animation System ────────────────────────────────────────────────
+interface PUAnim {
+  effect: string;
+  px: number;  // grid x of trigger
+  py: number;  // grid y of trigger
+  t: number;   // elapsed 0..1
+  duration: number; // ms
+  startTime: number;
+  data?: Record<string, unknown>; // extra payload (e.g. which columns for meteor)
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Cell {
   color:string; border:string;
@@ -132,9 +142,11 @@ function loadPersonalBest(): LocalHS | null {
   try { const r = localStorage.getItem(LOCAL_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
 }
 function savePersonalBest(e: LocalHS): boolean {
-  const cur = loadPersonalBest();
-  if (!cur || e.score > cur.score) { localStorage.setItem(LOCAL_KEY, JSON.stringify(e)); return true; }
-  return false;
+  try {
+    const cur = loadPersonalBest();
+    if (!cur || e.score > cur.score) { localStorage.setItem(LOCAL_KEY, JSON.stringify(e)); return true; }
+    return false;
+  } catch { return false; }
 }
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
@@ -143,11 +155,9 @@ const emptyBoard = (): (Cell|null)[][] => Array.from({ length: BH }, () => Array
 function getCriticalZoneFill(board: (Cell|null)[][]): number {
   const start = Math.floor((BW - CRITICAL_ZONE_SIZE) / 2);
   let occupied = 0;
-  for (let dy = 0; dy < CRITICAL_ZONE_SIZE; dy++) {
-    for (let dx = 0; dx < CRITICAL_ZONE_SIZE; dx++) {
+  for (let dy = 0; dy < CRITICAL_ZONE_SIZE; dy++)
+    for (let dx = 0; dx < CRITICAL_ZONE_SIZE; dx++)
       if (board[start + dy][start + dx] !== null) occupied++;
-    }
-  }
   return occupied / (CRITICAL_ZONE_SIZE * CRITICAL_ZONE_SIZE);
 }
 
@@ -224,7 +234,6 @@ function settle(board: (Cell|null)[][], rot: Rot): (Cell|null)[][] {
   return cur;
 }
 
-// ─── LINE CLEAR: horizontal or vertical runs of ≥ CLEAR_MIN touching blocks ──
 interface LineGroup {
   cells: [number,number][];
   puCells: { y:number; x:number; effect:string; name:string }[];
@@ -232,24 +241,18 @@ interface LineGroup {
 
 function findLines(board: (Cell|null)[][]): LineGroup[] {
   const groups: LineGroup[] = [];
-  const toDelete = new Set<number>(); // y*BW+x encoded
-
-  // ── horizontal pass ──────────────────────────────────────────────────
+  const toDelete = new Set<number>();
   for (let y = 0; y < BH; y++) {
-    let runStart = -1;
-    let runLen = 0;
+    let runStart = -1, runLen = 0;
     for (let x = 0; x <= BW; x++) {
       const occupied = x < BW && board[y][x] !== null;
-      if (occupied) {
-        if (runStart === -1) runStart = x;
-        runLen++;
-      } else {
+      if (occupied) { if (runStart === -1) runStart = x; runLen++; }
+      else {
         if (runLen >= CLEAR_MIN) {
           const cells: [number,number][] = [];
           const puCells: LineGroup['puCells'] = [];
           for (let i = runStart; i < runStart + runLen; i++) {
-            cells.push([y, i]);
-            toDelete.add(y * BW + i);
+            cells.push([y, i]); toDelete.add(y * BW + i);
             const cell = board[y][i]!;
             if (cell.isPowerUp && cell.effect) puCells.push({ y, x:i, effect:cell.effect, name:cell.name??'' });
           }
@@ -259,24 +262,18 @@ function findLines(board: (Cell|null)[][]): LineGroup[] {
       }
     }
   }
-
-  // ── vertical pass ────────────────────────────────────────────────────
   for (let x = 0; x < BW; x++) {
-    let runStart = -1;
-    let runLen = 0;
+    let runStart = -1, runLen = 0;
     for (let y = 0; y <= BH; y++) {
       const occupied = y < BH && board[y][x] !== null;
-      if (occupied) {
-        if (runStart === -1) runStart = y;
-        runLen++;
-      } else {
+      if (occupied) { if (runStart === -1) runStart = y; runLen++; }
+      else {
         if (runLen >= CLEAR_MIN) {
           const cells: [number,number][] = [];
           const puCells: LineGroup['puCells'] = [];
           for (let i = runStart; i < runStart + runLen; i++) {
             if (!toDelete.has(i * BW + x)) {
-              cells.push([i, x]);
-              toDelete.add(i * BW + x);
+              cells.push([i, x]); toDelete.add(i * BW + x);
               const cell = board[i][x]!;
               if (cell.isPowerUp && cell.effect) puCells.push({ y:i, x, effect:cell.effect, name:cell.name??'' });
             }
@@ -287,7 +284,6 @@ function findLines(board: (Cell|null)[][]): LineGroup[] {
       }
     }
   }
-
   return groups;
 }
 
@@ -298,18 +294,12 @@ function applyLineClear(
 ): { board:(Cell|null)[][]; cleared:number; powerUps:{ y:number; x:number; effect:string; name:string }[] } {
   const groups = findLines(board);
   if (!groups.length) return { board, cleared: 0, powerUps: [] };
-
   const next = board.map(r => [...r]) as (Cell|null)[][];
   let cleared = 0;
   const powerUps: { y:number; x:number; effect:string; name:string }[] = [];
-
   for (const grp of groups) {
     for (const [y, x] of grp.cells) {
-      if (next[y][x]) {
-        burst(x*cs + cs/2, y*cs + cs/2, 6);
-        next[y][x] = null;
-        cleared++;
-      }
+      if (next[y][x]) { burst(x*cs + cs/2, y*cs + cs/2, 6); next[y][x] = null; cleared++; }
     }
     for (const pu of grp.puCells) powerUps.push(pu);
   }
@@ -325,7 +315,6 @@ function settleAndClear(
   let current = board;
   let totalCleared = 0;
   const allPowerUps: { y:number; x:number; effect:string; name:string }[] = [];
-
   for (let pass = 0; pass < 20; pass++) {
     current = settle(current, rot);
     const { board: afterClear, cleared, powerUps } = applyLineClear(current, cs, burst);
@@ -334,7 +323,6 @@ function settleAndClear(
     totalCleared += cleared;
     allPowerUps.push(...powerUps);
   }
-
   return { board: current, totalCleared, allPowerUps };
 }
 
@@ -342,14 +330,12 @@ function calcCellSize(cw: number, ch: number): number {
   return Math.min(Math.max(8, Math.min(Math.floor((cw-4)/BW), Math.floor((ch-4)/BH))), 64);
 }
 
-// ─── S-curve speed ────────────────────────────────────────────────────────────
 function getFallMsForLevel(level: number): number {
   const t = Math.min(level-1, 99) / 99;
   const s = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
   return Math.round(2200 - s*(2200-450));
 }
 
-// ─── Canvas symbol drawing ────────────────────────────────────────────────────
 function drawSym(ctx: CanvasRenderingContext2D, sym: string, cx: number, cy: number, cs: number, col: string, t: number) {
   const r = cs * 0.27;
   ctx.save(); ctx.translate(cx, cy);
@@ -380,6 +366,452 @@ function drawPauseIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, si
   ctx.beginPath(); ctx.roundRect(cx+gap,   cy-h/2, w, h, 2); ctx.fill();
 }
 
+// ─── Power-up Animation Renderer ─────────────────────────────────────────────
+function drawPUAnim(
+  ctx: CanvasRenderingContext2D,
+  anim: PUAnim,
+  cs: number,
+  cw: number,
+  ch: number,
+) {
+  const t = anim.t; // 0 = start, 1 = end
+  const ease = (x: number) => x < 0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2;
+  const eased = ease(t);
+
+  ctx.save();
+
+  switch (anim.effect) {
+
+    // ── LASER: two beams shoot from trigger cell across full row + column ──
+    case 'laser': {
+      const cx = (anim.px + 0.5) * cs;
+      const cy = (anim.py + 0.5) * cs;
+      // Phase 0-0.3: charge up (pulsing dot)
+      // Phase 0.3-0.7: beams expand
+      // Phase 0.7-1.0: fade out
+      const chargeEnd = 0.25, fireEnd = 0.7;
+
+      if (t < chargeEnd) {
+        const tp = t / chargeEnd;
+        const r = cs * 0.8 * tp;
+        ctx.globalAlpha = 0.9 * tp;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        grad.addColorStop(0, '#FFFFFF');
+        grad.addColorStop(0.4, '#4080FF');
+        grad.addColorStop(1, 'rgba(64,128,255,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+      } else if (t < fireEnd) {
+        const tp = (t - chargeEnd) / (fireEnd - chargeEnd);
+        const alpha = Math.min(1, tp * 3);
+        // Horizontal beam
+        ctx.globalAlpha = alpha;
+        const beamH = cs * 0.55;
+        const beamGradH = ctx.createLinearGradient(0, cy, cw, cy);
+        beamGradH.addColorStop(0, 'rgba(64,128,255,0)');
+        beamGradH.addColorStop(0.3, 'rgba(180,220,255,0.9)');
+        beamGradH.addColorStop(0.5, '#FFFFFF');
+        beamGradH.addColorStop(0.7, 'rgba(180,220,255,0.9)');
+        beamGradH.addColorStop(1, 'rgba(64,128,255,0)');
+        ctx.fillStyle = beamGradH;
+        ctx.fillRect(0, cy - beamH/2, cw, beamH);
+        // Core bright line
+        ctx.globalAlpha = alpha * 0.95;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, cy - 2, cw, 4);
+        // Vertical beam
+        ctx.globalAlpha = alpha * 0.85;
+        const beamGradV = ctx.createLinearGradient(cx, 0, cx, ch);
+        beamGradV.addColorStop(0, 'rgba(64,128,255,0)');
+        beamGradV.addColorStop(0.3, 'rgba(180,220,255,0.9)');
+        beamGradV.addColorStop(0.5, '#FFFFFF');
+        beamGradV.addColorStop(0.7, 'rgba(180,220,255,0.9)');
+        beamGradV.addColorStop(1, 'rgba(64,128,255,0)');
+        const beamV = cs * 0.55;
+        ctx.fillStyle = beamGradV;
+        ctx.fillRect(cx - beamV/2, 0, beamV, ch);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(cx - 2, 0, 4, ch);
+        // Center flash
+        ctx.globalAlpha = alpha * 0.9;
+        const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs*1.5);
+        flash.addColorStop(0, 'rgba(255,255,255,0.95)');
+        flash.addColorStop(0.3, 'rgba(64,128,255,0.6)');
+        flash.addColorStop(1, 'rgba(64,128,255,0)');
+        ctx.fillStyle = flash;
+        ctx.beginPath(); ctx.arc(cx, cy, cs*1.5, 0, Math.PI*2); ctx.fill();
+      } else {
+        const tp = (t - fireEnd) / (1 - fireEnd);
+        ctx.globalAlpha = (1-tp) * 0.6;
+        ctx.fillStyle = 'rgba(64,128,255,0.3)';
+        ctx.fillRect(0, (anim.py)*cs, cw, cs);
+        ctx.fillRect((anim.px)*cs, 0, cs, ch);
+      }
+      break;
+    }
+
+    // ── BOMB: expanding ring + shockwave ──────────────────────────────────
+    case 'bomb': {
+      const cx = (anim.px + 0.5) * cs;
+      const cy = (anim.py + 0.5) * cs;
+      const maxR = cs * 2.2;
+
+      if (t < 0.15) {
+        // Flash
+        ctx.globalAlpha = (1 - t/0.15) * 0.8;
+        ctx.fillStyle = '#FFAA44';
+        ctx.beginPath(); ctx.arc(cx, cy, cs*1.5*(t/0.15), 0, Math.PI*2); ctx.fill();
+      } else {
+        const tp = (t - 0.15) / 0.85;
+        const r = maxR * ease(tp);
+        // Outer ring
+        ctx.globalAlpha = (1-tp) * 0.9;
+        ctx.strokeStyle = '#FF6020';
+        ctx.lineWidth = cs * 0.3 * (1-tp);
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+        // Inner glow
+        ctx.globalAlpha = (1-tp) * 0.6;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r*0.8);
+        grad.addColorStop(0, 'rgba(255,180,60,0.7)');
+        grad.addColorStop(0.5, 'rgba(255,80,20,0.4)');
+        grad.addColorStop(1, 'rgba(255,60,0,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, r*0.8, 0, Math.PI*2); ctx.fill();
+        // Shockwave ring (faster)
+        if (tp > 0.2) {
+          const tp2 = (tp - 0.2) / 0.8;
+          ctx.globalAlpha = (1-tp2) * 0.5;
+          ctx.strokeStyle = '#FFFF88';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(cx, cy, maxR * 1.5 * tp2, 0, Math.PI*2); ctx.stroke();
+        }
+      }
+      break;
+    }
+
+    // ── MEGA BOMB: huge explosion with multiple rings ─────────────────────
+    case 'megaBomb': {
+      const cx = (anim.px + 0.5) * cs;
+      const cy = (anim.py + 0.5) * cs;
+      const maxR = cs * 3.5;
+
+      if (t < 0.1) {
+        ctx.globalAlpha = t/0.1;
+        const flash = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs*2);
+        flash.addColorStop(0, 'rgba(255,255,255,1)');
+        flash.addColorStop(0.5, 'rgba(255,80,40,0.8)');
+        flash.addColorStop(1, 'rgba(255,80,40,0)');
+        ctx.fillStyle = flash;
+        ctx.beginPath(); ctx.arc(cx, cy, cs*2, 0, Math.PI*2); ctx.fill();
+      } else {
+        const tp = (t - 0.1) / 0.9;
+        for (let ring = 0; ring < 3; ring++) {
+          const delay = ring * 0.15;
+          if (tp < delay) continue;
+          const rtp = Math.min(1, (tp - delay) / 0.7);
+          const r = maxR * (0.5 + ring * 0.3) * ease(rtp);
+          ctx.globalAlpha = (1-rtp) * (0.9 - ring * 0.2);
+          ctx.strokeStyle = ring === 0 ? '#FFFFFF' : ring === 1 ? '#FF6020' : '#FF2000';
+          ctx.lineWidth = cs * (0.4 - ring*0.1) * (1-rtp) + 1;
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+        }
+        // Heat shimmer overlay
+        ctx.globalAlpha = (1-eased) * 0.2;
+        ctx.fillStyle = '#FF4400';
+        ctx.fillRect(0, 0, cw, ch);
+      }
+      break;
+    }
+
+    // ── FREEZE: ice crystal spreads outward from center ───────────────────
+    case 'freeze': {
+      const cx = (anim.px + 0.5) * cs;
+      const cy = (anim.py + 0.5) * cs;
+
+      if (t < 0.4) {
+        const tp = t / 0.4;
+        // Crystal burst from center
+        ctx.globalAlpha = tp * 0.9;
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2;
+          const len = cs * 3.5 * ease(tp);
+          ctx.strokeStyle = '#88EEFF';
+          ctx.lineWidth = Math.max(1, cs * 0.15 * (1-tp*0.5));
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + Math.cos(angle)*len, cy + Math.sin(angle)*len);
+          ctx.stroke();
+          // Branch crystals
+          if (tp > 0.4) {
+            const branchLen = len * 0.4;
+            const btp = (tp - 0.4) / 0.6;
+            for (const bSign of [-1, 1]) {
+              const bAngle = angle + bSign * Math.PI / 5;
+              const bx = cx + Math.cos(angle)*len*0.6;
+              const by = cy + Math.sin(angle)*len*0.6;
+              ctx.globalAlpha = tp * 0.7 * btp;
+              ctx.beginPath();
+              ctx.moveTo(bx, by);
+              ctx.lineTo(bx + Math.cos(bAngle)*branchLen*btp, by + Math.sin(bAngle)*branchLen*btp);
+              ctx.stroke();
+            }
+          }
+        }
+      } else {
+        const tp = (t - 0.4) / 0.6;
+        // Full board frost overlay
+        ctx.globalAlpha = (1-tp) * 0.25;
+        ctx.fillStyle = '#88EEFF';
+        ctx.fillRect(0, 0, cw, ch);
+        // Snowflake pattern
+        ctx.globalAlpha = (1-tp) * 0.5;
+        ctx.strokeStyle = '#CCFFFF';
+        ctx.lineWidth = 1;
+        for (let y = 0; y < BH; y += 3) {
+          for (let x = 0; x < BW; x += 3) {
+            const fx = (x + 0.5) * cs, fy = (y + 0.5) * cs;
+            for (let i = 0; i < 4; i++) {
+              const a = (i / 4) * Math.PI;
+              ctx.beginPath(); ctx.moveTo(fx - Math.cos(a)*cs*0.35, fy - Math.sin(a)*cs*0.35);
+              ctx.lineTo(fx + Math.cos(a)*cs*0.35, fy + Math.sin(a)*cs*0.35); ctx.stroke();
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    // ── METEOR: 3 columns get struck from above ───────────────────────────
+    case 'meteor': {
+      const cols = (anim.data?.cols as number[]) || [0, 7, 14];
+      for (let ci = 0; ci < cols.length; ci++) {
+        const delay = ci * 0.12;
+        if (t < delay) continue;
+        const tp = Math.min(1, (t - delay) / 0.8);
+        const col = cols[ci];
+        const cx = (col + 0.5) * cs;
+
+        if (tp < 0.5) {
+          // Meteor falling down
+          const yEnd = ch * tp * 2;
+          ctx.globalAlpha = (1 - tp * 0.5) * 0.9;
+          const grad = ctx.createLinearGradient(cx, 0, cx, yEnd);
+          grad.addColorStop(0, 'rgba(255,140,0,0)');
+          grad.addColorStop(0.5, 'rgba(255,180,0,0.8)');
+          grad.addColorStop(1, 'rgba(255,80,0,1)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(cx - cs*0.4, 0, cs*0.8, yEnd);
+          // Head glow
+          ctx.globalAlpha = 0.9;
+          const headGrad = ctx.createRadialGradient(cx, yEnd, 0, cx, yEnd, cs*0.9);
+          headGrad.addColorStop(0, '#FFFFFF');
+          headGrad.addColorStop(0.3, '#FF8C00');
+          headGrad.addColorStop(1, 'rgba(255,80,0,0)');
+          ctx.fillStyle = headGrad;
+          ctx.beginPath(); ctx.arc(cx, yEnd, cs*0.9, 0, Math.PI*2); ctx.fill();
+        } else {
+          // Impact shockwave
+          const itp = (tp - 0.5) / 0.5;
+          ctx.globalAlpha = (1-itp) * 0.8;
+          ctx.strokeStyle = '#FF8C00';
+          ctx.lineWidth = cs * 0.25 * (1-itp) + 1;
+          ctx.beginPath(); ctx.arc(cx, ch * 0.5, cs * 2 * itp, 0, Math.PI*2); ctx.stroke();
+          // Column flash
+          ctx.globalAlpha = (1-itp) * 0.4;
+          ctx.fillStyle = '#FF8C00';
+          ctx.fillRect(col * cs, 0, cs, ch);
+        }
+      }
+      break;
+    }
+
+    // ── CLEAR COLOR: rainbow wave sweeps across board ─────────────────────
+    case 'clearColor': {
+      const sweepX = eased * cw;
+      // Wave front
+      ctx.globalAlpha = 0.7 * (t < 0.8 ? 1 : (1-t)/0.2);
+      const waveGrad = ctx.createLinearGradient(sweepX - cs*2, 0, sweepX + cs, 0);
+      waveGrad.addColorStop(0, 'rgba(155,112,184,0)');
+      waveGrad.addColorStop(0.3, 'rgba(155,112,184,0.6)');
+      waveGrad.addColorStop(0.7, 'rgba(224,208,255,0.9)');
+      waveGrad.addColorStop(1, 'rgba(224,208,255,0)');
+      ctx.fillStyle = waveGrad;
+      ctx.fillRect(0, 0, cw, ch);
+      // Sparkle trail
+      if (t < 0.8) {
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#FFFFFF';
+        for (let i = 0; i < 5; i++) {
+          const sx = sweepX - i * cs * 0.3;
+          const sy = (Math.sin(t * 10 + i * 1.3) * 0.4 + 0.5) * ch;
+          ctx.beginPath(); ctx.arc(sx, sy, 2 + i, 0, Math.PI*2); ctx.fill();
+        }
+      }
+      break;
+    }
+
+    // ── DOUBLE / SCND BONUS: golden / orange score burst ──────────────────
+    case 'doubleScore':
+    case 'scndBonus': {
+      const col1 = anim.effect === 'scndBonus' ? '#FFC27A' : '#FFDC71';
+      const col2 = anim.effect === 'scndBonus' ? '#FF8C00' : '#FFD700';
+      // Radiating gold rings from center
+      for (let ring = 0; ring < 4; ring++) {
+        const delay = ring * 0.1;
+        if (t < delay) continue;
+        const rtp = Math.min(1, (t - delay) / 0.7);
+        const r = (cw * 0.5) * ease(rtp);
+        ctx.globalAlpha = (1-rtp) * 0.6;
+        ctx.strokeStyle = ring % 2 === 0 ? col1 : col2;
+        ctx.lineWidth = 3 * (1-rtp) + 1;
+        ctx.beginPath(); ctx.arc(cw/2, ch/2, r, 0, Math.PI*2); ctx.stroke();
+      }
+      // Center star burst
+      if (t < 0.5) {
+        const tp = t / 0.5;
+        ctx.globalAlpha = (1-tp) * 0.5;
+        ctx.fillStyle = col2;
+        for (let i = 0; i < 8; i++) {
+          const angle = (i/8)*Math.PI*2;
+          const len = cs * 3 * tp;
+          ctx.beginPath();
+          ctx.moveTo(cw/2, ch/2);
+          ctx.lineTo(cw/2 + Math.cos(angle)*len, ch/2 + Math.sin(angle)*len);
+          ctx.lineWidth = cs * 0.15 * (1-tp);
+          ctx.strokeStyle = col1;
+          ctx.stroke();
+        }
+      }
+      break;
+    }
+
+    // ── SHIELD: hexagonal barrier materializes ────────────────────────────
+    case 'shield': {
+      const cx = cw/2, cy = ch/2;
+      const maxR = Math.min(cw, ch) * 0.45;
+      const r = maxR * (t < 0.3 ? ease(t/0.3) : 1);
+      const alpha = t < 0.3 ? 1 : t < 0.7 ? 1 : (1-t)/0.3;
+      // Hexagon
+      ctx.globalAlpha = Math.max(0, alpha) * 0.7;
+      ctx.strokeStyle = '#E5E0D8';
+      ctx.lineWidth = cs * 0.15 * (t < 0.3 ? t/0.3 : 1);
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i/6)*Math.PI*2 - Math.PI/6;
+        if (i===0) ctx.moveTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+        else ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+      }
+      ctx.closePath(); ctx.stroke();
+      // Glow fill
+      ctx.globalAlpha = Math.max(0, alpha) * 0.15;
+      ctx.fillStyle = '#538BB9';
+      ctx.fill();
+      // Rim light
+      ctx.globalAlpha = Math.max(0, alpha) * 0.4;
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      break;
+    }
+
+    // ── GRAVITY: blocks rain down from top ────────────────────────────────
+    case 'gravity': {
+      const numDrops = 12;
+      for (let i = 0; i < numDrops; i++) {
+        const delay = (i / numDrops) * 0.4;
+        if (t < delay) continue;
+        const tp = Math.min(1, (t - delay) / 0.6);
+        const x = ((i * 137.5) % BW) * cs + cs/2;
+        const y = ch * ease(tp);
+        const pal = BLOCK_COLORS[i % BLOCK_COLORS.length];
+        ctx.globalAlpha = (1-tp) * 0.85;
+        ctx.fillStyle = pal.color;
+        const sz = cs * 0.6 * (1-tp*0.3);
+        ctx.fillRect(x - sz/2, y - sz/2, sz, sz);
+        // Trail
+        ctx.globalAlpha = (1-tp) * 0.3;
+        ctx.fillStyle = pal.color;
+        ctx.fillRect(x - sz*0.3, y - sz*1.5, sz*0.6, sz*1.2);
+      }
+      break;
+    }
+
+    // ── REWIND: clockwise time spiral rewinds ─────────────────────────────
+    case 'rewind': {
+      const cx = cw/2, cy = ch/2;
+      const maxR = Math.min(cw, ch) * 0.45;
+      // Spiral arc growing backward
+      ctx.globalAlpha = (t < 0.8 ? 0.9 : (1-t)/0.2);
+      ctx.strokeStyle = '#58D1C6';
+      ctx.lineWidth = cs * 0.15;
+      ctx.lineCap = 'round';
+      const turns = 2.5;
+      const steps = 80;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const pct = i / steps;
+        if (pct > t) break;
+        const angle = -pct * turns * Math.PI * 2 + Math.PI * 0.5;
+        const r = maxR * pct * (eased);
+        const x = cx + Math.cos(angle) * r;
+        const y = cy + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      // Clock overlay
+      ctx.globalAlpha = (t < 0.5 ? t/0.5 : (1-t)/0.5) * 0.4;
+      ctx.strokeStyle = '#A0EEFF';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, maxR * 0.55, 0, Math.PI*2); ctx.stroke();
+      // Clock hands spinning backward
+      const handAngle = -t * Math.PI * 4;
+      ctx.strokeStyle = '#CCFFFF';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(handAngle)*maxR*0.4, cy + Math.sin(handAngle)*maxR*0.4);
+      ctx.stroke();
+      break;
+    }
+
+    // ── SWAP: two-color vortex swirl ──────────────────────────────────────
+    case 'swap': {
+      const cx = cw/2, cy = ch/2;
+      const angle = t * Math.PI * 4;
+      const maxR = Math.min(cw, ch) * 0.4;
+      for (let arm = 0; arm < 2; arm++) {
+        const baseAngle = angle + arm * Math.PI;
+        for (let i = 0; i < 20; i++) {
+          const pct = i / 20;
+          const r = maxR * pct * eased;
+          const a = baseAngle + pct * Math.PI * 2;
+          const px = cx + Math.cos(a) * r;
+          const py = cy + Math.sin(a) * r;
+          ctx.globalAlpha = (1-pct) * (1-t*0.7) * 0.8;
+          ctx.fillStyle = arm === 0 ? '#C24B6E' : '#538BB9';
+          const sz = cs * 0.3 * (1-pct*0.5);
+          ctx.fillRect(px-sz/2, py-sz/2, sz, sz);
+        }
+      }
+      // Flash on center
+      if (t < 0.3) {
+        ctx.globalAlpha = (1 - t/0.3) * 0.6;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs*2);
+        grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+        grad.addColorStop(1, 'rgba(200,128,160,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, cs*2, 0, Math.PI*2); ctx.fill();
+      }
+      break;
+    }
+
+    default: break;
+  }
+
+  ctx.restore();
+}
+
 // ─── Dark / mobile hooks ──────────────────────────────────────────────────────
 function useIsDark(): boolean {
   const [v, set] = useState(true);
@@ -405,14 +837,14 @@ function useIsMobile(): boolean {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function ScndDropGame() {
-  const areaRef   = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const isDark    = useIsDark();
-  const isMobile  = useIsMobile();
-  const isDarkRef = useRef(isDark);
+  const areaRef    = useRef<HTMLDivElement>(null);
+  const canvasRef  = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null); // ← new: power-up animation layer
+  const isDark     = useIsDark();
+  const isMobile   = useIsMobile();
+  const isDarkRef  = useRef(isDark);
   useEffect(() => { isDarkRef.current = isDark; }, [isDark]);
 
-  // Game refs
   const boardRef    = useRef<(Cell|null)[][]>(emptyBoard());
   const pieceRef    = useRef<Piece|null>(null);
   const pxRef       = useRef(0);
@@ -442,7 +874,10 @@ export function ScndDropGame() {
   const bpRef       = useRef(0);
   const bpLimRef    = useRef(Math.floor(Math.random()*5)+3);
 
-  // UI state
+  // Power-up animations queue
+  const puAnimsRef  = useRef<PUAnim[]>([]);
+  const overlayRaf  = useRef(0);
+
   const [uiScore,      setUiScore]      = useState(0);
   const [uiLevel,      setUiLevel]      = useState(1);
   const [uiLines,      setUiLines]      = useState(0);
@@ -457,6 +892,7 @@ export function ScndDropGame() {
   const [globalHS,     setGlobalHS]     = useState<GlobalHS[]>([]);
   const [personalBest, setPersonalBest] = useState<LocalHS|null>(null);
   const [isNewRecord,  setIsNewRecord]  = useState(false);
+  // ── FIX: showName is now controlled purely by gameOver + score > 0 ────────
   const [showName,     setShowName]     = useState(false);
   const [pname,        setPname]        = useState('');
   const [saving,       setSaving]       = useState(false);
@@ -464,7 +900,6 @@ export function ScndDropGame() {
 
   useEffect(() => { setPersonalBest(loadPersonalBest()); }, []);
 
-  // ── sizing ────────────────────────────────────────────────────────────
   const recalc = useCallback(() => {
     if (!areaRef.current) return;
     const r = areaRef.current.getBoundingClientRect();
@@ -494,7 +929,54 @@ export function ScndDropGame() {
     });
   }, []);
 
-  // ── collision ─────────────────────────────────────────────────────────
+  // ── Spawn a power-up animation ─────────────────────────────────────────
+  const spawnPUAnim = useCallback((effect: string, px: number, py: number, data?: Record<string, unknown>) => {
+    const durationMap: Record<string, number> = {
+      laser:       900,
+      bomb:        700,
+      megaBomb:    1100,
+      freeze:      1000,
+      meteor:      1200,
+      clearColor:  800,
+      doubleScore: 900,
+      scndBonus:   900,
+      shield:      1000,
+      gravity:     900,
+      rewind:      1100,
+      swap:        800,
+    };
+    const dur = durationMap[effect] ?? 700;
+    puAnimsRef.current.push({
+      effect, px, py, t: 0, duration: dur, startTime: performance.now(), data,
+    });
+  }, []);
+
+  // ── Overlay animation loop ─────────────────────────────────────────────
+  const overlayLoop = useCallback((now: number) => {
+    const canvas = overlayRef.current;
+    if (!canvas) { overlayRaf.current = requestAnimationFrame(overlayLoop); return; }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { overlayRaf.current = requestAnimationFrame(overlayLoop); return; }
+    const cs = csRef.current;
+    const cw = BW * cs, ch = BH * cs;
+    canvas.width = cw; canvas.height = ch;
+    ctx.clearRect(0, 0, cw, ch);
+
+    // Update and draw all active animations
+    puAnimsRef.current = puAnimsRef.current.filter(anim => {
+      anim.t = Math.min(1, (now - anim.startTime) / anim.duration);
+      drawPUAnim(ctx, anim, cs, cw, ch);
+      return anim.t < 1;
+    });
+
+    overlayRaf.current = requestAnimationFrame(overlayLoop);
+  }, []);
+
+  useEffect(() => {
+    overlayRaf.current = requestAnimationFrame(overlayLoop);
+    return () => cancelAnimationFrame(overlayRaf.current);
+  }, [overlayLoop]);
+
   const hits = useCallback((shape: number[][], ox: number, oy: number): boolean => {
     const b = boardRef.current;
     for (let y = 0; y < shape.length; y++) for (let x = 0; x < shape[y].length; x++) {
@@ -514,7 +996,6 @@ export function ScndDropGame() {
     return { x: gx, y: gy };
   }, [hits]);
 
-  // ── centered spawn ────────────────────────────────────────────────────
   const spawn = useCallback((): boolean => {
     const isPU = Math.random() < 0.14;
     const pool = isPU ? POWERUPS : TETROMINOS;
@@ -528,26 +1009,20 @@ export function ScndDropGame() {
       pulse:  isPU ? (src as PUDef).pulse  : undefined,
       accent: isPU ? (src as PUDef).accent : undefined,
     };
-
-    const pw = piece.shape[0].length;
-    const ph = piece.shape.length;
+    const pw = piece.shape[0].length, ph = piece.shape.length;
     const idealX = Math.floor((BW - pw) / 2);
     const idealY = Math.floor((BH - ph) / 2);
     const maxR = Math.max(BW, BH);
     for (let r = 0; r <= maxR; r++) {
       const candidates: [number,number][] = [];
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++)
           if (Math.abs(dx) + Math.abs(dy) === r) candidates.push([dx, dy]);
-        }
-      }
       candidates.sort((a, b) => a[0]*a[0]+a[1]*a[1] - b[0]*b[0]-b[1]*b[1]);
       for (const [dx, dy] of candidates) {
         const tx = idealX + dx, ty = idealY + dy;
         if (tx >= 0 && tx+pw <= BW && ty >= 0 && ty+ph <= BH && !hits(piece.shape, tx, ty)) {
-          pieceRef.current = piece;
-          pxRef.current = tx;
-          pyRef.current = ty;
+          pieceRef.current = piece; pxRef.current = tx; pyRef.current = ty;
           return true;
         }
       }
@@ -555,11 +1030,25 @@ export function ScndDropGame() {
     return false;
   }, [hits]);
 
-  // ── power-up trigger ──────────────────────────────────────────────────
   const triggerPU = useCallback((effect: string, px: number, py: number, name: string) => {
     setPuName(name); showBonus(`${name}!`);
     const cs = csRef.current;
     burst(px*cs+cs/2, py*cs+cs/2, 30);
+
+    // ── Spawn the visual animation ──────────────────────────────────────
+    const animData: Record<string, unknown> = {};
+    if (effect === 'meteor') {
+      // precompute which cols so animation matches reality
+      const b = boardRef.current;
+      const freq: Record<number, number> = {};
+      for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) if (b[y][x]) freq[x] = (freq[x]||0)+1;
+      const sorted = Object.keys(freq).map(Number).sort((a,b2)=>freq[b2]-freq[a]);
+      animData.cols = sorted.slice(0, 3).length > 0
+        ? sorted.slice(0, 3)
+        : Array.from({length:BW},(_,i)=>i).sort(()=>Math.random()-.5).slice(0,3);
+    }
+    spawnPUAnim(effect, px, py, animData);
+
     const b = boardRef.current.map(r => [...r]) as (Cell|null)[][];
     let puScore = 0;
 
@@ -570,15 +1059,13 @@ export function ScndDropGame() {
           const nx=px+dx, ny=py+dy;
           if (nx>=0&&nx<BW&&ny>=0&&ny<BH&&b[ny][nx]) { burst(nx*cs+cs/2,ny*cs+cs/2,4); b[ny][nx]=null; cnt++; }
         }
-        boardRef.current = settle(b, rotRef.current);
-        puScore = cnt*300; break;
+        boardRef.current = settle(b, rotRef.current); puScore = cnt*300; break;
       }
       case 'laser': {
         let cnt = 0;
         for (let x=0;x<BW;x++) if(b[py][x]){burst(x*cs+cs/2,py*cs+cs/2,4);b[py][x]=null;cnt++;}
         for (let y=0;y<BH;y++) if(b[y][px]){burst(px*cs+cs/2,y*cs+cs/2,4);b[y][px]=null;cnt++;}
-        boardRef.current = settle(b, rotRef.current);
-        puScore = cnt*450; break;
+        boardRef.current = settle(b, rotRef.current); puScore = cnt*450; break;
       }
       case 'scndBonus':
         scndRef.current=true; updFlags();
@@ -589,8 +1076,7 @@ export function ScndDropGame() {
         setTimeout(()=>{freezeRef.current=false;updFlags();},4000);
         puScore=300; break;
       case 'gravity':
-        boardRef.current = settle(b, rotRef.current);
-        puScore=250; break;
+        boardRef.current = settle(b, rotRef.current); puScore=250; break;
       case 'clearColor': {
         const freq: Record<string,number> = {};
         for (let y=0;y<BH;y++) for (let x=0;x<BW;x++) if(b[y][x]&&!b[y][x]!.isPowerUp) {
@@ -601,8 +1087,7 @@ export function ScndDropGame() {
         if (topColor) for (let y=0;y<BH;y++) for (let x=0;x<BW;x++) if(b[y][x]?.color===topColor) {
           burst(x*cs+cs/2,y*cs+cs/2,3); b[y][x]=null; cnt++;
         }
-        boardRef.current = settle(b, rotRef.current);
-        puScore=cnt*300; break;
+        boardRef.current = settle(b, rotRef.current); puScore=cnt*300; break;
       }
       case 'doubleScore':
         doubleRef.current=true; updFlags();
@@ -618,15 +1103,13 @@ export function ScndDropGame() {
           const nx=px+dx, ny=py+dy;
           if (nx>=0&&nx<BW&&ny>=0&&ny<BH&&b[ny][nx]) { burst(nx*cs+cs/2,ny*cs+cs/2,6); b[ny][nx]=null; cnt++; }
         }
-        boardRef.current = settle(b, rotRef.current);
-        puScore=cnt*750; break;
+        boardRef.current = settle(b, rotRef.current); puScore=cnt*750; break;
       }
       case 'meteor': {
         const cols = Array.from({length:BW},(_,i)=>i).sort(()=>Math.random()-.5).slice(0,3);
         let cnt = 0;
         for (const col of cols) for (let y=0;y<BH;y++) if(b[y][col]){burst(col*cs+cs/2,y*cs+cs/2,4);b[y][col]=null;cnt++;}
-        boardRef.current = settle(b, rotRef.current);
-        puScore=cnt*500; break;
+        boardRef.current = settle(b, rotRef.current); puScore=cnt*500; break;
       }
       case 'rewind':
         if (histRef.current.length > 0) {
@@ -660,9 +1143,21 @@ export function ScndDropGame() {
     puScore = Math.floor(puScore * mult);
     if (puScore > 0) { scoreRef.current += puScore; setUiScore(scoreRef.current); }
     setTimeout(() => setPuName(''), 2500);
-  }, [burst, showBonus, updFlags]);
+  }, [burst, showBonus, updFlags, spawnPUAnim]);
 
-  // ── merge ─────────────────────────────────────────────────────────────
+  const endGame = useCallback(() => {
+    playRef.current=false; goRef.current=true;
+    cancelAnimationFrame(rafRef.current); cancelAnimationFrame(gravRaf.current);
+    const finalScore = scoreRef.current;
+    setPlaying(false); setGameOver(true); setFinalSc(finalScore);
+    setIsNewRecord(false);
+    // ── FIX: always show name input if score > 0 ─────────────────────────
+    if (finalScore > 0) {
+      setShowName(true);
+    }
+    fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
+  }, []);
+
   const merge = useCallback(() => {
     const p = pieceRef.current; if (!p) return;
     histRef.current = [...histRef.current.slice(-4), {
@@ -670,7 +1165,6 @@ export function ScndDropGame() {
       score: scoreRef.current, lines: linesRef.current,
       level: levelRef.current, combo: comboRef.current,
     }];
-
     let nb = boardRef.current.map(r => [...r]) as (Cell|null)[][];
     for (let y=0;y<p.shape.length;y++) for (let x=0;x<p.shape[y].length;x++) {
       if (!p.shape[y][x]) continue;
@@ -684,17 +1178,11 @@ export function ScndDropGame() {
         isGold: !p.isPowerUp && Math.random()<0.04,
       };
     }
-
     const cs = csRef.current;
     const { board: afterAll, totalCleared, allPowerUps } = settleAndClear(nb, rotRef.current, cs, burst);
     boardRef.current = afterAll;
-
-    // ✨ Critical zone check – Game Over if too full
     const fillPercent = getCriticalZoneFill(boardRef.current);
-    if (fillPercent >= CRITICAL_ZONE_MAX_FILL) {
-      endGame();
-      return;
-    }
+    if (fillPercent >= CRITICAL_ZONE_MAX_FILL) { endGame(); return; }
 
     let added = 0;
     if (totalCleared > 0) {
@@ -714,25 +1202,12 @@ export function ScndDropGame() {
 
     bpRef.current++;
     if (bpRef.current >= bpLimRef.current) {
-      bpRef.current = 0;
-      bpLimRef.current = Math.floor(Math.random()*5)+3;
+      bpRef.current = 0; bpLimRef.current = Math.floor(Math.random()*5)+3;
       doRot();
     }
     if (!spawn()) endGame();
-  }, [burst, spawn, triggerPU]);
+  }, [burst, spawn, triggerPU, endGame]);
 
-  const endGame = useCallback(() => {
-    playRef.current=false; goRef.current=true;
-    cancelAnimationFrame(rafRef.current); cancelAnimationFrame(gravRaf.current);
-    setPlaying(false); setGameOver(true); setFinalSc(scoreRef.current); setIsNewRecord(false);
-    if (scoreRef.current > 0) {
-      const pb = loadPersonalBest();
-      if (!pb || scoreRef.current > pb.score) setShowName(true);
-    }
-    fetch('/api/game-highscores').then(r=>r.json()).then(d=>{if(Array.isArray(d))setGlobalHS(d);}).catch(()=>{});
-  }, []);
-
-  // ── movement ──────────────────────────────────────────────────────────
   const move = useCallback((sdx: number, sdy: number) => {
     const p = pieceRef.current;
     if (!p||!playRef.current||pauseRef.current||goRef.current||freezeRef.current) return;
@@ -758,6 +1233,10 @@ export function ScndDropGame() {
       canvasRef.current.style.transform = `rotate(${next}deg)`;
       canvasRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2,0.9,0.4,1.1)';
     }
+    if (overlayRef.current) {
+      overlayRef.current.style.transform = `rotate(${next}deg)`;
+      overlayRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2,0.9,0.4,1.1)';
+    }
     if (typeof window !== 'undefined' && window.navigator.vibrate) window.navigator.vibrate(80);
   }, []);
 
@@ -768,7 +1247,6 @@ export function ScndDropGame() {
     return ms;
   }, []);
 
-  // ── DRAW ──────────────────────────────────────────────────────────────
   const draw = useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d'); if (!ctx) return;
@@ -784,7 +1262,6 @@ export function ScndDropGame() {
     for (let y=0;y<=BH;y++){ctx.beginPath();ctx.moveTo(0,y*cs);ctx.lineTo(cw,y*cs);ctx.stroke();}
     ctx.strokeStyle = BRAND; ctx.lineWidth = 2; ctx.strokeRect(1,1,cw-2,ch-2);
 
-    // Highlight lines that are close to being cleared
     const previewGroups = findLines(boardRef.current);
     for (const grp of previewGroups) {
       ctx.fillStyle = 'rgba(255,68,0,0.09)';
@@ -811,7 +1288,6 @@ export function ScndDropGame() {
       }
     }
 
-    // Ghost + active piece
     const p = pieceRef.current;
     if (p&&!goRef.current&&!freezeRef.current&&!pauseRef.current) {
       const g = ghost();
@@ -849,7 +1325,6 @@ export function ScndDropGame() {
       }
     }
 
-    // Particles
     partsRef.current = partsRef.current.filter(pt => pt.life>0);
     for (const pt of partsRef.current) {
       ctx.globalAlpha=pt.life; ctx.fillStyle=pt.color;
@@ -858,27 +1333,22 @@ export function ScndDropGame() {
     }
     ctx.globalAlpha = 1;
 
-    // ── Visual warning for critical zone ─────────────────────────────────
     const fill = getCriticalZoneFill(boardRef.current);
     if (fill >= 0.3) {
       const start = Math.floor((BW - CRITICAL_ZONE_SIZE) / 2);
       const intensity = Math.min(0.5, (fill - 0.3) / 0.2);
       ctx.fillStyle = `rgba(255, 68, 0, ${intensity * 0.5})`;
-      for (let dy = 0; dy < CRITICAL_ZONE_SIZE; dy++) {
-        for (let dx = 0; dx < CRITICAL_ZONE_SIZE; dx++) {
+      for (let dy = 0; dy < CRITICAL_ZONE_SIZE; dy++)
+        for (let dx = 0; dx < CRITICAL_ZONE_SIZE; dx++)
           ctx.fillRect((start + dx) * cs, (start + dy) * cs, cs, cs);
-        }
-      }
     }
 
-    // Progress bar
     const blocksPerLevel = 40;
     const prog = ((linesRef.current % blocksPerLevel) / blocksPerLevel) * cw;
     ctx.fillStyle = T.progressTrack; ctx.fillRect(0,ch-3,cw,3);
     ctx.fillStyle = BRAND; ctx.fillRect(0,ch-3,prog,3);
   }, [ghost]);
 
-  // ── game loop ─────────────────────────────────────────────────────────
   const gameLoop = useCallback((now: number) => {
     if (!playRef.current||goRef.current||pauseRef.current) return;
     pulseRef.current = now * 0.008;
@@ -888,7 +1358,6 @@ export function ScndDropGame() {
     rafRef.current = requestAnimationFrame(gameLoop);
   }, [getFallMs, move, draw]);
 
-  // ── gravity loop with cascading ───────────────────────────────────────
   const gravLoop = useCallback((now: number) => {
     if (!playRef.current||goRef.current||pauseRef.current||freezeRef.current) {
       gravRaf.current = requestAnimationFrame(gravLoop); return;
@@ -911,7 +1380,6 @@ export function ScndDropGame() {
     gravRaf.current = requestAnimationFrame(gravLoop);
   }, [burst, triggerPU]);
 
-  // ── start ─────────────────────────────────────────────────────────────
   const startGame = useCallback(() => {
     cancelAnimationFrame(rafRef.current); cancelAnimationFrame(gravRaf.current);
     boardRef.current=emptyBoard(); scoreRef.current=0; levelRef.current=1;
@@ -920,10 +1388,12 @@ export function ScndDropGame() {
     shieldRef.current=false; doubleRef.current=false; scndRef.current=false;
     partsRef.current=[]; histRef.current=[]; bpRef.current=0;
     bpLimRef.current=Math.floor(Math.random()*5)+3;
+    puAnimsRef.current=[];
     goRef.current=false; pauseRef.current=false; playRef.current=true;
     const rots: Rot[] = [0,90,180,270];
     rotRef.current = rots[Math.floor(Math.random()*4)];
     if (canvasRef.current) canvasRef.current.style.transform=`rotate(${rotRef.current}deg)`;
+    if (overlayRef.current) overlayRef.current.style.transform=`rotate(${rotRef.current}deg)`;
     setUiScore(0); setUiLevel(1); setUiLines(0); setUiCombo(0);
     setGameOver(false); setPaused(false); setPuName(''); setBonus('');
     setShowName(false); setIsNewRecord(false); updFlags();
@@ -1000,7 +1470,6 @@ export function ScndDropGame() {
 
       <div style={{background:`linear-gradient(90deg,${BRAND_DIM},${BRAND},${BRAND_DIM})`}} className="h-0.5 flex-shrink-0"/>
 
-      {/* header */}
       <div className="flex-shrink-0 py-1 px-3 text-center">
         <h3 style={{color:BRAND,letterSpacing:'0.18em'}} className="text-lg md:text-xl font-black uppercase">SCND DROP</h3>
         {activeBadges.length>0&&(
@@ -1019,14 +1488,14 @@ export function ScndDropGame() {
         )}
       </div>
 
-      {/* main */}
       <div className="flex-1 flex flex-col md:flex-row gap-2 px-2 pb-1 min-h-0">
 
-        {/* canvas */}
         <div ref={areaRef} className="flex-1 min-h-0 flex items-center justify-center relative">
           <div className="relative" style={{width:csize.w,height:csize.h}}>
             <div className="absolute -inset-1 rounded pointer-events-none"
               style={{boxShadow:`0 0 24px 2px ${BRAND}22`}}/>
+
+            {/* Game canvas */}
             <canvas ref={canvasRef}
               style={{
                 display:'block', width:csize.w, height:csize.h,
@@ -1034,11 +1503,25 @@ export function ScndDropGame() {
                 transition:'transform 0.4s cubic-bezier(0.2,0.9,0.4,1.1)',
                 imageRendering:'pixelated',
                 border:`2px solid ${BRAND}`, borderRadius:3,
+                position:'absolute', top:0, left:0,
+              }}
+            />
+
+            {/* Power-up animation overlay — sits on top, pointer-events:none */}
+            <canvas ref={overlayRef}
+              style={{
+                display:'block', width:csize.w, height:csize.h,
+                transform:`rotate(${rotRef.current}deg)`,
+                transition:'transform 0.4s cubic-bezier(0.2,0.9,0.4,1.1)',
+                imageRendering:'pixelated',
+                borderRadius:3,
+                position:'absolute', top:0, left:0,
+                pointerEvents:'none',
               }}
             />
 
             {paused&&!gameOver&&(
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded"
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded z-10"
                 style={{background:T.overlayBg,backdropFilter:'blur(6px)'}}>
                 <div style={{color:BRAND}} className="text-base font-black tracking-[0.3em]">PAUSE</div>
                 <OBtn label="WEITER"   onClick={togglePause} bg={BRAND}        fg={T.canvasBg}/>
@@ -1047,7 +1530,7 @@ export function ScndDropGame() {
               </div>
             )}
             {!playing&&!gameOver&&(
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded"
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded z-10"
                 style={{background:T.overlayBg,backdropFilter:'blur(4px)'}}>
                 <div style={{color:BRAND,letterSpacing:'0.2em'}} className="text-xl font-black">SCND DROP</div>
                 <div style={{color:T.textMuted}} className="text-[9px] text-center px-4">
@@ -1057,7 +1540,7 @@ export function ScndDropGame() {
               </div>
             )}
             {gameOver&&(
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded"
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded z-10"
                 style={{background:T.overlayBg,backdropFilter:'blur(6px)'}}>
                 <div className="font-black text-base tracking-wider">
                   <span style={{color:BRAND}}>GAME</span>
@@ -1070,7 +1553,6 @@ export function ScndDropGame() {
           </div>
         </div>
 
-        {/* sidebar */}
         <div className="flex-shrink-0 flex flex-row md:flex-col gap-2 md:w-40 pb-1">
           <div className="flex-1 md:flex-none rounded p-2" style={panelStyle}>
             <div style={{color:T.textMuted}} className="text-[6px] uppercase tracking-widest text-center mb-0.5">PUNKTE</div>
@@ -1158,7 +1640,6 @@ export function ScndDropGame() {
         </div>
       </div>
 
-      {/* mobile controls */}
       {playing&&!gameOver&&!paused&&(
         <div style={{background:T.panelBg,borderTopColor:T.panelBorder}}
           className="md:hidden flex-shrink-0 border-t py-3 px-4">
@@ -1189,7 +1670,7 @@ export function ScndDropGame() {
         </div>
       )}
 
-      {/* name modal */}
+      {/* ── Name input modal ── */}
       {showName&&(
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
           style={{background:T.overlayBg,backdropFilter:'blur(8px)'}}>
