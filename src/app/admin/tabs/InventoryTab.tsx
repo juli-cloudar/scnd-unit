@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { Trash2, ExternalLink, RefreshCw, ShoppingBag, Edit3, Search, ImageIcon, Save } from "lucide-react";
+import { Trash2, ExternalLink, RefreshCw, ShoppingBag, Edit3, Search, ImageIcon, Save, Archive, Package } from "lucide-react";
 import { proxyImg } from "../utils/helpers";
 import { ToastType } from "../hooks/useToast";
 
@@ -13,11 +13,14 @@ interface Employee {
   permissions: { canAddProducts: boolean; canEditProducts: boolean; canDeleteProducts: boolean; canViewStats: boolean; canManageEmployees: boolean; };
 }
 
-// Zentrale Kategorienliste (inkl. aller gewünschten Kategorien)
+// Zentrale Kategorienliste
 const PRODUCT_CATEGORIES = [
   'Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Hemden', 
   'Headwear', 'Polos', 'Taschen', 'Sonstiges'
 ];
+
+// Filter-Typ
+type FilterType = 'all' | 'available' | 'sold';
 
 export function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,15 +29,28 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
   const [activeCategory, setActiveCategory] = useState('Alle');
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  // ========== NEU: Filter mit 3 Zuständen ==========
+  const [filterType, setFilterType] = useState<FilterType>('available'); // Standard: nur verfügbare
 
+  // ========== GEÄNDERT: loadProducts mit Filter ==========
   const loadProducts = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('products').select('*').order('id');
+    let query = supabase.from('products').select('*').order('id');
+    
+    // Filter anwenden
+    if (filterType === 'available') {
+      query = query.eq('sold', false);
+    } else if (filterType === 'sold') {
+      query = query.eq('sold', true);
+    }
+    // bei 'all' wird kein Filter angewendet
+    
+    const { data, error } = await query;
     if (!error && data) setProducts(data);
     setLoading(false);
-  }, []);
+  }, [filterType]);
 
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => { loadProducts(); }, [filterType]);
 
   const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
   const allBrands = ["Alle", ...brandList];
@@ -49,7 +65,10 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
 
   const markSold = async (id: number, currentSold: boolean) => {
     const { error } = await supabase.from('products').update({ sold: !currentSold }).eq('id', id);
-    if (!error) { setProducts(p => p.map(x => x.id === id ? { ...x, sold: !currentSold } : x)); toast(currentSold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info'); }
+    if (!error) { 
+      setProducts(p => p.map(x => x.id === id ? { ...x, sold: !currentSold } : x)); 
+      toast(currentSold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info'); 
+    }
   };
 
   const deleteProduct = async (id: number) => {
@@ -66,7 +85,6 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           <input value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Preis"/>
           <input value={editingProduct.size} onChange={e => setEditingProduct({...editingProduct, size: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Größe"/>
         </div>
-        {/* Kategorien-Auswahl jetzt mit allen Kategorien aus PRODUCT_CATEGORIES */}
         <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3">
           {PRODUCT_CATEGORIES.map(cat => (
             <option key={cat} value={cat}>{cat}</option>
@@ -83,10 +101,10 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
 
   return (
     <div>
-      {/* Filter mit horizontalem Scroll - wie im Shop */}
+      {/* Filter mit horizontalem Scroll */}
       <div className="mb-6 space-y-6">
         
-        {/* Marken Filter - horizontal scrollbar */}
+        {/* Marken Filter */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -110,7 +128,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           </div>
         </div>
         
-        {/* Kategorien Filter - horizontal scrollbar (jetzt mit allen Kategorien) */}
+        {/* Kategorien Filter */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -135,14 +153,62 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
         </div>
       </div>
       
-      {/* Suche */}
+      {/* Suche mit 3 Filter-Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/><input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64"/></div>
-        <button onClick={loadProducts} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10"><RefreshCw className="w-4 h-4"/></button>
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
+          <input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64"/>
+        </div>
+        
+        <div className="flex gap-2">
+          {/* ========== 3-FACH FILTER BUTTONS ========== */}
+          <button 
+            onClick={() => setFilterType('available')} 
+            className={`px-3 py-2 border transition-all text-xs uppercase tracking-widest flex items-center gap-1 ${
+              filterType === 'available' 
+                ? 'bg-green-600/20 border-green-500 text-green-400' 
+                : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'
+            }`}
+            title="Nur verfügbare Artikel"
+          >
+            <Package className="w-4 h-4"/>
+            Verfügbar
+          </button>
+          
+          <button 
+            onClick={() => setFilterType('sold')} 
+            className={`px-3 py-2 border transition-all text-xs uppercase tracking-widest flex items-center gap-1 ${
+              filterType === 'sold' 
+                ? 'bg-red-600/20 border-red-500 text-red-400' 
+                : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'
+            }`}
+            title="Nur verkaufte Artikel"
+          >
+            <Archive className="w-4 h-4"/>
+            Verkauft
+          </button>
+          
+          <button 
+            onClick={() => setFilterType('all')} 
+            className={`px-3 py-2 border transition-all text-xs uppercase tracking-widest ${
+              filterType === 'all' 
+                ? 'bg-blue-600/20 border-blue-500 text-blue-400' 
+                : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'
+            }`}
+            title="Alle Artikel"
+          >
+            Alle
+          </button>
+          
+          <button onClick={loadProducts} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10">
+            <RefreshCw className="w-4 h-4"/>
+          </button>
+        </div>
+        
         <div className="text-xs text-gray-500">{filtered.length} von {products.length} Artikeln</div>
       </div>
       
-      {/* Produkt Grid mit Scrollbarkeit */}
+      {/* Produkt Grid */}
       <div className="max-h-[calc(100vh-380px)] overflow-y-auto pr-2 scrollbar-thin">
         {loading ? (
           <div className="text-center py-20 text-gray-500">Lade...</div>
