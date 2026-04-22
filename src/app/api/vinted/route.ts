@@ -1,6 +1,5 @@
 // src/app/api/vinted/route.ts
 import { NextResponse } from 'next/server';
-import { cleanProduct } from '@/lib/productCleaner';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -40,6 +39,59 @@ interface ScrapeResult {
   message?: string;
   action?: string;
   warning?: string;
+}
+
+// ========== EINFACHE CLEAN-FUNKTION (ohne externen Import) ==========
+function simpleCleanProduct(rawData: any): {
+  name: string;
+  brand: string;
+  category: string;
+  price: string;
+  size: string;
+  condition: string;
+} {
+  let name = rawData.name || '';
+  let brand = '';
+  
+  // Bekannte Marken (vereinfacht)
+  const knownBrands = [
+    'Tommy Hilfiger', 'The North Face', 'Helly Hansen', 'New Balance',
+    'Adidas', 'Nike', 'Puma', 'Columbia', 'Champion', 'Napapijri',
+    'Timberland', 'Lacoste', 'Carhartt', 'Vans', 'Converse', 'FILA'
+  ];
+  
+  // Marke erkennen
+  for (const knownBrand of knownBrands) {
+    if (name.toLowerCase().includes(knownBrand.toLowerCase())) {
+      brand = knownBrand;
+      break;
+    }
+  }
+  
+  // Fallback: erstes Wort als Marke
+  if (!brand && name) {
+    const firstWord = name.split(' ')[0];
+    brand = firstWord;
+    name = name.replace(firstWord, '').trim();
+  }
+  
+  // Kategorie erkennen
+  let category = 'Pullover';
+  const nameLower = name.toLowerCase();
+  if (nameLower.includes('jacke') || nameLower.includes('jacket') || nameLower.includes('fleece')) category = 'Jacken';
+  else if (nameLower.includes('sweatshirt') || nameLower.includes('crewneck')) category = 'Sweatshirts';
+  else if (nameLower.includes('polo')) category = 'Polos';
+  else if (nameLower.includes('top') || nameLower.includes('shirt')) category = 'Tops';
+  else if (nameLower.includes('weste')) category = 'Westen';
+  
+  return {
+    name: name.trim() || 'Unbenanntes Produkt',
+    brand: brand || 'Unbekannt',
+    category: category,
+    price: rawData.price?.toString().replace('.', ',') || '0',
+    size: rawData.size || '',
+    condition: rawData.condition || 'Gut'
+  };
 }
 
 // HILFSFUNKTIONEN
@@ -225,14 +277,12 @@ function extractItemFromHTML(html: string, url: string): ScrapeResult {
     }
   }
 
-  // JETZT: Verwende cleanProduct für Name, Brand, Category
-  const cleaned = cleanProduct({
+  // JETZT: Verwende simpleCleanProduct statt cleanProduct
+  const cleaned = simpleCleanProduct({
     name: rawName,
     price: price,
     size: size,
     condition: condition,
-    vinted_url: url,
-    images: images
   });
 
   // KATEGORIE (falls cleanProduct keine gesetzt hat)
