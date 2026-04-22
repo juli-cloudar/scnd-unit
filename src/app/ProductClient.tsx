@@ -21,13 +21,13 @@ interface Product {
   price: string;
   size: string;
   condition: string;
-  images: string[] | null;
+  images: string[];  // ← KEIN null mehr!
   vinted_url: string;
   sold: boolean;
 }
 
 interface ProductClientProps {
-  initialProducts: Product[];
+  initialProducts: any[];  // ← any für Rohdaten aus Supabase
 }
 
 const fadeIn = {
@@ -47,21 +47,31 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [search, setSearch] = useState("");
   
-  // Direkt die initialProducts verwenden (kein Cleaner mehr!)
-  const [products] = useState<Product[]>(initialProducts);
+  // Normalisiere die Produkte: null → []
+  const [products, setProducts] = useState<Product[]>([]);
   const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
   
   const [visibleProducts, setVisibleProducts] = useState<Product[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Eindeutige Marken und Kategorien aus den Rohdaten extrahieren
+  // Daten normalisieren wenn initialProducts kommen
   useEffect(() => {
-    const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort();
-    const categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+    if (!initialProducts || initialProducts.length === 0) return;
+    
+    // WICHTIG: images null → [] konvertieren
+    const normalized = initialProducts.map((p: any) => ({
+      ...p,
+      images: p.images || []  // ← null wird zu []
+    }));
+    
+    setProducts(normalized);
+    
+    const brands = [...new Set(normalized.map((p: Product) => p.brand).filter(Boolean))].sort();
+    const categories = [...new Set(normalized.map((p: Product) => p.category).filter(Boolean))].sort();
     setUniqueBrands(brands);
     setUniqueCategories(categories);
-  }, [products]);
+  }, [initialProducts]);
 
   useEffect(() => {
     if (products.length === 0) return;
@@ -96,8 +106,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
     ${viewMode === mode ? 'bg-[#FF4400] text-white' : 'bg-[var(--bg-secondary)] border border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}
   `;
 
-  // Kein Loading-State mehr, da Daten von Server kommen
-  if (products.length === 0) {
+  if (products.length === 0 && initialProducts?.length === 0) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
         <div className="text-center">
@@ -225,8 +234,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* ABOUT SECTION - den Rest von deinem Original hier einfügen */}
-      {/* ... (About, Game, Contact, Footer bleiben exakt gleich wie in deinem Original) ... */}
+      {/* Den Rest (About, Game, Contact, Footer) aus deinem Original hier einfügen */}
       
     </div>
   );
