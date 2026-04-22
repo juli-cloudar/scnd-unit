@@ -21,13 +21,13 @@ interface Product {
   price: string;
   size: string;
   condition: string;
-  images: string[];  // ← KEIN null mehr!
+  images: string[];
   vinted_url: string;
   sold: boolean;
 }
 
 interface ProductClientProps {
-  initialProducts: any[];  // ← any für Rohdaten aus Supabase
+  initialProducts: any[];
 }
 
 const fadeIn = {
@@ -47,7 +47,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [search, setSearch] = useState("");
   
-  // Normalisiere die Produkte: null → []
   const [products, setProducts] = useState<Product[]>([]);
   const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
@@ -55,14 +54,12 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   const [visibleProducts, setVisibleProducts] = useState<Product[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Daten normalisieren wenn initialProducts kommen
   useEffect(() => {
     if (!initialProducts || initialProducts.length === 0) return;
     
-    // WICHTIG: images null → [] konvertieren
     const normalized = initialProducts.map((p: any) => ({
       ...p,
-      images: p.images || []  // ← null wird zu []
+      images: p.images || []
     }));
     
     setProducts(normalized);
@@ -234,8 +231,77 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* Den Rest (About, Game, Contact, Footer) aus deinem Original hier einfügen */}
-      
+      {/* ABOUT SECTION */}
+      <section id="about" className="py-24 bg-[var(--bg-secondary)] relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_49%,rgba(255,68,0,0.03)_50%,transparent_51%)] bg-[length:20px_20px]" />
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 relative z-10">
+          <div className="grid md:grid-cols-2 gap-16 items-center max-w-7xl mx-auto">
+            <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+              <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">ABOUT_<span className="text-[#FF4400]">UNIT</span></h2>
+              <div className="space-y-4 text-[var(--text-secondary)] leading-relaxed">
+                <p>SCND UNIT ist ein Curated Reselling-Projekt aus Bad Kreuznach. Wir suchen die besten Vintage-Pieces, Streetwear-Klassiker und Y2K-Schnäppchen – und bringen sie zu dir.</p>
+                <p>Unser Fokus liegt auf ehrlichen Beschreibungen, schnellem Versand (innerhalb 48h) und einem sorgfältig ausgewählten Inventar. Von Gorpcore-Utility bis zu Vintage-Grails: Jedes Piece wird von uns geprüft und fotografiert.</p>
+                <p className="text-[#FF4400] font-bold uppercase tracking-widest text-sm">Kein Fast Fashion – nur Qualität mit Geschichte.</p>
+              </div>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
+              <div className="aspect-square bg-[var(--bg-primary)] border border-[#FF4400]/20 p-8 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-8xl font-bold text-[#FF4400]/20 mb-4">SCND</div>
+                  <div className="grid grid-cols-2 gap-4 text-sm uppercase tracking-widest">
+                    <div className="p-4 bg-[var(--bg-secondary)] border border-[var(--border-color)]"><span className="block text-2xl font-bold text-[#FF4400]">100%</span><span className="text-[var(--text-secondary)]">Authentic</span></div>
+                    <div className="p-4 bg-[var(--bg-secondary)] border border-[var(--border-color)]"><span className="block text-2xl font-bold text-[#FF4400]">48h</span><span className="text-[var(--text-secondary)]">Shipping</span></div>
+                    <div className="p-4 bg-[var(--bg-secondary)] border border-[var(--border-color)]"><span className="block text-2xl font-bold text-[#FF4400]">DE</span><span className="text-[var(--text-secondary)]">Based</span></div>
+                    <div className="p-4 bg-[var(--bg-secondary)] border border-[var(--border-color)]"><span className="block text-2xl font-bold text-[#FF4400]">{products.length}+</span><span className="text-[var(--text-secondary)]">Items</span></div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* SCND DROP GAME SECTION */}
+      <section id="game" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="max-w-7xl mx-auto">
+          <ScndDropGame />
+        </div>
+      </section>
+
+      {/* CONTACT SECTION */}
+      <section id="contact" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">GET_IN_<span className="text-[#FF4400]">TOUCH</span></h2>
+            <p className="text-[var(--text-secondary)] mb-12 uppercase tracking-widest">Fragen zu einem Artikel? Schreib uns auf Vinted oder Instagram.</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="group inline-flex items-center justify-center gap-3 px-8 py-4 bg-[#FF4400] text-white font-bold uppercase tracking-widest hover:bg-[#FF4400]/80 transition-all">
+                <MessageCircle className="w-5 h-5" />Nachricht auf Vinted
+              </a>
+              <a href="https://www.instagram.com/scnd.unit" target="_blank" className="group inline-flex items-center justify-center gap-3 px-8 py-4 border border-[var(--border-color)] hover:border-[#FF4400] hover:text-[#FF4400] transition-all uppercase tracking-widest">
+                <Instagram className="w-5 h-5" />@scnd.unit
+              </a>
+            </div>
+            <div className="mt-16 flex items-center justify-center gap-2 text-sm text-[var(--text-secondary)] uppercase tracking-widest">
+              <MapPin className="w-4 h-4 text-[#FF4400]" />Bad Kreuznach, Deutschland
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-[var(--border-color)] py-12 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-2xl font-bold tracking-tighter">
+            <span className="text-[#FF4400]">SCND</span>_UNIT
+          </div>
+          <div className="flex gap-6 text-sm uppercase tracking-widest text-[var(--text-secondary)]">
+            <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="hover:text-[#FF4400] transition-colors">Vinted</a>
+            <a href="https://www.instagram.com/scnd.unit" target="_blank" className="hover:text-[#FF4400] transition-colors">Instagram</a>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">© 2025 SCND UNIT • Bad Kreuznach</p>
+        </div>
+      </footer>
     </div>
   );
 }
