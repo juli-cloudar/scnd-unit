@@ -13,6 +13,7 @@ import { type ViewMode } from '@/components/ViewToggle';
 import { ProductView } from '@/components/ProductView';
 import { Navigation } from '@/components/Navigation';
 import { ScndDropGame } from '@/components/ScndDropGame';
+import { DataPrivacy, useDataPrivacy } from '@/components/DataPrivacy';
 
 interface Product {
   id: number;
