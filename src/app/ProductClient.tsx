@@ -12,7 +12,6 @@ import {
 import { type ViewMode } from '@/components/ViewToggle';
 import { ProductView } from '@/components/ProductView';
 import { Navigation } from '@/components/Navigation';
-import { ScndDropGame } from '@/components/ScndDropGame';
 import { DataPrivacy, useDataPrivacy } from '@/components/DataPrivacy';
 
 interface Product {
@@ -55,6 +54,9 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
   
   const [visibleProducts, setVisibleProducts] = useState<Product[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Datenschutz Hook
+  const { isOpen: isPrivacyOpen, setIsOpen: setIsPrivacyOpen } = useDataPrivacy();
 
   useEffect(() => {
     if (!initialProducts || initialProducts.length === 0) return;
@@ -263,7 +265,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-
       {/* CONTACT SECTION */}
       <section id="contact" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-4xl mx-auto text-center">
@@ -285,7 +286,7 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
       
-          {/* Footer */}
+      {/* Footer */}
       <footer className="border-t border-[var(--border-color)] py-12 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="text-2xl font-bold tracking-tighter">
@@ -294,11 +295,17 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
           <div className="flex gap-6 text-sm uppercase tracking-widest text-[var(--text-secondary)]">
             <a href="https://www.vinted.de/member/3138250645-scndunit" target="_blank" className="hover:text-[#FF4400] transition-colors">Vinted</a>
             <a href="https://www.instagram.com/scnd.unit" target="_blank" className="hover:text-[#FF4400] transition-colors">Instagram</a>
-            <Link href="/impressum" className="hover:text-[#FF4400] transition-colors">Impressum</Link>  {/* ← NEU */}
+            <Link href="/impressum" className="hover:text-[#FF4400] transition-colors">Impressum</Link>
+            <button onClick={() => setIsPrivacyOpen(true)} className="hover:text-[#FF4400] transition-colors cursor-pointer">
+              Datenschutz
+            </button>
           </div>
           <p className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">© 2025 SCND UNIT • Bad Kreuznach</p>
         </div>
       </footer>
+
+      {/* Datenschutz Modal */}
+      <DataPrivacy isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
     </div>
   );
 }
