@@ -262,12 +262,6 @@ export function ProductClient({ initialProducts }: ProductClientProps) {
         </div>
       </section>
 
-      {/* SCND DROP GAME SECTION */}
-      <section id="game" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
-        <div className="max-w-7xl mx-auto">
-          <ScndDropGame />
-        </div>
-      </section>
 
       {/* CONTACT SECTION */}
       <section id="contact" className="py-24 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
