@@ -1,7 +1,7 @@
 // src/components/DataPrivacy.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';  // ← useEffect muss importiert werden!
 import { X } from 'lucide-react';
 import Link from 'next/link';
 
