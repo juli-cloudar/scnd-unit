@@ -256,22 +256,7 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
         </div>
       )}
 
-      {/* STATUS CHECK TAB (nur Einzelprüfung) */}
-      {activeSubTab === 'status' && (
-        <div className="bg-[#111] border border-blue-500/30 p-6 space-y-3">
-          <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2"><Search className="w-5 h-5"/>Einzelnes Item prüfen</h3>
-          <div className="flex gap-2">
-            <input type="text" placeholder="https://www.vinted.de/items/..." value={singleUrl} onChange={e => setSingleUrl(e.target.value)} className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"/>
-            <button onClick={checkSingleItem} disabled={statusLoading} className="px-5 py-3 bg-blue-600 text-white text-xs font-bold uppercase">🔍 Check</button>
-          </div>
-          {singleResult && (
-            <div className={`p-4 border text-sm rounded ${singleResult.status === 'available' ? 'border-green-500/50 bg-green-950/20' : 'border-red-500/50 bg-red-950/20'}`}>
-              <span className="px-2 py-0.5 text-xs font-bold uppercase rounded bg-green-500 text-white">{singleResult.status}</span>
-              {singleResult.name && <span className="ml-2">{singleResult.name}</span>}
-            </div>
-          )}
-        </div>
-      )}
+      
 
       {/* JSON MERGE TAB */}
       {activeSubTab === 'merge' && (
