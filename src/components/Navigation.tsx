@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThemeToggle } from './ThemeToggle';
-import { GameButton } from './GameButton';
 
 interface NavigationProps {
   scrolled: boolean;
