@@ -138,19 +138,7 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
     } finally { setImportLoading(false); }
   };
 
-  // ========== STATUS CHECK (nur Einzelprüfung) ==========
-  const checkSingleItem = async () => {
-    if (!singleUrl) { toast('Bitte URL eingeben', 'error'); return; }
-    setStatusLoading(true);
-    try {
-      const res = await fetch('/api/vinted', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'single', url: singleUrl }) });
-      const data = await res.json();
-      setSingleResult(data);
-      if (data.status === 'sold') toast('Item ist VERKAUFT!', 'error');
-      else if (data.status === 'available') toast('Item ist verfügbar', 'success');
-    } catch (e) { toast('Fehler', 'error'); }
-    finally { setStatusLoading(false); }
-  };
+ 
 
   // ========== JSON MERGE ==========
   const handleMergeFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
