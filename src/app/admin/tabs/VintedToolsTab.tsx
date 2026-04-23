@@ -236,8 +236,7 @@ export function VintedToolsTab({ user, toast, confirm }: { user: Employee | null
     <div className="space-y-6">
       <div className="flex gap-2 border-b border-[#FF4400]/30 pb-4">
         <button onClick={() => setActiveSubTab('import')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'import' ? 'bg-green-600 text-white' : 'border border-green-600/30 text-green-500'}`}><Upload className="w-4 h-4 inline mr-1"/>JSON Import</button>
-        <button onClick={() => setActiveSubTab('status')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'status' ? 'bg-blue-600 text-white' : 'border border-blue-600/30 text-blue-500'}`}><Search className="w-4 h-4 inline mr-1"/>Status Check</button>
-        <button onClick={() => setActiveSubTab('merge')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'merge' ? 'bg-purple-600 text-white' : 'border border-purple-600/30 text-purple-500'}`}><Merge className="w-4 h-4 inline mr-1"/>JSON Merge</button>
+         <button onClick={() => setActiveSubTab('merge')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'merge' ? 'bg-purple-600 text-white' : 'border border-purple-600/30 text-purple-500'}`}><Merge className="w-4 h-4 inline mr-1"/>JSON Merge</button>
         <button onClick={() => setActiveSubTab('clean')} className={`px-4 py-2 text-xs uppercase font-bold ${activeSubTab === 'clean' ? 'bg-red-600 text-white' : 'border border-red-600/30 text-red-500'}`}><AlertTriangle className="w-4 h-4 inline mr-1"/>Auto Clean</button>
       </div>
 
