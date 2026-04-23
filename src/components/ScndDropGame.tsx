@@ -1470,23 +1470,30 @@ export function ScndDropGame() {
 
       <div style={{background:`linear-gradient(90deg,${BRAND_DIM},${BRAND},${BRAND_DIM})`}} className="h-0.5 flex-shrink-0"/>
 
-      <div className="flex-shrink-0 py-1 px-3 text-center">
-        <h3 style={{color:BRAND,letterSpacing:'0.18em'}} className="text-lg md:text-xl font-black uppercase">SCND DROP</h3>
-        {activeBadges.length>0&&(
-          <div className="flex justify-center gap-1 mt-0.5 flex-wrap">
-            {activeBadges.map(f=>(
-              <span key={f.label} style={{color:f.col,border:`1px solid ${f.col}55`,background:`${f.col}18`}}
-                className="px-1.5 py-0.5 rounded text-[7px] font-bold tracking-widest animate-pulse">{f.label}</span>
-            ))}
-          </div>
-        )}
-        {(bonus||puName)&&(
-          <div className="mt-0.5 animate-bounce">
-            <span style={{color:BRAND,borderColor:`${BRAND}40`}}
-              className="inline-block px-2 py-0.5 text-[8px] font-bold tracking-wider border rounded-sm">{puName||bonus}</span>
-          </div>
-        )}
-      </div>
+    <div className="flex-shrink-0 py-1 px-3 text-center flex flex-col items-center">
+  {/* Logo Bereich */}
+  <div>
+    <img 
+      src="/scnd-drop-logo.jpg" 
+      alt="SCND DROP"
+      className="h-10 md:h-14 w-auto object-contain"
+    />
+  </div>
+  {activeBadges.length>0&&(
+    <div className="flex justify-center gap-1 mt-1 flex-wrap">
+      {activeBadges.map(f=>(
+        <span key={f.label} style={{color:f.col,border:`1px solid ${f.col}55`,background:`${f.col}18`}}
+          className="px-1.5 py-0.5 rounded text-[7px] font-bold tracking-widest animate-pulse">{f.label}</span>
+      ))}
+    </div>
+  )}
+  {(bonus||puName)&&(
+    <div className="mt-0.5 animate-bounce">
+      <span style={{color:BRAND,borderColor:`${BRAND}40`}}
+        className="inline-block px-2 py-0.5 text-[8px] font-bold tracking-wider border rounded-sm">{puName||bonus}</span>
+    </div>
+  )}
+</div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-2 px-2 pb-1 min-h-0">
 
