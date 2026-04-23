@@ -1474,10 +1474,12 @@ export function ScndDropGame() {
   {/* Logo Bereich */}
   <div>
     <img 
-      src="/scnd-drop-logo.jpg" 
-      alt="SCND DROP"
-      className="h-10 md:h-14 w-auto object-contain"
-    />
+  src="/scnd-drop-logo.jpg" 
+  alt="SCND DROP"
+  width={130}
+  height={80}
+  className="object-contain"
+/>
   </div>
   {activeBadges.length>0&&(
     <div className="flex justify-center gap-1 mt-1 flex-wrap">
