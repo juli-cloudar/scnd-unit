@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { Trash2, ExternalLink, RefreshCw, ShoppingBag, Edit3, Search, ImageIcon, Save, Archive, Package } from "lucide-react";
+import { 
+  Trash2, ExternalLink, RefreshCw, ShoppingBag, Edit3, Search, 
+  ImageIcon, Save, Archive, Package, Tags, X, Check, Edit2, 
+  AlertCircle, Plus
+} from "lucide-react";
 import { proxyImg } from "../utils/helpers";
 import { ToastType } from "../hooks/useToast";
 
@@ -13,15 +17,248 @@ interface Employee {
   permissions: { canAddProducts: boolean; canEditProducts: boolean; canDeleteProducts: boolean; canViewStats: boolean; canManageEmployees: boolean; };
 }
 
-// Fallback-Kategorien (falls keine in DB)
+// Fallback-Kategorien
 const FALLBACK_CATEGORIES = [
   'Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Hemden', 
   'Headwear', 'Polos', 'Taschen', 'Sonstiges'
 ];
 
-// Filter-Typ
 type FilterType = 'all' | 'available' | 'sold';
 
+// ============================================================
+// MARKEN-VERWALTUNGS-COMPONENT
+// ============================================================
+function BrandManager({ 
+  brands, 
+  onBrandsUpdated, 
+  onClose,
+  toast 
+}: { 
+  brands: string[]; 
+  onBrandsUpdated: () => void; 
+  onClose: () => void;
+  toast: (msg: string, type?: ToastType) => void;
+}) {
+  const [editingBrand, setEditingBrand] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [mergeTarget, setMergeTarget] = useState<string | null>(null);
+  const [newBrandName, setNewBrandName] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleEdit = async (oldBrand: string) => {
+    if (!editValue.trim()) return;
+    setIsProcessing(true);
+    try {
+      // Aktualisiere alle Produkte mit der alten Marke
+      const { error } = await supabase
+        .from('products')
+        .update({ brand: editValue.trim() })
+        .eq('brand', oldBrand);
+      
+      if (error) throw error;
+      toast(`✅ "${oldBrand}" → "${editValue.trim()}" aktualisiert`, 'success');
+      onBrandsUpdated();
+      setEditingBrand(null);
+      setEditValue('');
+    } catch (error) {
+      toast('Fehler beim Aktualisieren', 'error');
+    }
+    setIsProcessing(false);
+  };
+
+  const handleMerge = async (sourceBrand: string, targetBrand: string) => {
+    if (sourceBrand === targetBrand) return;
+    setIsProcessing(true);
+    try {
+      // Alle Produkte von source zu target verschieben
+      const { error } = await supabase
+        .from('products')
+        .update({ brand: targetBrand })
+        .eq('brand', sourceBrand);
+      
+      if (error) throw error;
+      toast(`✅ "${sourceBrand}" wurde mit "${targetBrand}" zusammengeführt`, 'success');
+      onBrandsUpdated();
+      setMergeTarget(null);
+    } catch (error) {
+      toast('Fehler beim Zusammenführen', 'error');
+    }
+    setIsProcessing(false);
+  };
+
+  const handleAddBrand = async () => {
+    if (!newBrandName.trim()) return;
+    // Neue Marke wird automatisch beim nächsten Produkt mit dieser Marke erstellt
+    toast(`💡 Neue Marke "${newBrandName.trim()}" kann beim nächsten Produkt verwendet werden`, 'info');
+    setNewBrandName('');
+    onBrandsUpdated();
+  };
+
+  const handleDeleteEmptyBrand = async (brand: string) => {
+    // Prüfe ob Produkte mit dieser Marke existieren
+    const { count, error } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('brand', brand);
+    
+    if (error) return;
+    
+    if (count && count > 0) {
+      toast(`❌ "${brand}" kann nicht gelöscht werden (${count} Produkte verwenden diese Marke)`, 'error');
+    } else {
+      toast(`ℹ️ "${brand}" hat keine Produkte und wird ignoriert`, 'info');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-[#111] border border-[#FF4400]/30 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center p-4 border-b border-[#FF4400]/20">
+          <div className="flex items-center gap-2">
+            <Tags className="w-5 h-5 text-[#FF4400]" />
+            <h3 className="text-lg font-bold uppercase tracking-wider">Marken verwalten</h3>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-[#FF4400]/10 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-6">
+          {/* Neue Marke hinzufügen */}
+          <div className="bg-[#1A1A1A] rounded-lg p-4">
+            <h4 className="text-sm font-bold text-[#FF4400] mb-3">➕ Neue Marke hinzufügen</h4>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newBrandName}
+                onChange={(e) => setNewBrandName(e.target.value)}
+                placeholder="z.B. Supreme, Balenciaga, ..."
+                className="flex-1 bg-[#0A0A0A] border border-[#FF4400]/30 rounded px-3 py-2 text-sm"
+              />
+              <button
+                onClick={handleAddBrand}
+                className="px-4 py-2 bg-[#FF4400] text-white rounded text-sm font-bold"
+              >
+                <Plus className="w-4 h-4 inline mr-1" /> Hinzufügen
+              </button>
+            </div>
+          </div>
+
+          {/* Marken bearbeiten / mergen */}
+          <div>
+            <h4 className="text-sm font-bold text-[#FF4400] mb-3">✏️ Marken bearbeiten & zusammenführen</h4>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {brands.map(brand => (
+                <div key={brand} className="bg-[#1A1A1A] rounded-lg p-3">
+                  {editingBrand === brand ? (
+                    // Edit Mode
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="flex-1 bg-[#0A0A0A] border border-[#FF4400]/30 rounded px-3 py-2 text-sm"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleEdit(brand)}
+                        disabled={isProcessing}
+                        className="px-3 py-2 bg-green-600 text-white rounded"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => { setEditingBrand(null); setEditValue(''); }}
+                        className="px-3 py-2 bg-gray-700 text-white rounded"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : mergeTarget === brand ? (
+                    // Merge Mode
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-400">
+                        Wähle die Ziel-Marke für <span className="text-[#FF4400]">{brand}</span>:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {brands.filter(b => b !== brand).map(b => (
+                          <button
+                            key={b}
+                            onClick={() => handleMerge(brand, b)}
+                            disabled={isProcessing}
+                            className="px-3 py-1 bg-[#FF4400]/20 border border-[#FF4400]/30 rounded text-xs hover:bg-[#FF4400]/30 transition-colors"
+                          >
+                            {b}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setMergeTarget(null)}
+                          className="px-3 py-1 bg-gray-700 rounded text-xs"
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Normal Mode
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-sm">{brand}</span>
+                        <span className="text-xs text-gray-500">({brand.length} Zeichen)</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => { setEditingBrand(brand); setEditValue(brand); }}
+                          className="p-1.5 hover:bg-blue-600/20 rounded-lg transition-colors"
+                          title="Bearbeiten"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-blue-400" />
+                        </button>
+                        <button
+                          onClick={() => setMergeTarget(brand)}
+                          className="p-1.5 hover:bg-purple-600/20 rounded-lg transition-colors"
+                          title="Mit anderer Marke zusammenführen"
+                        >
+                          <Tags className="w-3.5 h-3.5 text-purple-400" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEmptyBrand(brand)}
+                          className="p-1.5 hover:bg-red-600/20 rounded-lg transition-colors"
+                          title="Leere Marke löschen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Info-Box */}
+          <div className="bg-blue-600/10 border border-blue-600/30 rounded-lg p-4">
+            <div className="flex gap-2">
+              <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0" />
+              <div className="text-xs text-gray-400">
+                <p className="font-bold text-blue-400 mb-1">Hinweise:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><strong>Bearbeiten:</strong> Ändert den Namen der Marke für ALLE betroffenen Produkte</li>
+                  <li><strong>Zusammenführen:</strong> Verschiebt alle Produkte von einer Marke zu einer anderen</li>
+                  <li><strong>Löschen:</strong> Entfernt nur Marken, die von keinem Produkt verwendet werden</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// HAUPT-COMPONENT
+// ============================================================
 export function InventoryTab({ user, toast, confirm }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,14 +268,15 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [filterType, setFilterType] = useState<FilterType>('available');
   
-  // ========== NEU: Dynamische Kategorien aus Supabase ==========
+  // Dynamische Daten
   const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
+  
+  // Marken-Verwaltung Modal
+  const [showBrandManager, setShowBrandManager] = useState(false);
 
-  // ========== Lade eindeutige Kategorien aus Supabase ==========
   const loadFilterOptions = useCallback(async () => {
     try {
-      // Eindeutige Kategorien aus products Tabelle
       const { data: categoriesData, error: catError } = await supabase
         .from('products')
         .select('category')
@@ -49,7 +287,6 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
         setDynamicCategories(categories);
       }
       
-      // Eindeutige Marken aus products Tabelle
       const { data: brandsData, error: brandError } = await supabase
         .from('products')
         .select('brand')
@@ -64,7 +301,6 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
     }
   }, []);
 
-  // ========== loadProducts mit Filter ==========
   const loadProducts = useCallback(async () => {
     setLoading(true);
     let query = supabase.from('products').select('*').order('id');
@@ -80,13 +316,11 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
     setLoading(false);
   }, [filterType]);
 
-  // Lade Produkte und Filteroptionen beim Start
   useEffect(() => {
     loadProducts();
     loadFilterOptions();
   }, [filterType, loadProducts, loadFilterOptions]);
 
-  // Verwende dynamische Kategorien, sonst Fallback
   const allCategories = ["Alle", ...(dynamicCategories.length > 0 ? dynamicCategories : FALLBACK_CATEGORIES)];
   const allBrands = ["Alle", ...dynamicBrands];
   
@@ -102,8 +336,6 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
     if (!error) { 
       setProducts(p => p.map(x => x.id === id ? { ...x, sold: !currentSold } : x)); 
       toast(currentSold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info'); 
-      // Filteroptionen neu laden, da sich Kategorien ändern könnten
-      loadFilterOptions();
     }
   };
 
@@ -112,7 +344,6 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
     if (!error) { 
       setProducts(p => p.filter(x => x.id !== id)); 
       toast('Produkt gelöscht', 'info');
-      // Filteroptionen neu laden
       loadFilterOptions();
     }
   };
@@ -126,7 +357,6 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           <input value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Preis"/>
           <input value={editingProduct.size} onChange={e => setEditingProduct({...editingProduct, size: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Größe"/>
         </div>
-        {/* Dynamische Kategorien-Auswahl */}
         <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3">
           {(dynamicCategories.length > 0 ? dynamicCategories : FALLBACK_CATEGORIES).map(cat => (
             <option key={cat} value={cat}>{cat}</option>
@@ -143,14 +373,37 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
 
   return (
     <div>
+      {/* Marken-Verwaltung Modal */}
+      {showBrandManager && (
+        <BrandManager
+          brands={dynamicBrands}
+          onBrandsUpdated={() => {
+            loadFilterOptions();
+            loadProducts();
+          }}
+          onClose={() => setShowBrandManager(false)}
+          toast={toast}
+        />
+      )}
+
       {/* Filter mit horizontalem Scroll */}
       <div className="mb-6 space-y-6">
         
-        {/* Marken Filter - dynamisch */}
+        {/* Marken Filter mit Verwaltungs-Button */}
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-1 h-4 bg-[#FF4400]"></div>
-            <p className="text-xs text-gray-400 uppercase tracking-widest">Marken</p>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-4 bg-[#FF4400]"></div>
+              <p className="text-xs text-gray-400 uppercase tracking-widest">Marken</p>
+            </div>
+            <button
+              onClick={() => setShowBrandManager(true)}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-[#FF4400]/20 border border-[#FF4400]/30 text-[#FF4400] rounded hover:bg-[#FF4400]/30 transition-colors"
+              title="Marken verwalten"
+            >
+              <Tags className="w-3 h-3" />
+              Marken verwalten
+            </button>
           </div>
           <div className="relative">
             <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
@@ -170,7 +423,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           </div>
         </div>
         
-        {/* Kategorien Filter - DYNAMISCH aus Supabase */}
+        {/* Kategorien Filter */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 bg-[#FF4400]"></div>
