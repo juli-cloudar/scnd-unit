@@ -13,8 +13,8 @@ interface Employee {
   permissions: { canAddProducts: boolean; canEditProducts: boolean; canDeleteProducts: boolean; canViewStats: boolean; canManageEmployees: boolean; };
 }
 
-// Zentrale Kategorienliste
-const PRODUCT_CATEGORIES = [
+// Fallback-Kategorien (falls keine in DB)
+const FALLBACK_CATEGORIES = [
   'Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Hemden', 
   'Headwear', 'Polos', 'Taschen', 'Sonstiges'
 ];
@@ -29,32 +29,66 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
   const [activeCategory, setActiveCategory] = useState('Alle');
   const [search, setSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  // ========== NEU: Filter mit 3 Zuständen ==========
-  const [filterType, setFilterType] = useState<FilterType>('available'); // Standard: nur verfügbare
+  const [filterType, setFilterType] = useState<FilterType>('available');
+  
+  // ========== NEU: Dynamische Kategorien aus Supabase ==========
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
+  const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
 
-  // ========== GEÄNDERT: loadProducts mit Filter ==========
+  // ========== Lade eindeutige Kategorien aus Supabase ==========
+  const loadFilterOptions = useCallback(async () => {
+    try {
+      // Eindeutige Kategorien aus products Tabelle
+      const { data: categoriesData, error: catError } = await supabase
+        .from('products')
+        .select('category')
+        .not('category', 'is', null);
+      
+      if (!catError && categoriesData) {
+        const categories = [...new Set(categoriesData.map(p => p.category).filter(Boolean))].sort();
+        setDynamicCategories(categories);
+      }
+      
+      // Eindeutige Marken aus products Tabelle
+      const { data: brandsData, error: brandError } = await supabase
+        .from('products')
+        .select('brand')
+        .not('brand', 'is', null);
+      
+      if (!brandError && brandsData) {
+        const brands = [...new Set(brandsData.map(p => p.brand).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
+        setDynamicBrands(brands);
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Filteroptionen:', error);
+    }
+  }, []);
+
+  // ========== loadProducts mit Filter ==========
   const loadProducts = useCallback(async () => {
     setLoading(true);
     let query = supabase.from('products').select('*').order('id');
     
-    // Filter anwenden
     if (filterType === 'available') {
       query = query.eq('sold', false);
     } else if (filterType === 'sold') {
       query = query.eq('sold', true);
     }
-    // bei 'all' wird kein Filter angewendet
     
     const { data, error } = await query;
     if (!error && data) setProducts(data);
     setLoading(false);
   }, [filterType]);
 
-  useEffect(() => { loadProducts(); }, [filterType]);
+  // Lade Produkte und Filteroptionen beim Start
+  useEffect(() => {
+    loadProducts();
+    loadFilterOptions();
+  }, [filterType, loadProducts, loadFilterOptions]);
 
-  const brandList = Array.from(new Set(products.map(p => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'de'));
-  const allBrands = ["Alle", ...brandList];
-  const allCategories = ["Alle", ...PRODUCT_CATEGORIES];
+  // Verwende dynamische Kategorien, sonst Fallback
+  const allCategories = ["Alle", ...(dynamicCategories.length > 0 ? dynamicCategories : FALLBACK_CATEGORIES)];
+  const allBrands = ["Alle", ...dynamicBrands];
   
   const filtered = products.filter(p => {
     if (activeBrand !== "Alle" && p.brand !== activeBrand) return false;
@@ -68,12 +102,19 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
     if (!error) { 
       setProducts(p => p.map(x => x.id === id ? { ...x, sold: !currentSold } : x)); 
       toast(currentSold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info'); 
+      // Filteroptionen neu laden, da sich Kategorien ändern könnten
+      loadFilterOptions();
     }
   };
 
   const deleteProduct = async (id: number) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (!error) { setProducts(p => p.filter(x => x.id !== id)); toast('Produkt gelöscht', 'info'); }
+    if (!error) { 
+      setProducts(p => p.filter(x => x.id !== id)); 
+      toast('Produkt gelöscht', 'info');
+      // Filteroptionen neu laden
+      loadFilterOptions();
+    }
   };
 
   if (editingProduct) return (
@@ -85,14 +126,15 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           <input value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Preis"/>
           <input value={editingProduct.size} onChange={e => setEditingProduct({...editingProduct, size: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Größe"/>
         </div>
+        {/* Dynamische Kategorien-Auswahl */}
         <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3">
-          {PRODUCT_CATEGORIES.map(cat => (
+          {(dynamicCategories.length > 0 ? dynamicCategories : FALLBACK_CATEGORIES).map(cat => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
         <input value={editingProduct.vinted_url} onChange={e => setEditingProduct({...editingProduct, vinted_url: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Vinted URL"/>
         <div className="flex gap-2">
-          <button onClick={() => { supabase.from('products').update(editingProduct).eq('id', editingProduct.id).then(() => { setEditingProduct(null); toast('Produkt gespeichert'); loadProducts(); }); }} className="flex-1 py-3 bg-[#FF4400] text-white font-bold uppercase"><Save className="w-4 h-4 inline mr-2"/>Speichern</button>
+          <button onClick={() => { supabase.from('products').update(editingProduct).eq('id', editingProduct.id).then(() => { setEditingProduct(null); toast('Produkt gespeichert'); loadProducts(); loadFilterOptions(); }); }} className="flex-1 py-3 bg-[#FF4400] text-white font-bold uppercase"><Save className="w-4 h-4 inline mr-2"/>Speichern</button>
           <button onClick={() => setEditingProduct(null)} className="flex-1 py-3 border border-gray-600 text-gray-400 uppercase">Abbrechen</button>
         </div>
       </div>
@@ -104,7 +146,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
       {/* Filter mit horizontalem Scroll */}
       <div className="mb-6 space-y-6">
         
-        {/* Marken Filter */}
+        {/* Marken Filter - dynamisch */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -128,7 +170,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           </div>
         </div>
         
-        {/* Kategorien Filter */}
+        {/* Kategorien Filter - DYNAMISCH aus Supabase */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <div className="w-1 h-4 bg-[#FF4400]"></div>
@@ -161,7 +203,6 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
         </div>
         
         <div className="flex gap-2">
-          {/* ========== 3-FACH FILTER BUTTONS ========== */}
           <button 
             onClick={() => setFilterType('available')} 
             className={`px-3 py-2 border transition-all text-xs uppercase tracking-widest flex items-center gap-1 ${
@@ -200,7 +241,7 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
             Alle
           </button>
           
-          <button onClick={loadProducts} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10">
+          <button onClick={() => { loadProducts(); loadFilterOptions(); }} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10">
             <RefreshCw className="w-4 h-4"/>
           </button>
         </div>
