@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Save, ImagePlus, Trash2, Package, X } from "lucide-react";
 import { logActivity } from "../utils/helpers";
@@ -9,7 +9,8 @@ interface Employee {
   permissions: { canAddProducts: boolean; };
 }
 
-const PRODUCT_CATEGORIES = [
+// Fallback-Kategorien (falls keine in DB)
+const FALLBACK_CATEGORIES = [
   'Jacken', 'Pullover', 'Sweatshirts', 'Tops', 'Hemden',
   'Headwear', 'Polos', 'Taschen', 'Sonstiges'
 ];
@@ -27,7 +28,7 @@ export function AddTab({ user, toast, onProductAdded }: { user: Employee | null,
   const [formData, setFormData] = useState({
     name: '',
     brand: '',
-    category: 'Sweatshirts',
+    category: '',
     price: '',
     size: '',
     condition: 'Gut',
@@ -35,6 +36,48 @@ export function AddTab({ user, toast, onProductAdded }: { user: Employee | null,
     images: [] as string[]
   });
   const [newImageUrl, setNewImageUrl] = useState('');
+  
+  // ========== NEU: Dynamische Kategorien aus Supabase ==========
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  // ========== Lade eindeutige Kategorien aus Supabase ==========
+  const loadCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('category')
+        .not('category', 'is', null);
+      
+      if (!error && data && data.length > 0) {
+        const categories = [...new Set(data.map(p => p.category).filter(Boolean))].sort();
+        setDynamicCategories(categories);
+        // Setze Standardkategorie auf die erste verfügbare
+        if (categories.length > 0 && !formData.category) {
+          setFormData(prev => ({ ...prev, category: categories[0] }));
+        }
+      } else {
+        // Fallback-Kategorien verwenden
+        setDynamicCategories(FALLBACK_CATEGORIES);
+        if (!formData.category) {
+          setFormData(prev => ({ ...prev, category: FALLBACK_CATEGORIES[0] }));
+        }
+      }
+    } catch (error) {
+      console.error('Fehler beim Laden der Kategorien:', error);
+      setDynamicCategories(FALLBACK_CATEGORIES);
+      if (!formData.category) {
+        setFormData(prev => ({ ...prev, category: FALLBACK_CATEGORIES[0] }));
+      }
+    }
+    setLoadingCategories(false);
+  };
+
+  // Lade Kategorien beim Start
+  useEffect(() => {
+    loadCategories();
+  }, []);
 
   const addImage = () => {
     if (newImageUrl.trim() && !formData.images.includes(newImageUrl.trim())) {
@@ -85,12 +128,17 @@ export function AddTab({ user, toast, onProductAdded }: { user: Employee | null,
       logActivity(user?.id || 0, user?.username || 'Admin', 'Produkt hinzugefügt', `"${newProduct.name}"`); 
       // Formular zurücksetzen
       setFormData({ 
-        name: '', brand: '', category: 'Sweatshirts', price: '', 
+        name: '', brand: '', category: dynamicCategories[0] || '', price: '', 
         size: '', condition: 'Gut', vinted_url: '', images: [] 
       }); 
-      onProductAdded(); 
+      onProductAdded();
+      // Kategorien neu laden (falls neue Kategorie hinzugekommen ist)
+      loadCategories();
     } 
   };
+
+  // Aktuelle Kategorien (dynamisch oder Fallback)
+  const categories = dynamicCategories.length > 0 ? dynamicCategories : FALLBACK_CATEGORIES;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -185,14 +233,20 @@ export function AddTab({ user, toast, onProductAdded }: { user: Employee | null,
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              {/* Dynamische Kategorien-Auswahl */}
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({...formData, category: e.target.value})}
                 className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3 text-sm rounded-sm"
+                disabled={loadingCategories}
               >
-                {PRODUCT_CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+                {loadingCategories ? (
+                  <option>Lade Kategorien...</option>
+                ) : (
+                  categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))
+                )}
               </select>
               
               <input
