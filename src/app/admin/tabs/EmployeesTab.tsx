@@ -36,7 +36,7 @@ const getDefaultTabPermissions = (role: string) => {
     return {
       can_access_inventory: true,
       can_access_add: true,
-     _access_vintedTools: true,
+      can_access_vintedTools: true,
       can_access_employees: true,
       can_access_logs: true,
       can_access_game: true,
@@ -97,7 +97,14 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       canViewStats: false,
       canManageEmployees: false,
     },
-    ...getDefaultTabPermissions('Mitarbeiter')
+    can_access_inventory: true,
+    can_access_add: true,
+    can_access_vintedTools: false,
+    can_access_employees: false,
+    can_access_logs: false,
+    can_access_game: true,
+    can_access_multiChannel: false,
+    can_access_analyticsMarketing: false,
   });
 
   useEffect(() => {
@@ -137,14 +144,19 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     }
     setIsAdding(true);
     
-    const { username, password, role, permissions, ...tabPermissions } = newEmployee;
-    
     supabase.from('employees').insert({
-      username,
-      password,
-      role,
-      permissions,
-      ...tabPermissions,
+      username: newEmployee.username,
+      password: newEmployee.password,
+      role: newEmployee.role,
+      permissions: newEmployee.permissions,
+      can_access_inventory: newEmployee.can_access_inventory,
+      can_access_add: newEmployee.can_access_add,
+      can_access_vintedTools: newEmployee.can_access_vintedTools,
+      can_access_employees: newEmployee.can_access_employees,
+      can_access_logs: newEmployee.can_access_logs,
+      can_access_game: newEmployee.can_access_game,
+      can_access_multiChannel: newEmployee.can_access_multiChannel,
+      can_access_analyticsMarketing: newEmployee.can_access_analyticsMarketing,
       login_count: 0,
       total_work_hours: 0,
       online: false
@@ -165,7 +177,14 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
             canViewStats: false,
             canManageEmployees: false,
           },
-          ...getDefaultTabPermissions('Mitarbeiter')
+          can_access_inventory: true,
+          can_access_add: true,
+          can_access_vintedTools: false,
+          can_access_employees: false,
+          can_access_logs: false,
+          can_access_game: true,
+          can_access_multiChannel: false,
+          can_access_analyticsMarketing: false,
         });
         const loadEmployees = async () => {
           const { data } = await supabase.from('employees').select('*').order('id');
@@ -177,7 +196,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     });
   };
 
-  const updateTabPermissions = async (employee: Employee, tabPermissions: {
+  const updateTabPermissions = async (employee: Employee, updates: {
     can_access_inventory: boolean;
     can_access_add: boolean;
     can_access_vintedTools: boolean;
@@ -189,7 +208,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
   }) => {
     const { error } = await supabase
       .from('employees')
-      .update(tabPermissions)
+      .update(updates)
       .eq('id', employee.id);
     
     if (error) {
@@ -197,7 +216,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     } else {
       toast(`Tab-Berechtigungen für ${employee.username} aktualisiert`, 'success');
       logActivity(currentUser.id, currentUser.username, 'Tab-Berechtigungen geändert', `für "${employee.username}"`);
-      setEmployees(prev => prev.map(e => e.id === employee.id ? { ...e, ...tabPermissions } : e));
+      setEmployees(prev => prev.map(e => e.id === employee.id ? { ...e, ...updates } : e));
       setEditingPermissions(null);
     }
   };
@@ -213,10 +232,18 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           <input placeholder="Passwort" type="password" value={newEmployee.password} onChange={e => setNewEmployee({...newEmployee, password: e.target.value})} className="bg-[#1A1A1A] border border-yellow-400/30 px-4 py-3 text-sm"/>
           <select value={newEmployee.role} onChange={e => {
             const role = e.target.value as any;
+            const defaultPerms = getDefaultTabPermissions(role);
             setNewEmployee({
               ...newEmployee,
               role,
-              ...getDefaultTabPermissions(role)
+              can_access_inventory: defaultPerms.can_access_inventory,
+              can_access_add: defaultPerms.can_access_add,
+              can_access_vintedTools: defaultPerms.can_access_vintedTools,
+              can_access_employees: defaultPerms.can_access_employees,
+              can_access_logs: defaultPerms.can_access_logs,
+              can_access_game: defaultPerms.can_access_game,
+              can_access_multiChannel: defaultPerms.can_access_multiChannel,
+              can_access_analyticsMarketing: defaultPerms.can_access_analyticsMarketing,
             });
           }} className="bg-[#1A1A1A] border border-yellow-400/30 px-4 py-3 text-sm">
             <option>Mitarbeiter</option>
@@ -245,7 +272,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               <label key={tab.key} className="flex items-center gap-2 text-xs cursor-pointer">
                 <input 
                   type="checkbox" 
-                  checked={(newEmployee[tab.dbField as keyof typeof newEmployee] as boolean) || false} 
+                  checked={newEmployee[tab.dbField as keyof typeof newEmployee] as boolean} 
                   onChange={e => setNewEmployee({
                     ...newEmployee,
                     [tab.dbField]: e.target.checked
@@ -301,7 +328,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               <label key={tab.key} className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-[#1A1A1A] rounded">
                 <input
                   type="checkbox"
-                  checked={(editingPermissions[tab.dbField as keyof Employee] as boolean) || false}
+                  checked={editingPermissions[tab.dbField as keyof Employee] as boolean}
                   onChange={e => setEditingPermissions({
                     ...editingPermissions,
                     [tab.dbField]: e.target.checked
