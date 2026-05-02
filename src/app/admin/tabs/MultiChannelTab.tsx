@@ -13,6 +13,7 @@ interface Product {
   id: number;
   name: string;
   brand: string;
+  category: string;   // ← Hinzugefügt
   price: string;
   size: string;
   condition: string;
@@ -22,7 +23,8 @@ interface Product {
 }
 
 interface Employee {
-  id: number; username: string;
+  id: number; 
+  username: string;
   permissions: { canAddProducts: boolean; canEditProducts: boolean; };
 }
 
