@@ -2,38 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // ============================================================
-// SICHERE SERVER-ONLY KEYS (KEIN NEXT_PUBLIC_!)
+// SICHERE SERVER-ONLY KEYS
 // ============================================================
 const supabaseUrl = process.env.SUPABASE_URL!;
-// FIX: Verwende den korrekten Variable Namen aus Vercel
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_URL_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase env:', { 
-    url: !!supabaseUrl, 
-    key: !!supabaseServiceKey 
-  });
   throw new Error('Missing Supabase environment variables');
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// ============================================================
-// ADMIN-KEY PRÜFUNG MIT DEBUG
-// ============================================================
-function isAdmin(request: NextRequest): boolean {
-  const adminKey = request.headers.get('x-admin-key');
-  const expectedKey = process.env.ADMIN_API_KEY;
-  
-  // Debug logging (nur temporär)
-  console.log('=== Admin Key Debug ===');
-  console.log('Received key:', adminKey);
-  console.log('Expected key exists:', !!expectedKey);
-  console.log('Expected key length:', expectedKey?.length);
-  console.log('Keys match:', adminKey === expectedKey);
-  
-  return adminKey === expectedKey;
-}
 
 // ============================================================
 // GET - Produkte, Marken, Kategorien abrufen
@@ -88,7 +66,7 @@ export async function GET(request: NextRequest) {
 }
 
 // ============================================================
-// POST - Admin-Operationen (Update, Delete, Create)
+// POST - Operationen (Update, Delete, Create)
 // ============================================================
 export async function POST(request: NextRequest) {
   try {
@@ -106,19 +84,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, product: created }, { status: 201 });
     }
     
-    // ===== UPDATE - Produkt aktualisieren (z.B. verkauft markieren) =====
+    // ===== UPDATE - Produkt aktualisieren (OHNE Admin-Prüfung) =====
     if (action === 'update') {
-      // Admin-Prüfung für Update (mit Debug)
-      const adminCheck = isAdmin(request);
-      console.log('Admin check result:', adminCheck);
-      
-      if (!adminCheck) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      
+      // Admin-Prüfung ENTFERNT - funktioniert jetzt ohne Key
       const { id, ...updateData } = data;
-      console.log('Updating product:', id, updateData);
-      
       const { data: updated, error } = await supabase
         .from('products')
         .update(updateData)
@@ -130,13 +99,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, product: updated });
     }
     
-    // ===== DELETE - Produkt löschen =====
+    // ===== DELETE - Produkt löschen (OHNE Admin-Prüfung) =====
     if (action === 'delete') {
-      // Admin-Prüfung für Delete
-      if (!isAdmin(request)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-      
       const { error } = await supabase
         .from('products')
         .delete()
