@@ -4,7 +4,6 @@ import {
   ImageIcon, Save, Archive, Package, Tags, X, Check, Edit2, 
   AlertCircle, Plus
 } from "lucide-react";
-import { proxyImg } from "../utils/helpers";
 import { ToastType } from "../hooks/useToast";
 
 interface Product {
@@ -287,12 +286,17 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
     return true;
   });
 
+  // ============================================================
+  // MARK SOLD - FIXED WITH ADMIN KEY
+  // ============================================================
   const markSold = async (id: number, currentSold: boolean) => {
+    const adminKeyValue = sessionStorage.getItem('admin_key');
+    
     const res = await fetch('/api/products', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': adminKey || ''
+        'x-admin-key': adminKeyValue || ''
       },
       body: JSON.stringify({ action: 'update', data: { id, sold: !currentSold } })
     });
@@ -301,16 +305,23 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
       setProducts(p => p.map(x => x.id === id ? { ...x, sold: !currentSold } : x));
       toast(currentSold ? 'Produkt reaktiviert' : 'Produkt als verkauft markiert', 'info');
     } else {
+      const error = await res.text();
+      console.error('API Fehler:', res.status, error);
       toast('Fehler beim Aktualisieren', 'error');
     }
   };
 
+  // ============================================================
+  // DELETE PRODUCT - FIXED WITH ADMIN KEY
+  // ============================================================
   const deleteProduct = async (id: number) => {
+    const adminKeyValue = sessionStorage.getItem('admin_key');
+    
     const res = await fetch('/api/products', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': adminKey || ''
+        'x-admin-key': adminKeyValue || ''
       },
       body: JSON.stringify({ action: 'delete', data: { id } })
     });
@@ -324,38 +335,91 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
     }
   };
 
+  // ============================================================
+  // SAVE PRODUCT EDIT - FIXED WITH ADMIN KEY
+  // ============================================================
+  const saveProductEdit = async () => {
+    if (!editingProduct) return;
+    
+    const adminKeyValue = sessionStorage.getItem('admin_key');
+    
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'x-admin-key': adminKeyValue || '' 
+      },
+      body: JSON.stringify({ action: 'update', data: editingProduct })
+    });
+    
+    if (res.ok) {
+      setEditingProduct(null);
+      toast('Produkt gespeichert', 'success');
+      loadProducts();
+      loadFilterOptions();
+    } else {
+      toast('Fehler beim Speichern', 'error');
+    }
+  };
+
   if (editingProduct) return (
     <div className="max-w-2xl mx-auto bg-[#111] border border-[#FF4400]/30 p-6">
       <h3 className="text-lg font-bold text-[#FF4400] mb-4">Produkt bearbeiten</h3>
       <div className="space-y-4">
-        <input value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Name"/>
+        <input 
+          value={editingProduct.name} 
+          onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} 
+          className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" 
+          placeholder="Name"
+        />
         <div className="grid grid-cols-2 gap-4">
-          <input value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Preis"/>
-          <input value={editingProduct.size} onChange={e => setEditingProduct({...editingProduct, size: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Größe"/>
+          <input 
+            value={editingProduct.price} 
+            onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} 
+            className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" 
+            placeholder="Preis"
+          />
+          <input 
+            value={editingProduct.size} 
+            onChange={e => setEditingProduct({...editingProduct, size: e.target.value})} 
+            className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" 
+            placeholder="Größe"
+          />
         </div>
-        <select value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3">
+        <select 
+          value={editingProduct.category} 
+          onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} 
+          className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3"
+        >
           {(dynamicCategories.length > 0 ? dynamicCategories : FALLBACK_CATEGORIES).map(cat => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
-        <input value={editingProduct.vinted_url} onChange={e => setEditingProduct({...editingProduct, vinted_url: e.target.value})} className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" placeholder="Vinted URL"/>
+        <input 
+          value={editingProduct.brand} 
+          onChange={e => setEditingProduct({...editingProduct, brand: e.target.value})} 
+          className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" 
+          placeholder="Marke"
+        />
+        <input 
+          value={editingProduct.vinted_url} 
+          onChange={e => setEditingProduct({...editingProduct, vinted_url: e.target.value})} 
+          className="w-full bg-[#1A1A1A] border border-[#FF4400]/30 px-4 py-3" 
+          placeholder="Vinted URL"
+        />
         <div className="flex gap-2">
-          <button onClick={async () => {
-            const res = await fetch('/api/products', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-admin-key': adminKey || '' },
-              body: JSON.stringify({ action: 'update', data: editingProduct })
-            });
-            if (res.ok) {
-              setEditingProduct(null);
-              toast('Produkt gespeichert', 'success');
-              loadProducts();
-              loadFilterOptions();
-            } else {
-              toast('Fehler beim Speichern', 'error');
-            }
-          }} className="flex-1 py-3 bg-[#FF4400] text-white font-bold uppercase"><Save className="w-4 h-4 inline mr-2"/>Speichern</button>
-          <button onClick={() => setEditingProduct(null)} className="flex-1 py-3 border border-gray-600 text-gray-400 uppercase">Abbrechen</button>
+          <button 
+            onClick={saveProductEdit} 
+            className="flex-1 py-3 bg-[#FF4400] text-white font-bold uppercase"
+          >
+            <Save className="w-4 h-4 inline mr-2"/>Speichern
+          </button>
+          <button 
+            onClick={() => setEditingProduct(null)} 
+            className="flex-1 py-3 border border-gray-600 text-gray-400 uppercase"
+          >
+            Abbrechen
+          </button>
         </div>
       </div>
     </div>
@@ -382,14 +446,21 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
               <div className="w-1 h-4 bg-[#FF4400]"></div>
               <p className="text-xs text-gray-400 uppercase tracking-widest">Marken</p>
             </div>
-            <button onClick={() => setShowBrandManager(true)} className="flex items-center gap-1 px-2 py-1 text-xs bg-[#FF4400]/20 border border-[#FF4400]/30 text-[#FF4400] rounded hover:bg-[#FF4400]/30">
+            <button 
+              onClick={() => setShowBrandManager(true)} 
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-[#FF4400]/20 border border-[#FF4400]/30 text-[#FF4400] rounded hover:bg-[#FF4400]/30"
+            >
               <Tags className="w-3 h-3" /> Marken verwalten
             </button>
           </div>
           <div className="relative">
             <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
               {allBrands.map(b => (
-                <button key={b} onClick={() => setActiveBrand(b)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest rounded-sm ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
+                <button 
+                  key={b} 
+                  onClick={() => setActiveBrand(b)} 
+                  className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest rounded-sm ${activeBrand === b ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}
+                >
                   {b}
                 </button>
               ))}
@@ -405,7 +476,11 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           <div className="relative">
             <div className="flex overflow-x-auto gap-2 pb-4 scrollbar-custom">
               {allCategories.map(c => (
-                <button key={c} onClick={() => setActiveCategory(c)} className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest rounded-sm ${activeCategory === c ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}>
+                <button 
+                  key={c} 
+                  onClick={() => setActiveCategory(c)} 
+                  className={`px-4 py-2 text-xs whitespace-nowrap uppercase tracking-widest rounded-sm ${activeCategory === c ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] border border-[#FF4400]/20 text-gray-400 hover:border-[#FF4400] hover:text-[#FF4400]'}`}
+                >
                   {c}
                 </button>
               ))}
@@ -417,20 +492,38 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
-          <input type="text" placeholder="Suchen..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64"/>
+          <input 
+            type="text" 
+            placeholder="Suchen..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            className="pl-10 pr-4 py-2 bg-[#1A1A1A] border border-[#FF4400]/30 text-sm w-64"
+          />
         </div>
         
         <div className="flex gap-2">
-          <button onClick={() => setFilterType('available')} className={`px-3 py-2 border text-xs uppercase tracking-widest flex items-center gap-1 ${filterType === 'available' ? 'bg-green-600/20 border-green-500 text-green-400' : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+          <button 
+            onClick={() => setFilterType('available')} 
+            className={`px-3 py-2 border text-xs uppercase tracking-widest flex items-center gap-1 ${filterType === 'available' ? 'bg-green-600/20 border-green-500 text-green-400' : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}
+          >
             <Package className="w-4 h-4"/> Verfügbar
           </button>
-          <button onClick={() => setFilterType('sold')} className={`px-3 py-2 border text-xs uppercase tracking-widest flex items-center gap-1 ${filterType === 'sold' ? 'bg-red-600/20 border-red-500 text-red-400' : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+          <button 
+            onClick={() => setFilterType('sold')} 
+            className={`px-3 py-2 border text-xs uppercase tracking-widest flex items-center gap-1 ${filterType === 'sold' ? 'bg-red-600/20 border-red-500 text-red-400' : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}
+          >
             <Archive className="w-4 h-4"/> Verkauft
           </button>
-          <button onClick={() => setFilterType('all')} className={`px-3 py-2 border text-xs uppercase tracking-widest ${filterType === 'all' ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}>
+          <button 
+            onClick={() => setFilterType('all')} 
+            className={`px-3 py-2 border text-xs uppercase tracking-widest ${filterType === 'all' ? 'bg-blue-600/20 border-blue-500 text-blue-400' : 'border-[#FF4400]/30 text-gray-400 hover:text-[#FF4400]'}`}
+          >
             Alle
           </button>
-          <button onClick={() => { loadProducts(); loadFilterOptions(); }} className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10">
+          <button 
+            onClick={() => { loadProducts(); loadFilterOptions(); }} 
+            className="p-2 border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10"
+          >
             <RefreshCw className="w-4 h-4"/>
           </button>
         </div>
@@ -445,19 +538,60 @@ export function InventoryTab({ user, toast, confirm }: { user: Employee | null, 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {filtered.map(p => (
               <div key={p.id} className={`relative border transition-all ${p.sold ? 'border-red-500/50 opacity-50' : 'border-[#FF4400]/20 hover:border-[#FF4400]/50'}`}>
-                {p.sold && (<div className="absolute inset-0 flex items-center justify-center pointer-events-none"><span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rotate-[-15deg] uppercase tracking-widest">Verkauft</span></div>)}
+                {p.sold && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rotate-[-15deg] uppercase tracking-widest">Verkauft</span>
+                  </div>
+                )}
                 <div className="aspect-[3/4] bg-[#1A1A1A] overflow-hidden relative">
-                  <img src={p.images?.[0] ? `/api/image-proxy?url=${encodeURIComponent(p.images[0])}` : ''} alt={p.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }} />
-                  {p.images?.length > 1 && (<div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 text-xs font-bold flex items-center gap-1"><ImageIcon className="w-3 h-3"/> {p.images.length}</div>)}
+                  <img 
+                    src={p.images?.[0] ? `/api/image-proxy?url=${encodeURIComponent(p.images[0])}` : ''} 
+                    alt={p.name} 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }} 
+                  />
+                  {p.images?.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 text-xs font-bold flex items-center gap-1">
+                      <ImageIcon className="w-3 h-3"/> {p.images.length}
+                    </div>
+                  )}
                 </div>
                 <div className="p-2 bg-[#0A0A0A]">
                   <p className="text-xs font-bold truncate">{p.name}</p>
                   <p className="text-xs text-[#FF4400] mt-0.5">{p.price} · {p.size}</p>
                   <div className="flex gap-1 mt-2">
-                    {user?.permissions.canEditProducts && (<button onClick={() => setEditingProduct(p)} className="px-2 py-1 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10"><Edit3 className="w-3 h-3"/></button>)}
-                    {user?.permissions.canEditProducts && (<button onClick={() => markSold(p.id, p.sold)} className={`flex-1 py-1 text-xs font-bold uppercase flex items-center justify-center gap-1 ${p.sold ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}><ShoppingBag className="w-3 h-3"/>{p.sold ? 'Reaktiv.' : 'Verkauft'}</button>)}
-                    <a href={p.vinted_url} target="_blank" className="px-2 py-1 border border-[#FF4400]/30 text-[#FF4400]"><ExternalLink className="w-3 h-3"/></a>
-                    {user?.permissions.canDeleteProducts && (<button onClick={() => confirm('Produkt wirklich löschen?', () => deleteProduct(p.id))} className="px-2 py-1 border border-red-500/30 text-red-400"><Trash2 className="w-3 h-3"/></button>)}
+                    {user?.permissions.canEditProducts && (
+                      <button 
+                        onClick={() => setEditingProduct(p)} 
+                        className="px-2 py-1 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                      >
+                        <Edit3 className="w-3 h-3"/>
+                      </button>
+                    )}
+                    {user?.permissions.canEditProducts && (
+                      <button 
+                        onClick={() => markSold(p.id, p.sold)} 
+                        className={`flex-1 py-1 text-xs font-bold uppercase flex items-center justify-center gap-1 ${p.sold ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'}`}
+                      >
+                        <ShoppingBag className="w-3 h-3"/>{p.sold ? 'Reaktiv.' : 'Verkauft'}
+                      </button>
+                    )}
+                    <a 
+                      href={p.vinted_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="px-2 py-1 border border-[#FF4400]/30 text-[#FF4400]"
+                    >
+                      <ExternalLink className="w-3 h-3"/>
+                    </a>
+                    {user?.permissions.canDeleteProducts && (
+                      <button 
+                        onClick={() => confirm('Produkt wirklich löschen?', () => deleteProduct(p.id))} 
+                        className="px-2 py-1 border border-red-500/30 text-red-400"
+                      >
+                        <Trash2 className="w-3 h-3"/>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
