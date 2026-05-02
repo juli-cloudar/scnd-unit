@@ -36,7 +36,7 @@ const getDefaultTabPermissions = (role: string) => {
     return {
       can_access_inventory: true,
       can_access_add: true,
-      can_access_vintedTools: true,
+     _access_vintedTools: true,
       can_access_employees: true,
       can_access_logs: true,
       can_access_game: true,
@@ -70,14 +70,14 @@ const getDefaultTabPermissions = (role: string) => {
 };
 
 const TabList = [
-  { key: 'inventory' as const, dbField: 'can_access_inventory', label: 'Inventar', icon: Package },
-  { key: 'add' as const, dbField: 'can_access_add', label: 'Hinzufügen', icon: Plus },
-  { key: 'vintedTools' as const, dbField: 'can_access_vintedTools', label: 'Vinted Tools', icon: Globe },
-  { key: 'employees' as const, dbField: 'can_access_employees', label: 'Team', icon: Users },
-  { key: 'logs' as const, dbField: 'can_access_logs', label: 'Logs', icon: Clock },
-  { key: 'game' as const, dbField: 'can_access_game', label: 'SCND DROP', icon: Gamepad2 },
-  { key: 'multiChannel' as const, dbField: 'can_access_multiChannel', label: 'Multi-Channel', icon: Share2 },
-  { key: 'analyticsMarketing' as const, dbField: 'can_access_analyticsMarketing', label: 'Analytics & Marketing', icon: TrendingUp },
+  { key: 'inventory', dbField: 'can_access_inventory', label: 'Inventar', icon: Package },
+  { key: 'add', dbField: 'can_access_add', label: 'Hinzufügen', icon: Plus },
+  { key: 'vintedTools', dbField: 'can_access_vintedTools', label: 'Vinted Tools', icon: Globe },
+  { key: 'employees', dbField: 'can_access_employees', label: 'Team', icon: Users },
+  { key: 'logs', dbField: 'can_access_logs', label: 'Logs', icon: Clock },
+  { key: 'game', dbField: 'can_access_game', label: 'SCND DROP', icon: Gamepad2 },
+  { key: 'multiChannel', dbField: 'can_access_multiChannel', label: 'Multi-Channel', icon: Share2 },
+  { key: 'analyticsMarketing', dbField: 'can_access_analyticsMarketing', label: 'Analytics & Marketing', icon: TrendingUp },
 ];
 
 export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Employee, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
@@ -113,7 +113,6 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       }
       
       if (data) {
-        // Stelle sicher, dass alle Mitarbeiter die Tab-Berechtigungsfelder haben
         const employeesWithDefaults = data.map(emp => ({
           ...emp,
           can_access_inventory: emp.can_access_inventory ?? true,
@@ -203,22 +202,6 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     }
   };
 
-  // Hilfsfunktion: Prüft ob ein Mitarbeiter Zugriff auf einen Tab hat
-  const hasTabAccess = (employee: Employee, tabKey: string) => {
-    const fieldMap: Record<string, keyof Employee> = {
-      inventory: 'can_access_inventory',
-      add: 'can_access_add',
-      vintedTools: 'can_access_vintedTools',
-      employees: 'can_access_employees',
-      logs: 'can_access_logs',
-      game: 'can_access_game',
-      multiChannel: 'can_access_multiChannel',
-      analyticsMarketing: 'can_access_analyticsMarketing',
-    };
-    const field = fieldMap[tabKey];
-    return employee[field] === true;
-  };
-
   return (
     <div className="space-y-6">
       {/* Neuen Mitarbeiter hinzufügen */}
@@ -262,7 +245,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               <label key={tab.key} className="flex items-center gap-2 text-xs cursor-pointer">
                 <input 
                   type="checkbox" 
-                  checked={newEmployee[tab.dbField as keyof typeof newEmployee] as boolean || false} 
+                  checked={(newEmployee[tab.dbField as keyof typeof newEmployee] as boolean) || false} 
                   onChange={e => setNewEmployee({
                     ...newEmployee,
                     [tab.dbField]: e.target.checked
@@ -318,7 +301,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               <label key={tab.key} className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-[#1A1A1A] rounded">
                 <input
                   type="checkbox"
-                  checked={editingPermissions[tab.dbField as keyof Employee] as boolean || false}
+                  checked={(editingPermissions[tab.dbField as keyof Employee] as boolean) || false}
                   onChange={e => setEditingPermissions({
                     ...editingPermissions,
                     [tab.dbField]: e.target.checked
@@ -368,37 +351,58 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               {employees.map(emp => (
                 <tr key={emp.id} className="border-t border-[#FF4400]/10">
                   <td className="px-4 py-3 font-bold">{emp.username}</td>
-                  <td className="px-4 py-3"><span className={`px-2 py-1 text-xs ${emp.role === 'Admin' ? 'bg-yellow-400 text-black' : emp.role === 'Manager' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'}`}>{emp.role}</span></td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 text-xs ${emp.role === 'Admin' ? 'bg-yellow-400 text-black' : emp.role === 'Manager' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'}`}>
+                      {emp.role}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">{emp.login_count}×</td>
-                  <td className="px-4 py-3"><span className={`flex items-center gap-1 ${emp.online ? 'text-green-500' : 'text-gray-500'}`}><div className={`w-2 h-2 rounded-full ${emp.online ? 'bg-green-500' : 'bg-gray-500'}`}/>{emp.online ? 'Online' : 'Offline'}</span></td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`flex items-center gap-1 ${emp.online ? 'text-green-500' : 'text-gray-500'}`}>
+                      <div className={`w-2 h-2 rounded-full ${emp.online ? 'bg-green-500' : 'bg-gray-500'}`}/>
+                      {emp.online ? 'Online' : 'Offline'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">
+                    {emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).slice(0, 3).map(tab => (
-                        <span key={tab.key} className="text-xs text-purple-400" title={tab.label}><tab.icon className="w-3 h-3"/></span>
+                        <span key={tab.key} className="text-xs text-purple-400" title={tab.label}>
+                          <tab.icon className="w-3 h-3"/>
+                        </span>
                       ))}
                       {TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).length > 3 && (
-                        <span className="text-xs text-gray-500">+{TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).length - 3}</span>
+                        <span className="text-xs text-gray-500">
+                          +{TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).length - 3}
+                        </span>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
-                      <button onClick={() => setEditingPermissions(emp)} className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs" title="Tab-Berechtigungen"><Shield className="w-3 h-3"/></button>
-                      <button onClick={() => setEditingEmployee(emp)} className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs" title="Passwort ändern"><Key className="w-3 h-3"/></button>
+                      <button onClick={() => setEditingPermissions(emp)} className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs" title="Tab-Berechtigungen">
+                        <Shield className="w-3 h-3"/>
+                      </button>
+                      <button onClick={() => setEditingEmployee(emp)} className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs" title="Passwort ändern">
+                        <Key className="w-3 h-3"/>
+                      </button>
                       <button onClick={() => confirm(`${emp.username} wirklich löschen?`, () => {
                         supabase.from('employees').delete().eq('id', emp.id).then(() => {
                           toast('Mitarbeiter gelöscht', 'info');
                           logActivity(currentUser.id, currentUser.username, 'Mitarbeiter gelöscht', `"${emp.username}"`);
                           setEmployees(prev => prev.filter(e => e.id !== emp.id));
                         });
-                      })} className="px-2 py-1 bg-red-500/20 text-red-400 text-xs"><Trash2 className="w-3 h-3"/></button>
+                      })} className="px-2 py-1 bg-red-500/20 text-red-400 text-xs">
+                        <Trash2 className="w-3 h-3"/>
+                      </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
-          <tr>
+          </table>
         </div>
       </div>
     </div>
