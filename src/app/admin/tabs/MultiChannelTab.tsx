@@ -118,7 +118,7 @@ Abholung in Bad Kreuznach
 Bei Interesse bitte melden.`;
   };
 
-  const copyToClipboard = async (text: string, type: 'ebay' | 'facebook' | 'group' | 'image' | 'single', index?: number) => {
+  const copyToClipboard = async (text: string, type: 'ebay' | 'facebook' | 'group' | 'image' | 'single', imageCount?: number, index?: number) => {
     try {
       await navigator.clipboard.writeText(text);
       
@@ -134,10 +134,10 @@ Bei Interesse bitte melden.`;
         setCopiedGroup(true);
         setTimeout(() => setCopiedGroup(false), 2000);
         toast('Facebook Gruppen Text kopiert', 'success');
-      } else if (type === 'image') {
+      } else if (type === 'image' && imageCount !== undefined) {
         setCopiedImage(true);
         setTimeout(() => setCopiedImage(false), 2000);
-        toast(`${product?.images?.length || 0} Bild-URLs kopiert`, 'success');
+        toast(`${imageCount} Bild-URLs kopiert`, 'success');
       } else if (type === 'single' && index !== undefined) {
         setCopiedSingleImage(index);
         setTimeout(() => setCopiedSingleImage(null), 2000);
@@ -284,7 +284,7 @@ Bei Interesse bitte melden.`;
                   </button>
                 </div>
 
-                {/* Bild-URLs - Alle auf einmal + einzeln */}
+                {/* Bild-URLs */}
                 {product.images && product.images.length > 0 && (
                   <div className="border border-gray-800 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
@@ -294,7 +294,7 @@ Bei Interesse bitte melden.`;
                         <span className="text-xs text-gray-500">({product.images.length} Bilder)</span>
                       </div>
                       <button
-                        onClick={() => copyToClipboard(product.images.join('\n'), 'image')}
+                        onClick={() => copyToClipboard(product.images.join('\n'), 'image', product.images.length)}
                         className="flex items-center gap-1 px-3 py-1.5 bg-purple-600/20 border border-purple-600/30 text-purple-500 text-xs rounded hover:bg-purple-600/30 transition-colors"
                       >
                         {copiedImage ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -302,7 +302,6 @@ Bei Interesse bitte melden.`;
                       </button>
                     </div>
                     
-                    {/* Miniatur-Vorschau mit Einzel-Kopierfunktion */}
                     <div className="flex gap-2 mt-2 flex-wrap">
                       {product.images.slice(0, 4).map((img, idx) => (
                         <div key={idx} className="relative group">
@@ -313,7 +312,7 @@ Bei Interesse bitte melden.`;
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                           <button
-                            onClick={() => copyToClipboard(img, 'single', idx)}
+                            onClick={() => copyToClipboard(img, 'single', undefined, idx)}
                             className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded"
                             title="Einzelne URL kopieren"
                           >
