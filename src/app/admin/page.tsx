@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Package, BarChart3, Plus, Globe, Users, Clock, LogOut, Gamepad2, Share2
+  Package, BarChart3, Plus, Globe, Users, Clock, LogOut, Gamepad2, Share2, TrendingUp
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -24,6 +24,7 @@ import { AnalyticsTab } from './tabs/AnalyticsTab';
 import { EmployeesTab } from './tabs/EmployeesTab';
 import { LogsTab } from './tabs/LogsTab';
 import { MultiChannelTab } from './tabs/MultiChannelTab';
+import { AnalyticsMarketingTab } from './tabs/AnalyticsMarketingTab';
 
 // Types
 interface Employee {
@@ -225,13 +226,21 @@ export default function ManagementPanel() {
               }`}>
               <Gamepad2 className="w-4 h-4 inline mr-1"/>SCND DROP
             </button>
-            {/* NEU: Multi-Channel Tab */}
             <button onClick={() => setActiveTab('multichannel')}
               className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
                 activeTab === 'multichannel' ? 'bg-purple-600 text-white' : 'border border-purple-600/30 text-purple-500 hover:bg-purple-600/10'
               }`}>
               <Share2 className="w-4 h-4 inline mr-1"/>Multi-Channel
             </button>
+            {/* NEU: Analytics & Marketing Tab */}
+            {currentUser?.permissions.canViewStats && (
+              <button onClick={() => setActiveTab('analytics-marketing')}
+                className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
+                  activeTab === 'analytics-marketing' ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10'
+                }`}>
+                <TrendingUp className="w-4 h-4 inline mr-1"/>Analytics & Marketing
+              </button>
+            )}
             <button onClick={handleLogout}
               className="px-4 py-2 border border-red-500 text-red-500 hover:bg-red-500/10 text-xs uppercase font-bold">
               <LogOut className="w-4 h-4 inline mr-1"/>Logout
@@ -252,8 +261,8 @@ export default function ManagementPanel() {
             <ScndDropGame />
           </div>
         )}
-        {/* NEU: Multi-Channel Tab Content */}
         {activeTab === 'multichannel' && <MultiChannelTab user={currentUser} toast={addToast} />}
+        {activeTab === 'analytics-marketing' && <AnalyticsMarketingTab user={currentUser} toast={addToast} />}
       </main>
     </div>
   );
