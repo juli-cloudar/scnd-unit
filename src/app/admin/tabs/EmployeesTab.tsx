@@ -107,33 +107,34 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     can_access_analyticsMarketing: false,
   });
 
+  const loadEmployees = async () => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('id');
+    
+    if (error) {
+      console.error('Fehler beim Laden:', error);
+      return;
+    }
+    
+    if (data) {
+      const employeesWithDefaults = data.map(emp => ({
+        ...emp,
+        can_access_inventory: emp.can_access_inventory ?? true,
+        can_access_add: emp.can_access_add ?? true,
+        can_access_vintedTools: emp.can_access_vintedTools ?? false,
+        can_access_employees: emp.can_access_employees ?? false,
+        can_access_logs: emp.can_access_logs ?? false,
+        can_access_game: emp.can_access_game ?? true,
+        can_access_multiChannel: emp.can_access_multiChannel ?? false,
+        can_access_analyticsMarketing: emp.can_access_analyticsMarketing ?? false,
+      }));
+      setEmployees(employeesWithDefaults);
+    }
+  };
+
   useEffect(() => {
-    const loadEmployees = async () => {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*')
-        .order('id');
-      
-      if (error) {
-        console.error('Fehler beim Laden:', error);
-        return;
-      }
-      
-      if (data) {
-        const employeesWithDefaults = data.map(emp => ({
-          ...emp,
-          can_access_inventory: emp.can_access_inventory ?? true,
-          can_access_add: emp.can_access_add ?? true,
-          can_access_vintedTools: emp.can_access_vintedTools ?? false,
-          can_access_employees: emp.can_access_employees ?? false,
-          can_access_logs: emp.can_access_logs ?? false,
-          can_access_game: emp.can_access_game ?? true,
-          can_access_multiChannel: emp.can_access_multiChannel ?? false,
-          can_access_analyticsMarketing: emp.can_access_analyticsMarketing ?? false,
-        }));
-        setEmployees(employeesWithDefaults);
-      }
-    };
     loadEmployees();
   }, []);
 
@@ -186,10 +187,6 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           can_access_multiChannel: false,
           can_access_analyticsMarketing: false,
         });
-        const loadEmployees = async () => {
-          const { data } = await supabase.from('employees').select('*').order('id');
-          if (data) setEmployees(data);
-        };
         loadEmployees();
       }
       setIsAdding(false);
@@ -212,7 +209,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       .eq('id', employee.id);
     
     if (error) {
-      toast('Fehler beim Aktualisieren der Berechtigungen', 'error');
+      toast('Fehler beim Aktualisieren der Berechtigungen: ' + error.message, 'error');
     } else {
       toast(`Tab-Berechtigungen für ${employee.username} aktualisiert`, 'success');
       logActivity(currentUser.id, currentUser.username, 'Tab-Berechtigungen geändert', `für "${employee.username}"`);
@@ -304,10 +301,6 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                 logActivity(currentUser.id, currentUser.username, 'Passwort geändert', `für "${editingEmployee.username}"`);
                 setNewPassword('');
                 setEditingEmployee(null);
-                const loadEmployees = async () => {
-                  const { data } = await supabase.from('employees').select('*').order('id');
-                  if (data) setEmployees(data);
-                };
                 loadEmployees();
               });
             }} className="px-6 py-3 bg-blue-500 text-white font-bold uppercase text-xs">Speichern</button>
@@ -419,7 +412,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                         supabase.from('employees').delete().eq('id', emp.id).then(() => {
                           toast('Mitarbeiter gelöscht', 'info');
                           logActivity(currentUser.id, currentUser.username, 'Mitarbeiter gelöscht', `"${emp.username}"`);
-                          setEmployees(prev => prev.filter(e => e.id !== emp.id));
+                          loadEmployees();
                         });
                       })} className="px-2 py-1 bg-red-500/20 text-red-400 text-xs">
                         <Trash2 className="w-3 h-3"/>
