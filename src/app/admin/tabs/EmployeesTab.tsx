@@ -19,15 +19,15 @@ interface Employee {
     canViewStats: boolean;
     canManageEmployees: boolean;
   };
-  // Tab-Berechtigungen als separate Spalten in Supabase
+  // Tab-Berechtigungen (Spaltennamen wie in Supabase)
   can_access_inventory: boolean;
   can_access_add: boolean;
-  can_access_vintedTools: boolean;
+  can_access_vintedtools: boolean;      // ← kleines t
   can_access_employees: boolean;
   can_access_logs: boolean;
   can_access_game: boolean;
-  can_access_multiChannel: boolean;
-  can_access_analyticsMarketing: boolean;
+  can_access_multichannel: boolean;     // ← kleines c
+  can_access_analyticsmarketing: boolean; // ← kleines m
 }
 
 // Standard-Tab-Berechtigungen für verschiedene Rollen
@@ -36,35 +36,35 @@ const getDefaultTabPermissions = (role: string) => {
     return {
       can_access_inventory: true,
       can_access_add: true,
-      can_access_vintedTools: true,
+      can_access_vintedtools: true,
       can_access_employees: true,
       can_access_logs: true,
       can_access_game: true,
-      can_access_multiChannel: true,
-      can_access_analyticsMarketing: true,
+      can_access_multichannel: true,
+      can_access_analyticsmarketing: true,
     };
   } else if (role === 'Manager') {
     return {
       can_access_inventory: true,
       can_access_add: true,
-      can_access_vintedTools: true,
+      can_access_vintedtools: true,
       can_access_employees: false,
       can_access_logs: false,
       can_access_game: true,
-      can_access_multiChannel: true,
-      can_access_analyticsMarketing: true,
+      can_access_multichannel: true,
+      can_access_analyticsmarketing: true,
     };
   } else {
     // Mitarbeiter
     return {
       can_access_inventory: true,
       can_access_add: true,
-      can_access_vintedTools: false,
+      can_access_vintedtools: false,
       can_access_employees: false,
       can_access_logs: false,
       can_access_game: true,
-      can_access_multiChannel: false,
-      can_access_analyticsMarketing: false,
+      can_access_multichannel: false,
+      can_access_analyticsmarketing: false,
     };
   }
 };
@@ -72,12 +72,12 @@ const getDefaultTabPermissions = (role: string) => {
 const TabList = [
   { key: 'inventory', dbField: 'can_access_inventory', label: 'Inventar', icon: Package },
   { key: 'add', dbField: 'can_access_add', label: 'Hinzufügen', icon: Plus },
-  { key: 'vintedTools', dbField: 'can_access_vintedTools', label: 'Vinted Tools', icon: Globe },
+  { key: 'vintedTools', dbField: 'can_access_vintedtools', label: 'Vinted Tools', icon: Globe },
   { key: 'employees', dbField: 'can_access_employees', label: 'Team', icon: Users },
   { key: 'logs', dbField: 'can_access_logs', label: 'Logs', icon: Clock },
   { key: 'game', dbField: 'can_access_game', label: 'SCND DROP', icon: Gamepad2 },
-  { key: 'multiChannel', dbField: 'can_access_multiChannel', label: 'Multi-Channel', icon: Share2 },
-  { key: 'analyticsMarketing', dbField: 'can_access_analyticsMarketing', label: 'Analytics & Marketing', icon: TrendingUp },
+  { key: 'multiChannel', dbField: 'can_access_multichannel', label: 'Multi-Channel', icon: Share2 },
+  { key: 'analyticsMarketing', dbField: 'can_access_analyticsmarketing', label: 'Analytics & Marketing', icon: TrendingUp },
 ];
 
 export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Employee, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
@@ -99,12 +99,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     },
     can_access_inventory: true,
     can_access_add: true,
-    can_access_vintedTools: false,
+    can_access_vintedtools: false,
     can_access_employees: false,
     can_access_logs: false,
     can_access_game: true,
-    can_access_multiChannel: false,
-    can_access_analyticsMarketing: false,
+    can_access_multichannel: false,
+    can_access_analyticsmarketing: false,
   });
 
   const loadEmployees = async () => {
@@ -123,12 +123,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         ...emp,
         can_access_inventory: emp.can_access_inventory ?? true,
         can_access_add: emp.can_access_add ?? true,
-        can_access_vintedTools: emp.can_access_vintedTools ?? false,
+        can_access_vintedtools: emp.can_access_vintedtools ?? false,
         can_access_employees: emp.can_access_employees ?? false,
         can_access_logs: emp.can_access_logs ?? false,
         can_access_game: emp.can_access_game ?? true,
-        can_access_multiChannel: emp.can_access_multiChannel ?? false,
-        can_access_analyticsMarketing: emp.can_access_analyticsMarketing ?? false,
+        can_access_multichannel: emp.can_access_multichannel ?? false,
+        can_access_analyticsmarketing: emp.can_access_analyticsmarketing ?? false,
       }));
       setEmployees(employeesWithDefaults);
     }
@@ -152,12 +152,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       permissions: newEmployee.permissions,
       can_access_inventory: newEmployee.can_access_inventory,
       can_access_add: newEmployee.can_access_add,
-      can_access_vintedTools: newEmployee.can_access_vintedTools,
+      can_access_vintedtools: newEmployee.can_access_vintedtools,
       can_access_employees: newEmployee.can_access_employees,
       can_access_logs: newEmployee.can_access_logs,
       can_access_game: newEmployee.can_access_game,
-      can_access_multiChannel: newEmployee.can_access_multiChannel,
-      can_access_analyticsMarketing: newEmployee.can_access_analyticsMarketing,
+      can_access_multichannel: newEmployee.can_access_multichannel,
+      can_access_analyticsmarketing: newEmployee.can_access_analyticsmarketing,
       login_count: 0,
       total_work_hours: 0,
       online: false
@@ -180,12 +180,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           },
           can_access_inventory: true,
           can_access_add: true,
-          can_access_vintedTools: false,
+          can_access_vintedtools: false,
           can_access_employees: false,
           can_access_logs: false,
           can_access_game: true,
-          can_access_multiChannel: false,
-          can_access_analyticsMarketing: false,
+          can_access_multichannel: false,
+          can_access_analyticsmarketing: false,
         });
         loadEmployees();
       }
@@ -196,12 +196,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
   const updateTabPermissions = async (employee: Employee, updates: {
     can_access_inventory: boolean;
     can_access_add: boolean;
-    can_access_vintedTools: boolean;
+    can_access_vintedtools: boolean;
     can_access_employees: boolean;
     can_access_logs: boolean;
     can_access_game: boolean;
-    can_access_multiChannel: boolean;
-    can_access_analyticsMarketing: boolean;
+    can_access_multichannel: boolean;
+    can_access_analyticsmarketing: boolean;
   }) => {
     const { error } = await supabase
       .from('employees')
@@ -235,12 +235,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               role,
               can_access_inventory: defaultPerms.can_access_inventory,
               can_access_add: defaultPerms.can_access_add,
-              can_access_vintedTools: defaultPerms.can_access_vintedTools,
+              can_access_vintedtools: defaultPerms.can_access_vintedtools,
               can_access_employees: defaultPerms.can_access_employees,
               can_access_logs: defaultPerms.can_access_logs,
               can_access_game: defaultPerms.can_access_game,
-              can_access_multiChannel: defaultPerms.can_access_multiChannel,
-              can_access_analyticsMarketing: defaultPerms.can_access_analyticsMarketing,
+              can_access_multichannel: defaultPerms.can_access_multichannel,
+              can_access_analyticsmarketing: defaultPerms.can_access_analyticsmarketing,
             });
           }} className="bg-[#1A1A1A] border border-yellow-400/30 px-4 py-3 text-sm">
             <option>Mitarbeiter</option>
@@ -313,7 +313,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       {editingPermissions && (
         <div className="bg-[#111] border border-purple-500/30 p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2"><Shield className="w-5 h-5"/> Tab-Berechtigungen für {editingPermissions.username}</h3>
+            <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2"><Shield className="w-5 h-5"/> Tab-Berechtigungen für ${editingPermissions.username}</h3>
             <button onClick={() => setEditingPermissions(null)} className="text-gray-400 hover:text-white">✕</button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -338,12 +338,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               const updates = {
                 can_access_inventory: editingPermissions.can_access_inventory,
                 can_access_add: editingPermissions.can_access_add,
-                can_access_vintedTools: editingPermissions.can_access_vintedTools,
+                can_access_vintedtools: editingPermissions.can_access_vintedtools,
                 can_access_employees: editingPermissions.can_access_employees,
                 can_access_logs: editingPermissions.can_access_logs,
                 can_access_game: editingPermissions.can_access_game,
-                can_access_multiChannel: editingPermissions.can_access_multiChannel,
-                can_access_analyticsMarketing: editingPermissions.can_access_analyticsMarketing,
+                can_access_multichannel: editingPermissions.can_access_multichannel,
+                can_access_analyticsmarketing: editingPermissions.can_access_analyticsmarketing,
               };
               updateTabPermissions(editingPermissions, updates);
             }} className="px-6 py-3 bg-purple-500 text-white font-bold uppercase text-xs">Speichern</button>
@@ -419,7 +419,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                       </button>
                     </div>
                   </td>
-                </tr>
+                </table>
               ))}
             </tbody>
           </table>
