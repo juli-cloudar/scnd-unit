@@ -13,7 +13,7 @@ interface Product {
   id: number;
   name: string;
   brand: string;
-  category: string;   // ← Hinzugefügt
+  category: string;
   price: string;
   size: string;
   condition: string;
@@ -37,13 +37,12 @@ export function MultiChannelTab({ user, toast }: { user: Employee | null, toast:
   const [brands, setBrands] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   
-  // Copy states
   const [copiedEbay, setCopiedEbay] = useState(false);
   const [copiedFacebook, setCopiedFacebook] = useState(false);
   const [copiedGroup, setCopiedGroup] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
+  const [copiedSingleImage, setCopiedSingleImage] = useState<number | null>(null);
 
-  // Produkte laden
   const loadProducts = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -54,8 +53,6 @@ export function MultiChannelTab({ user, toast }: { user: Employee | null, toast:
     
     if (!error && data) {
       setProducts(data);
-      
-      // Extrahiere Marken und Kategorien
       const uniqueBrands = [...new Set(data.map(p => p.brand).filter(Boolean))].sort();
       const uniqueCategories = [...new Set(data.map(p => p.category).filter(Boolean))].sort();
       setBrands(uniqueBrands);
@@ -68,7 +65,6 @@ export function MultiChannelTab({ user, toast }: { user: Employee | null, toast:
     loadProducts();
   }, []);
 
-  // Gefilterte Produkte
   const filteredProducts = products.filter(p => {
     if (activeBrand !== 'Alle' && p.brand !== activeBrand) return false;
     if (activeCategory !== 'Alle' && p.category !== activeCategory) return false;
@@ -76,7 +72,6 @@ export function MultiChannelTab({ user, toast }: { user: Employee | null, toast:
     return true;
   });
 
-  // Text-Generierung
   const generateEbayTitle = (product: Product) => {
     return `${product.brand} ${product.name} - Groesse ${product.size} - ${product.condition}`;
   };
@@ -123,7 +118,7 @@ Abholung in Bad Kreuznach
 Bei Interesse bitte melden.`;
   };
 
-  const copyToClipboard = async (text: string, type: 'ebay' | 'facebook' | 'group' | 'image') => {
+  const copyToClipboard = async (text: string, type: 'ebay' | 'facebook' | 'group' | 'image' | 'single', index?: number) => {
     try {
       await navigator.clipboard.writeText(text);
       
@@ -142,6 +137,10 @@ Bei Interesse bitte melden.`;
       } else if (type === 'image') {
         setCopiedImage(true);
         setTimeout(() => setCopiedImage(false), 2000);
+        toast(`${product?.images?.length || 0} Bild-URLs kopiert`, 'success');
+      } else if (type === 'single' && index !== undefined) {
+        setCopiedSingleImage(index);
+        setTimeout(() => setCopiedSingleImage(null), 2000);
         toast('Bild-URL kopiert', 'success');
       }
     } catch (err) {
@@ -162,7 +161,6 @@ Bei Interesse bitte melden.`;
 
   return (
     <div>
-      {/* Kopfbereich */}
       <div className="flex items-center gap-3 mb-6">
         <Share2 className="w-6 h-6 text-[#FF4400]" />
         <h2 className="text-xl font-bold uppercase tracking-tighter">
@@ -170,9 +168,7 @@ Bei Interesse bitte melden.`;
         </h2>
       </div>
 
-      {/* Filterbereich */}
       <div className="mb-6 space-y-4">
-        {/* Suche */}
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/>
           <input 
@@ -184,7 +180,6 @@ Bei Interesse bitte melden.`;
           />
         </div>
 
-        {/* Filterzeile */}
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-gray-500" />
@@ -212,7 +207,6 @@ Bei Interesse bitte melden.`;
         </div>
       </div>
 
-      {/* Produktliste */}
       {loading ? (
         <div className="text-center py-20 text-gray-500">Lade Produkte...</div>
       ) : filteredProducts.length === 0 ? (
@@ -221,7 +215,6 @@ Bei Interesse bitte melden.`;
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredProducts.map(product => (
             <div key={product.id} className="bg-[#111] border border-[#FF4400]/20 rounded-lg overflow-hidden">
-              {/* Produktkopf */}
               <div className="flex gap-4 p-4 border-b border-gray-800">
                 <div className="w-20 h-20 bg-[#1A1A1A] rounded-lg overflow-hidden flex-shrink-0">
                   <img 
@@ -245,7 +238,6 @@ Bei Interesse bitte melden.`;
                 </div>
               </div>
 
-              {/* Copy Buttons */}
               <div className="p-4 space-y-2">
                 {/* eBay */}
                 <div className="flex items-center justify-between p-2 bg-[#1A1A1A] rounded-lg">
@@ -292,20 +284,53 @@ Bei Interesse bitte melden.`;
                   </button>
                 </div>
 
-                {/* Bild-URL */}
-                {product.images && product.images[0] && (
-                  <div className="flex items-center justify-between p-2 bg-[#1A1A1A] rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Image className="w-4 h-4 text-purple-500" />
-                      <span className="text-sm font-bold">Bild-URL</span>
+                {/* Bild-URLs - Alle auf einmal + einzeln */}
+                {product.images && product.images.length > 0 && (
+                  <div className="border border-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Image className="w-4 h-4 text-purple-500" />
+                        <span className="text-sm font-bold">Bild-URLs</span>
+                        <span className="text-xs text-gray-500">({product.images.length} Bilder)</span>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(product.images.join('\n'), 'image')}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-purple-600/20 border border-purple-600/30 text-purple-500 text-xs rounded hover:bg-purple-600/30 transition-colors"
+                      >
+                        {copiedImage ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copiedImage ? 'Kopiert' : 'Alle URLs kopieren'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => copyToClipboard(product.images[0], 'image')}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-purple-600/20 border border-purple-600/30 text-purple-500 text-xs rounded hover:bg-purple-600/30 transition-colors"
-                    >
-                      {copiedImage ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      {copiedImage ? 'Kopiert' : 'URL kopieren'}
-                    </button>
+                    
+                    {/* Miniatur-Vorschau mit Einzel-Kopierfunktion */}
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {product.images.slice(0, 4).map((img, idx) => (
+                        <div key={idx} className="relative group">
+                          <img 
+                            src={img.includes('vinted') ? `/api/image-proxy?url=${encodeURIComponent(img)}` : img} 
+                            alt={`Bild ${idx + 1}`}
+                            className="w-12 h-12 object-cover rounded border border-gray-700"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                          <button
+                            onClick={() => copyToClipboard(img, 'single', idx)}
+                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded"
+                            title="Einzelne URL kopieren"
+                          >
+                            {copiedSingleImage === idx ? (
+                              <Check className="w-3 h-3 text-green-400" />
+                            ) : (
+                              <Copy className="w-3 h-3 text-white" />
+                            )}
+                          </button>
+                        </div>
+                      ))}
+                      {product.images.length > 4 && (
+                        <div className="w-12 h-12 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-400">
+                          +{product.images.length - 4}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
