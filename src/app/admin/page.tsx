@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Package, BarChart3, Plus, Globe, Users, Clock, LogOut, Gamepad2
+  Package, BarChart3, Plus, Globe, Users, Clock, LogOut, Gamepad2, Share2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { ToastContainer } from './components/ToastContainer';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { LoginScreen } from './components/LoginScreen';
-import { ScndDropGame } from '@/components/ScndDropGame'; // ← NEU
+import { ScndDropGame } from '@/components/ScndDropGame';
 
 // Hooks
 import { useToast } from './hooks/useToast';
@@ -23,6 +23,7 @@ import { VintedToolsTab } from './tabs/VintedToolsTab';
 import { AnalyticsTab } from './tabs/AnalyticsTab';
 import { EmployeesTab } from './tabs/EmployeesTab';
 import { LogsTab } from './tabs/LogsTab';
+import { MultiChannelTab } from './tabs/MultiChannelTab';
 
 // Types
 interface Employee {
@@ -191,7 +192,7 @@ export default function ManagementPanel() {
                 className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
                   activeTab === 'add' ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10'
                 }`}>
-                <Plus className="w-4 h-4 inline mr-1"/>Hinzufügen
+                <Plus className="w-4 h-4 inline mr-1"/>Hinzufuegen
               </button>
             )}
             {currentUser?.permissions.canAddProducts && (
@@ -218,12 +219,18 @@ export default function ManagementPanel() {
                 <Clock className="w-4 h-4 inline mr-1"/>Logs
               </button>
             )}
-            {/* NEU: Spiel-Tab für alle eingeloggten Benutzer */}
             <button onClick={() => setActiveTab('game')}
               className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
                 activeTab === 'game' ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10'
               }`}>
               <Gamepad2 className="w-4 h-4 inline mr-1"/>SCND DROP
+            </button>
+            {/* NEU: Multi-Channel Tab */}
+            <button onClick={() => setActiveTab('multichannel')}
+              className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
+                activeTab === 'multichannel' ? 'bg-purple-600 text-white' : 'border border-purple-600/30 text-purple-500 hover:bg-purple-600/10'
+              }`}>
+              <Share2 className="w-4 h-4 inline mr-1"/>Multi-Channel
             </button>
             <button onClick={handleLogout}
               className="px-4 py-2 border border-red-500 text-red-500 hover:bg-red-500/10 text-xs uppercase font-bold">
@@ -240,12 +247,13 @@ export default function ManagementPanel() {
         {activeTab === 'analytics' && <AnalyticsTab />}
         {activeTab === 'employees' && currentUser?.permissions.canManageEmployees && <EmployeesTab currentUser={currentUser} toast={addToast} confirm={showConfirm} />}
         {activeTab === 'logs' && currentUser?.role === 'Admin' && <LogsTab toast={addToast} confirm={showConfirm} />}
-        {/* NEU: Spiel-Tab Content */}
         {activeTab === 'game' && (
           <div className="py-4">
             <ScndDropGame />
           </div>
         )}
+        {/* NEU: Multi-Channel Tab Content */}
+        {activeTab === 'multichannel' && <MultiChannelTab user={currentUser} toast={addToast} />}
       </main>
     </div>
   );
