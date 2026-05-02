@@ -19,15 +19,15 @@ interface Employee {
     canViewStats: boolean;
     canManageEmployees: boolean;
   };
-  tabPermissions: {
-    inventory: boolean;
-    add: boolean;
-    vintedTools: boolean;
-    employees: boolean;
-    logs: boolean;
-    game: boolean;
-    multiChannel: boolean;
-    analyticsMarketing: boolean;
+  tabPermissions?: {
+    inventory?: boolean;
+    add?: boolean;
+    vintedTools?: boolean;
+    employees?: boolean;
+    logs?: boolean;
+    game?: boolean;
+    multiChannel?: boolean;
+    analyticsMarketing?: boolean;
   };
 }
 
@@ -228,7 +228,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {TabList.map(tab => (
               <label key={tab.key} className="flex items-center gap-2 text-xs cursor-pointer">
-                <input type="checkbox" checked={newEmployee.tabPermissions[tab.key]} onChange={e => setNewEmployee({
+                <input type="checkbox" checked={newEmployee.tabPermissions?.[tab.key] || false} onChange={e => setNewEmployee({
                   ...newEmployee,
                   tabPermissions: { ...newEmployee.tabPermissions, [tab.key]: e.target.checked }
                 })} className="accent-yellow-400"/>
@@ -281,7 +281,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               <label key={tab.key} className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-[#1A1A1A] rounded">
                 <input
                   type="checkbox"
-                  checked={editingPermissions.tabPermissions[tab.key]}
+                  checked={editingPermissions.tabPermissions?.[tab.key] || false}
                   onChange={e => setEditingPermissions({
                     ...editingPermissions,
                     tabPermissions: { ...editingPermissions.tabPermissions, [tab.key]: e.target.checked }
@@ -325,11 +325,11 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                   <td className="px-4 py-3 text-gray-500 text-xs">{emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {TabList.filter(tab => emp.tabPermissions[tab.key]).slice(0, 3).map(tab => (
+                      {TabList.filter(tab => emp.tabPermissions?.[tab.key]).slice(0, 3).map(tab => (
                         <span key={tab.key} className="text-xs text-purple-400" title={tab.label}><tab.icon className="w-3 h-3"/></span>
                       ))}
-                      {Object.values(emp.tabPermissions).filter(v => v === true).length > 3 && (
-                        <span className="text-xs text-gray-500">+{Object.values(emp.tabPermissions).filter(v => v === true).length - 3}</span>
+                      {Object.values(emp.tabPermissions || {}).filter(v => v === true).length > 3 && (
+                        <span className="text-xs text-gray-500">+{Object.values(emp.tabPermissions || {}).filter(v => v === true).length - 3}</span>
                       )}
                     </div>
                   </td>
