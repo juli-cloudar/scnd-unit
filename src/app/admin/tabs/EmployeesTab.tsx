@@ -19,18 +19,16 @@ interface Employee {
     canViewStats: boolean;
     canManageEmployees: boolean;
   };
-  // Tab-Berechtigungen (Spaltennamen wie in Supabase)
   can_access_inventory: boolean;
   can_access_add: boolean;
-  can_access_vintedtools: boolean;      // ← kleines t
+  can_access_vintedtools: boolean;
   can_access_employees: boolean;
   can_access_logs: boolean;
   can_access_game: boolean;
-  can_access_multichannel: boolean;     // ← kleines c
-  can_access_analyticsmarketing: boolean; // ← kleines m
+  can_access_multichannel: boolean;
+  can_access_analyticsmarketing: boolean;
 }
 
-// Standard-Tab-Berechtigungen für verschiedene Rollen
 const getDefaultTabPermissions = (role: string) => {
   if (role === 'Admin') {
     return {
@@ -55,7 +53,6 @@ const getDefaultTabPermissions = (role: string) => {
       can_access_analyticsmarketing: true,
     };
   } else {
-    // Mitarbeiter
     return {
       can_access_inventory: true,
       can_access_add: true,
@@ -248,7 +245,6 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           </select>
         </div>
 
-        {/* Alte Berechtigungen (Aktionen) */}
         <div className="mb-4">
           <h4 className="text-xs text-yellow-400 mb-2">Berechtigungen (Aktionen)</h4>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -261,15 +257,14 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           </div>
         </div>
 
-        {/* Tab-Berechtigungen */}
         <div className="mb-4">
-          <h4 className="text-xs text-yellow-400 mb-2">Tab-Berechtigungen (welche Tabs sieht der Mitarbeiter?)</h4>
+          <h4 className="text-xs text-yellow-400 mb-2">Tab-Berechtigungen</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {TabList.map(tab => (
               <label key={tab.key} className="flex items-center gap-2 text-xs cursor-pointer">
                 <input 
                   type="checkbox" 
-                  checked={newEmployee[tab.dbField as keyof typeof newEmployee] as boolean} 
+                  checked={(newEmployee as any)[tab.dbField] || false} 
                   onChange={e => setNewEmployee({
                     ...newEmployee,
                     [tab.dbField]: e.target.checked
@@ -288,7 +283,6 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         </button>
       </div>
 
-      {/* Passwort ändern Modal */}
       {editingEmployee && (
         <div className="bg-[#111] border border-blue-500/30 p-6">
           <h3 className="text-lg font-bold text-blue-400 mb-4 flex items-center gap-2"><Key className="w-5 h-5"/> Passwort ändern für {editingEmployee.username}</h3>
@@ -309,11 +303,10 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         </div>
       )}
 
-      {/* Tab-Berechtigungen bearbeiten Modal */}
       {editingPermissions && (
         <div className="bg-[#111] border border-purple-500/30 p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2"><Shield className="w-5 h-5"/> Tab-Berechtigungen für ${editingPermissions.username}</h3>
+            <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2"><Shield className="w-5 h-5"/> Tab-Berechtigungen für {editingPermissions.username}</h3>
             <button onClick={() => setEditingPermissions(null)} className="text-gray-400 hover:text-white">✕</button>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -321,7 +314,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               <label key={tab.key} className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-[#1A1A1A] rounded">
                 <input
                   type="checkbox"
-                  checked={editingPermissions[tab.dbField as keyof Employee] as boolean}
+                  checked={(editingPermissions as any)[tab.dbField] || false}
                   onChange={e => setEditingPermissions({
                     ...editingPermissions,
                     [tab.dbField]: e.target.checked
@@ -352,7 +345,6 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         </div>
       )}
 
-      {/* Mitarbeiter Liste */}
       <div className="bg-[#111] border border-[#FF4400]/20 overflow-hidden">
         <div className="max-h-[400px] overflow-y-auto">
           <table className="w-full text-sm">
@@ -388,14 +380,14 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).slice(0, 3).map(tab => (
+                      {TabList.filter(tab => (emp as any)[tab.dbField] === true).slice(0, 3).map(tab => (
                         <span key={tab.key} className="text-xs text-purple-400" title={tab.label}>
                           <tab.icon className="w-3 h-3"/>
                         </span>
                       ))}
-                      {TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).length > 3 && (
+                      {TabList.filter(tab => (emp as any)[tab.dbField] === true).length > 3 && (
                         <span className="text-xs text-gray-500">
-                          +{TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).length - 3}
+                          +{TabList.filter(tab => (emp as any)[tab.dbField] === true).length - 3}
                         </span>
                       )}
                     </div>
@@ -419,7 +411,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                       </button>
                     </div>
                   </td>
-                </table>
+                </tr>
               ))}
             </tbody>
           </table>
