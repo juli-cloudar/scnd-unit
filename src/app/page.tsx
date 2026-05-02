@@ -6,7 +6,7 @@ import { ProductClient } from './ProductClient';
 import { supabaseServer } from '@/lib/supabase-server';
 
 export default async function Page() {
-  // Daten sicher über den Server-Client laden (KEIN API Key im Code!)
+  // Daten sicher über den Server-Client laden
   const { data: products, error } = await supabaseServer
     .from('products')
     .select('*')
