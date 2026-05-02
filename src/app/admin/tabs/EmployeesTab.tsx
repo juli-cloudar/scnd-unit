@@ -283,26 +283,58 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         </button>
       </div>
 
+      {/* Passwort ändern Modal - ADAPTIV */}
       {editingEmployee && (
-        <div className="bg-[#111] border border-blue-500/30 p-6">
-          <h3 className="text-lg font-bold text-blue-400 mb-4 flex items-center gap-2"><Key className="w-5 h-5"/> Passwort ändern für {editingEmployee.username}</h3>
-          <div className="flex gap-2">
-            <input type="password" placeholder="Neues Passwort" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="flex-1 bg-[#1A1A1A] border border-blue-500/30 px-4 py-3 text-sm"/>
-            <button onClick={() => {
-              if (!newPassword) { toast('Bitte neues Passwort eingeben', 'error'); return; }
-              supabase.from('employees').update({ password: newPassword }).eq('id', editingEmployee.id).then(() => {
-                toast('Passwort geändert');
-                logActivity(currentUser.id, currentUser.username, 'Passwort geändert', `für "${editingEmployee.username}"`);
-                setNewPassword('');
-                setEditingEmployee(null);
-                loadEmployees();
-              });
-            }} className="px-6 py-3 bg-blue-500 text-white font-bold uppercase text-xs">Speichern</button>
-            <button onClick={() => { setEditingEmployee(null); setNewPassword(''); }} className="px-6 py-3 border border-gray-600 text-gray-400 uppercase text-xs">Abbrechen</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111] border border-blue-500/30 rounded-lg w-full max-w-sm sm:max-w-md">
+            <div className="p-3 sm:p-4 border-b border-blue-500/20">
+              <h3 className="text-sm sm:text-base font-bold text-blue-400 flex items-center gap-2">
+                <Key className="w-4 h-4"/> Passwort ändern
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">für {editingEmployee.username}</p>
+            </div>
+            <div className="p-3 sm:p-4">
+              <input 
+                type="password" 
+                placeholder="Neues Passwort" 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)} 
+                className="w-full bg-[#1A1A1A] border border-blue-500/30 rounded px-3 py-2 text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 p-3 sm:p-4 pt-0">
+              <button 
+                onClick={() => {
+                  if (!newPassword) { toast('Bitte neues Passwort eingeben', 'error'); return; }
+                  supabase.from('employees').update({ password: newPassword }).eq('id', editingEmployee.id).then(({ error }) => {
+                    if (error) {
+                      toast('Fehler: ' + error.message, 'error');
+                    } else {
+                      toast('Passwort geändert', 'success');
+                      logActivity(currentUser.id, currentUser.username, 'Passwort geändert', `für "${editingEmployee.username}"`);
+                      setNewPassword('');
+                      setEditingEmployee(null);
+                      loadEmployees();
+                    }
+                  });
+                }} 
+                className="flex-1 py-2 bg-blue-500 text-white font-bold uppercase text-xs rounded hover:bg-blue-600 transition-colors"
+              >
+                Speichern
+              </button>
+              <button 
+                onClick={() => { setEditingEmployee(null); setNewPassword(''); }} 
+                className="flex-1 py-2 border border-gray-600 text-gray-400 uppercase text-xs rounded hover:bg-gray-800 transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* Tab-Berechtigungen bearbeiten Modal */}
       {editingPermissions && (
         <div className="bg-[#111] border border-purple-500/30 p-6">
           <div className="flex justify-between items-center mb-4">
@@ -345,76 +377,80 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         </div>
       )}
 
+      {/* Mitarbeiter Liste - Tabelle */}
       <div className="bg-[#111] border border-[#FF4400]/20 overflow-hidden">
         <div className="max-h-[400px] overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-[#FF4400] text-white sticky top-0">
-              <tr>
-                <th className="px-4 py-3 text-left">Username</th>
-                <th className="px-4 py-3 text-left">Rolle</th>
-                <th className="px-4 py-3 text-left">Logins</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Letzter Login</th>
-                <th className="px-4 py-3 text-left">Tabs</th>
-                <th className="px-4 py-3 text-left">Aktionen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map(emp => (
-                <tr key={emp.id} className="border-t border-[#FF4400]/10">
-                  <td className="px-4 py-3 font-bold">{emp.username}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 text-xs ${emp.role === 'Admin' ? 'bg-yellow-400 text-black' : emp.role === 'Manager' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'}`}>
-                      {emp.role}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{emp.login_count}×</td>
-                  <td className="px-4 py-3">
-                    <span className={`flex items-center gap-1 ${emp.online ? 'text-green-500' : 'text-gray-500'}`}>
-                      <div className={`w-2 h-2 rounded-full ${emp.online ? 'bg-green-500' : 'bg-gray-500'}`}/>
-                      {emp.online ? 'Online' : 'Offline'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    {emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {TabList.filter(tab => (emp as any)[tab.dbField] === true).slice(0, 3).map(tab => (
-                        <span key={tab.key} className="text-xs text-purple-400" title={tab.label}>
-                          <tab.icon className="w-3 h-3"/>
-                        </span>
-                      ))}
-                      {TabList.filter(tab => (emp as any)[tab.dbField] === true).length > 3 && (
-                        <span className="text-xs text-gray-500">
-                          +{TabList.filter(tab => (emp as any)[tab.dbField] === true).length - 3}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditingPermissions(emp)} className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs" title="Tab-Berechtigungen">
-                        <Shield className="w-3 h-3"/>
-                      </button>
-                      <button onClick={() => setEditingEmployee(emp)} className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs" title="Passwort ändern">
-                        <Key className="w-3 h-3"/>
-                      </button>
-                      <button onClick={() => confirm(`${emp.username} wirklich löschen?`, () => {
-                        supabase.from('employees').delete().eq('id', emp.id).then(() => {
-                          toast('Mitarbeiter gelöscht', 'info');
-                          logActivity(currentUser.id, currentUser.username, 'Mitarbeiter gelöscht', `"${emp.username}"`);
-                          loadEmployees();
-                        });
-                      })} className="px-2 py-1 bg-red-500/20 text-red-400 text-xs">
-                        <Trash2 className="w-3 h-3"/>
-                      </button>
-                    </div>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
+              <thead className="bg-[#FF4400] text-white sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 text-left">Username</th>
+                  <th className="px-4 py-3 text-left">Rolle</th>
+                  <th className="px-4 py-3 text-left">Logins</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left hidden md:table-cell">Letzter Login</th>
+                  <th className="px-4 py-3 text-left hidden lg:table-cell">Tabs</th>
+                  <th className="px-4 py-3 text-left">Aktionen</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {employees.map(emp => (
+                  <tr key={emp.id} className="border-t border-[#FF4400]/10">
+                    <td className="px-4 py-3 font-bold break-words max-w-[150px]">{emp.username}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs whitespace-nowrap ${emp.role === 'Admin' ? 'bg-yellow-400 text-black' : emp.role === 'Manager' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'}`}>
+                        {emp.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{emp.login_count}×</td>
+                    <td className="px-4 py-3">
+                      <span className={`flex items-center gap-1 ${emp.online ? 'text-green-500' : 'text-gray-500'}`}>
+                        <div className={`w-2 h-2 rounded-full ${emp.online ? 'bg-green-500' : 'bg-gray-500'}`}/>
+                        <span className="hidden sm:inline">{emp.online ? 'Online' : 'Offline'}</span>
+                        <span className="sm:hidden">{emp.online ? 'On' : 'Off'}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs hidden md:table-cell">
+                      {emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {TabList.filter(tab => (emp as any)[tab.dbField] === true).slice(0, 3).map(tab => (
+                          <span key={tab.key} className="text-xs text-purple-400" title={tab.label}>
+                            <tab.icon className="w-3 h-3"/>
+                          </span>
+                        ))}
+                        {TabList.filter(tab => (emp as any)[tab.dbField] === true).length > 3 && (
+                          <span className="text-xs text-gray-500">
+                            +{TabList.filter(tab => (emp as any)[tab.dbField] === true).length - 3}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingPermissions(emp)} className="p-1.5 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30" title="Tab-Berechtigungen">
+                          <Shield className="w-3.5 h-3.5"/>
+                        </button>
+                        <button onClick={() => setEditingEmployee(emp)} className="p-1.5 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30" title="Passwort ändern">
+                          <Key className="w-3.5 h-3.5"/>
+                        </button>
+                        <button onClick={() => confirm(`${emp.username} wirklich löschen?`, () => {
+                          supabase.from('employees').delete().eq('id', emp.id).then(() => {
+                            toast('Mitarbeiter gelöscht', 'info');
+                            logActivity(currentUser.id, currentUser.username, 'Mitarbeiter gelöscht', `"${emp.username}"`);
+                            loadEmployees();
+                          });
+                        })} className="p-1.5 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30" title="Löschen">
+                          <Trash2 className="w-3.5 h-3.5"/>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
