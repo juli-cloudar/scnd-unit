@@ -5,20 +5,34 @@ import { createClient } from '@supabase/supabase-js';
 // SICHERE SERVER-ONLY KEYS (KEIN NEXT_PUBLIC_!)
 // ============================================================
 const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// FIX: Verwende den korrekten Variable Namen aus Vercel
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_URL_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase env:', { 
+    url: !!supabaseUrl, 
+    key: !!supabaseServiceKey 
+  });
   throw new Error('Missing Supabase environment variables');
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // ============================================================
-// ADMIN-KEY PRÜFUNG
+// ADMIN-KEY PRÜFUNG MIT DEBUG
 // ============================================================
 function isAdmin(request: NextRequest): boolean {
   const adminKey = request.headers.get('x-admin-key');
-  return adminKey === process.env.ADMIN_API_KEY;
+  const expectedKey = process.env.ADMIN_API_KEY;
+  
+  // Debug logging (nur temporär)
+  console.log('=== Admin Key Debug ===');
+  console.log('Received key:', adminKey);
+  console.log('Expected key exists:', !!expectedKey);
+  console.log('Expected key length:', expectedKey?.length);
+  console.log('Keys match:', adminKey === expectedKey);
+  
+  return adminKey === expectedKey;
 }
 
 // ============================================================
@@ -94,12 +108,17 @@ export async function POST(request: NextRequest) {
     
     // ===== UPDATE - Produkt aktualisieren (z.B. verkauft markieren) =====
     if (action === 'update') {
-      // Admin-Prüfung für Update
-      if (!isAdmin(request)) {
+      // Admin-Prüfung für Update (mit Debug)
+      const adminCheck = isAdmin(request);
+      console.log('Admin check result:', adminCheck);
+      
+      if (!adminCheck) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
       
       const { id, ...updateData } = data;
+      console.log('Updating product:', id, updateData);
+      
       const { data: updated, error } = await supabase
         .from('products')
         .update(updateData)
