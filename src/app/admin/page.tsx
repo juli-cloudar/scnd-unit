@@ -20,7 +20,6 @@ import { useConfirm } from './hooks/useConfirm';
 import { InventoryTab } from './tabs/InventoryTab';
 import { AddTab } from './tabs/AddTab';
 import { VintedToolsTab } from './tabs/VintedToolsTab';
-import { AnalyticsTab } from './tabs/AnalyticsTab';
 import { EmployeesTab } from './tabs/EmployeesTab';
 import { LogsTab } from './tabs/LogsTab';
 import { MultiChannelTab } from './tabs/MultiChannelTab';
@@ -174,14 +173,7 @@ export default function ManagementPanel() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {currentUser?.permissions.canViewStats && (
-              <button onClick={() => setActiveTab('analytics')}
-                className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
-                  activeTab === 'analytics' ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10'
-                }`}>
-                <BarChart3 className="w-4 h-4 inline mr-1"/>Analytics
-              </button>
-            )}
+            {/* Alter Analytics Tab wurde entfernt */}
             <button onClick={() => setActiveTab('inventory')}
               className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
                 activeTab === 'inventory' ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10'
@@ -232,7 +224,7 @@ export default function ManagementPanel() {
               }`}>
               <Share2 className="w-4 h-4 inline mr-1"/>Multi-Channel
             </button>
-            {/* NEU: Analytics & Marketing Tab */}
+            {/* NEU: Analytics & Marketing Tab (ersetzt den alten Analytics Tab) */}
             {currentUser?.permissions.canViewStats && (
               <button onClick={() => setActiveTab('analytics-marketing')}
                 className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
@@ -253,7 +245,6 @@ export default function ManagementPanel() {
         {activeTab === 'inventory' && <InventoryTab user={currentUser} toast={addToast} confirm={showConfirm} />}
         {activeTab === 'add' && <AddTab user={currentUser} toast={addToast} onProductAdded={() => {}} />}
         {activeTab === 'vinted-tools' && currentUser?.permissions.canAddProducts && <VintedToolsTab user={currentUser} toast={addToast} confirm={showConfirm} />}
-        {activeTab === 'analytics' && <AnalyticsTab />}
         {activeTab === 'employees' && currentUser?.permissions.canManageEmployees && <EmployeesTab currentUser={currentUser} toast={addToast} confirm={showConfirm} />}
         {activeTab === 'logs' && currentUser?.role === 'Admin' && <LogsTab toast={addToast} confirm={showConfirm} />}
         {activeTab === 'game' && (
