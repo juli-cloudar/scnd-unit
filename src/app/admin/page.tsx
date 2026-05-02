@@ -25,7 +25,7 @@ import { LogsTab } from './tabs/LogsTab';
 import { MultiChannelTab } from './tabs/MultiChannelTab';
 import { AnalyticsMarketingTab } from './tabs/AnalyticsMarketingTab';
 
-// Types
+// Types - mit tabPermissions für Employee
 interface Employee {
   id: number;
   username: string;
@@ -41,6 +41,16 @@ interface Employee {
     canDeleteProducts: boolean;
     canViewStats: boolean;
     canManageEmployees: boolean;
+  };
+  tabPermissions?: {
+    inventory?: boolean;
+    add?: boolean;
+    vintedTools?: boolean;
+    employees?: boolean;
+    logs?: boolean;
+    game?: boolean;
+    multiChannel?: boolean;
+    analyticsMarketing?: boolean;
   };
 }
 
@@ -61,6 +71,16 @@ function createEmployeeFromUser(user: any): Employee {
       canDeleteProducts: true,
       canViewStats: true,
       canManageEmployees: true
+    },
+    tabPermissions: user.tabPermissions || {
+      inventory: true,
+      add: true,
+      vintedTools: true,
+      employees: true,
+      logs: true,
+      game: true,
+      multiChannel: true,
+      analyticsMarketing: true,
     }
   };
 }
@@ -94,6 +114,16 @@ export default function ManagementPanel() {
           canDeleteProducts: true,
           canViewStats: true,
           canManageEmployees: true
+        },
+        tabPermissions: {
+          inventory: true,
+          add: true,
+          vintedTools: true,
+          employees: true,
+          logs: true,
+          game: true,
+          multiChannel: true,
+          analyticsMarketing: true,
         }
       });
     } else if (savedAuth === 'employee' && savedUser) {
@@ -140,6 +170,16 @@ export default function ManagementPanel() {
             canDeleteProducts: true,
             canViewStats: true,
             canManageEmployees: true
+          },
+          tabPermissions: {
+            inventory: true,
+            add: true,
+            vintedTools: true,
+            employees: true,
+            logs: true,
+            game: true,
+            multiChannel: true,
+            analyticsMarketing: true,
           }
         });
       } else if (user) {
@@ -173,7 +213,6 @@ export default function ManagementPanel() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Alter Analytics Tab wurde entfernt */}
             <button onClick={() => setActiveTab('inventory')}
               className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
                 activeTab === 'inventory' ? 'bg-[#FF4400] text-white' : 'border border-[#FF4400]/30 text-[#FF4400] hover:bg-[#FF4400]/10'
@@ -224,7 +263,6 @@ export default function ManagementPanel() {
               }`}>
               <Share2 className="w-4 h-4 inline mr-1"/>Multi-Channel
             </button>
-            {/* NEU: Analytics & Marketing Tab (ersetzt den alten Analytics Tab) */}
             {currentUser?.permissions.canViewStats && (
               <button onClick={() => setActiveTab('analytics-marketing')}
                 className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
