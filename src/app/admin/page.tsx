@@ -25,7 +25,6 @@ import { LogsTab } from './tabs/LogsTab';
 import { MultiChannelTab } from './tabs/MultiChannelTab';
 import { AnalyticsMarketingTab } from './tabs/AnalyticsMarketingTab';
 
-// Types - mit tabPermissions für Employee
 interface Employee {
   id: number;
   username: string;
@@ -42,16 +41,15 @@ interface Employee {
     canViewStats: boolean;
     canManageEmployees: boolean;
   };
-  tabPermissions?: {
-    inventory?: boolean;
-    add?: boolean;
-    vintedTools?: boolean;
-    employees?: boolean;
-    logs?: boolean;
-    game?: boolean;
-    multiChannel?: boolean;
-    analyticsMarketing?: boolean;
-  };
+  // Tab-Berechtigungen (müssen mit EmployeesTab.tsx übereinstimmen)
+  can_access_inventory: boolean;
+  can_access_add: boolean;
+  can_access_vintedTools: boolean;
+  can_access_employees: boolean;
+  can_access_logs: boolean;
+  can_access_game: boolean;
+  can_access_multiChannel: boolean;
+  can_access_analyticsMarketing: boolean;
 }
 
 // Helper um Employee zu erstellen
@@ -72,16 +70,14 @@ function createEmployeeFromUser(user: any): Employee {
       canViewStats: true,
       canManageEmployees: true
     },
-    tabPermissions: user.tabPermissions || {
-      inventory: true,
-      add: true,
-      vintedTools: true,
-      employees: true,
-      logs: true,
-      game: true,
-      multiChannel: true,
-      analyticsMarketing: true,
-    }
+    can_access_inventory: user.can_access_inventory ?? true,
+    can_access_add: user.can_access_add ?? true,
+    can_access_vintedTools: user.can_access_vintedTools ?? false,
+    can_access_employees: user.can_access_employees ?? false,
+    can_access_logs: user.can_access_logs ?? false,
+    can_access_game: user.can_access_game ?? true,
+    can_access_multiChannel: user.can_access_multiChannel ?? false,
+    can_access_analyticsMarketing: user.can_access_analyticsMarketing ?? false,
   };
 }
 
@@ -115,16 +111,14 @@ export default function ManagementPanel() {
           canViewStats: true,
           canManageEmployees: true
         },
-        tabPermissions: {
-          inventory: true,
-          add: true,
-          vintedTools: true,
-          employees: true,
-          logs: true,
-          game: true,
-          multiChannel: true,
-          analyticsMarketing: true,
-        }
+        can_access_inventory: true,
+        can_access_add: true,
+        can_access_vintedTools: true,
+        can_access_employees: true,
+        can_access_logs: true,
+        can_access_game: true,
+        can_access_multiChannel: true,
+        can_access_analyticsMarketing: true,
       });
     } else if (savedAuth === 'employee' && savedUser) {
       try {
@@ -171,16 +165,14 @@ export default function ManagementPanel() {
             canViewStats: true,
             canManageEmployees: true
           },
-          tabPermissions: {
-            inventory: true,
-            add: true,
-            vintedTools: true,
-            employees: true,
-            logs: true,
-            game: true,
-            multiChannel: true,
-            analyticsMarketing: true,
-          }
+          can_access_inventory: true,
+          can_access_add: true,
+          can_access_vintedTools: true,
+          can_access_employees: true,
+          can_access_logs: true,
+          can_access_game: true,
+          can_access_multiChannel: true,
+          can_access_analyticsMarketing: true,
         });
       } else if (user) {
         setCurrentUser(createEmployeeFromUser(user));
