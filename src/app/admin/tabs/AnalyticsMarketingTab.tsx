@@ -39,7 +39,6 @@ function ProfitDashboard({ products, toast }: { products: Product[]; toast: (msg
   const [editingProduct, setEditingProduct] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  // Lade gespeicherte Einkaufspreise
   useEffect(() => {
     loadPurchasePrices();
   }, []);
@@ -67,13 +66,11 @@ function ProfitDashboard({ products, toast }: { products: Product[]; toast: (msg
 
   const soldProducts = products.filter(p => p.sold === true);
   
-  // Berechnungen
   const totalRevenue = soldProducts.reduce((sum, p) => sum + parseFloat(p.price.replace('€', '').trim()), 0);
   const totalCost = soldProducts.reduce((sum, p) => sum + (purchasePrices[p.id] || 0), 0);
   const totalProfit = totalRevenue - totalCost;
   const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
   
-  // Profit nach Marke
   const profitByBrand: Record<string, { revenue: number; cost: number; profit: number }> = {};
   soldProducts.forEach(p => {
     const brand = p.brand || 'Unbekannt';
@@ -127,7 +124,6 @@ function ProfitDashboard({ products, toast }: { products: Product[]; toast: (msg
         </div>
       </div>
 
-      {/* Einkaufspreise eingeben */}
       <div className="bg-[#1A1A1A] rounded-lg border border-gray-800">
         <div className="p-4 border-b border-gray-800 font-bold">Einkaufspreise eingeben</div>
         <div className="divide-y divide-gray-800 max-h-80 overflow-y-auto">
@@ -228,7 +224,6 @@ function SocialMediaGenerator({ products, toast }: { products: Product[]; toast:
 
   return (
     <div className="space-y-6">
-      {/* Produktauswahl */}
       <div className="bg-[#1A1A1A] rounded-lg border border-gray-800 p-4">
         <label className="block text-sm font-bold mb-2">Produkt auswählen</label>
         <select
@@ -248,7 +243,6 @@ function SocialMediaGenerator({ products, toast }: { products: Product[]; toast:
 
       {selectedProduct && (
         <>
-          {/* Plattform Auswahl */}
           <div className="flex gap-2">
             {(['instagram', 'facebook', 'tiktok'] as const).map(platform => (
               <button
@@ -268,7 +262,6 @@ function SocialMediaGenerator({ products, toast }: { products: Product[]; toast:
             ))}
           </div>
 
-          {/* Vorschau und Kopieren */}
           <div className="bg-[#1A1A1A] rounded-lg border border-gray-800 overflow-hidden">
             <div className="p-4 border-b border-gray-800 font-bold flex items-center justify-between">
               <span>Vorschau</span>
@@ -285,7 +278,6 @@ function SocialMediaGenerator({ products, toast }: { products: Product[]; toast:
             </div>
           </div>
 
-          {/* Hashtags extra */}
           <div className="bg-[#1A1A1A] rounded-lg border border-gray-800 p-4">
             <div className="flex justify-between items-center mb-3">
               <span className="font-bold">Hashtags</span>
@@ -310,13 +302,12 @@ function SocialMediaGenerator({ products, toast }: { products: Product[]; toast:
 }
 
 // ============================================================
-// SUB-COMPONENT: Brand Analytics
+// SUB-COMPONENT: Brand Analytics (früher Analytics)
 // ============================================================
 function BrandAnalytics({ products }: { products: Product[] }) {
   const soldProducts = products.filter(p => p.sold === true);
   const availableProducts = products.filter(p => !p.sold);
 
-  // Größen-Analyse
   const sizeStats: Record<string, { sold: number; available: number }> = {};
   products.forEach(p => {
     const size = p.size || 'Unknown';
@@ -325,7 +316,6 @@ function BrandAnalytics({ products }: { products: Product[] }) {
     else sizeStats[size].available++;
   });
 
-  // Preisspanne Analyse
   const priceRanges = [
     { min: 0, max: 20, name: '0-20€', sold: 0, available: 0 },
     { min: 20, max: 40, name: '20-40€', sold: 0, available: 0 },
@@ -343,7 +333,6 @@ function BrandAnalytics({ products }: { products: Product[] }) {
     }
   });
 
-  // Kategorie Analyse
   const categoryStats: Record<string, { sold: number; available: number }> = {};
   products.forEach(p => {
     const cat = p.category || 'Sonstiges';
@@ -352,7 +341,6 @@ function BrandAnalytics({ products }: { products: Product[] }) {
     else categoryStats[cat].available++;
   });
 
-  // Marken Analyse mit Verkaufsquote
   const brandStats = Object.entries(
     products.reduce((acc, p) => {
       const brand = p.brand || 'Unbekannt';
@@ -391,7 +379,6 @@ function BrandAnalytics({ products }: { products: Product[] }) {
         </div>
       </div>
 
-      {/* Beste Marken Verkaufsquote */}
       <div className="bg-[#1A1A1A] rounded-lg border border-gray-800">
         <div className="p-4 border-b border-gray-800 font-bold">Beste Marken (Verkaufsquote)</div>
         <div className="divide-y divide-gray-800">
@@ -407,7 +394,6 @@ function BrandAnalytics({ products }: { products: Product[] }) {
         </div>
       </div>
 
-      {/* Größen Performance */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-[#1A1A1A] rounded-lg border border-gray-800">
           <div className="p-4 border-b border-gray-800 font-bold">Größen Performance</div>
@@ -424,7 +410,6 @@ function BrandAnalytics({ products }: { products: Product[] }) {
           </div>
         </div>
 
-        {/* Preisspannen Performance */}
         <div className="bg-[#1A1A1A] rounded-lg border border-gray-800">
           <div className="p-4 border-b border-gray-800 font-bold">Preisspannen Performance</div>
           <div className="divide-y divide-gray-800">
@@ -441,7 +426,6 @@ function BrandAnalytics({ products }: { products: Product[] }) {
         </div>
       </div>
 
-      {/* Kategorien Performance */}
       <div className="bg-[#1A1A1A] rounded-lg border border-gray-800">
         <div className="p-4 border-b border-gray-800 font-bold">Kategorien Performance</div>
         <div className="divide-y divide-gray-800">
@@ -466,7 +450,7 @@ function BrandAnalytics({ products }: { products: Product[] }) {
 export function AnalyticsMarketingTab({ user, toast }: { user: Employee | null, toast: (msg: string, type?: ToastType) => void }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [subTab, setSubTab] = useState<'profit' | 'social' | 'analytics'>('profit');
+  const [subTab, setSubTab] = useState<'profit' | 'social' | 'brand'>('profit');
 
   useEffect(() => {
     loadProducts();
@@ -504,9 +488,9 @@ export function AnalyticsMarketingTab({ user, toast }: { user: Employee | null, 
           <Instagram className="w-4 h-4" /> Social Media
         </button>
         <button
-          onClick={() => setSubTab('analytics')}
+          onClick={() => setSubTab('brand')}
           className={`px-4 py-2 text-sm font-bold uppercase flex items-center gap-2 ${
-            subTab === 'analytics' ? 'text-[#FF4400] border-b-2 border-[#FF4400]' : 'text-gray-500'
+            subTab === 'brand' ? 'text-[#FF4400] border-b-2 border-[#FF4400]' : 'text-gray-500'
           }`}
         >
           <BarChart3 className="w-4 h-4" /> Brand Analytics
@@ -520,7 +504,7 @@ export function AnalyticsMarketingTab({ user, toast }: { user: Employee | null, 
         <>
           {subTab === 'profit' && <ProfitDashboard products={products} toast={toast} />}
           {subTab === 'social' && <SocialMediaGenerator products={products} toast={toast} />}
-          {subTab === 'analytics' && <BrandAnalytics products={products} />}
+          {subTab === 'brand' && <BrandAnalytics products={products} />}
         </>
       )}
     </div>
