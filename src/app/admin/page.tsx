@@ -41,15 +41,15 @@ interface Employee {
     canViewStats: boolean;
     canManageEmployees: boolean;
   };
-  // Tab-Berechtigungen (müssen mit EmployeesTab.tsx übereinstimmen)
+  // Tab-Berechtigungen (korrekte Spaltennamen aus Supabase)
   can_access_inventory: boolean;
   can_access_add: boolean;
-  can_access_vintedTools: boolean;
+  can_access_vintedtools: boolean;      // ← kleines t
   can_access_employees: boolean;
   can_access_logs: boolean;
   can_access_game: boolean;
-  can_access_multiChannel: boolean;
-  can_access_analyticsMarketing: boolean;
+  can_access_multichannel: boolean;     // ← kleines c
+  can_access_analyticsmarketing: boolean; // ← kleines m
 }
 
 // Helper um Employee zu erstellen
@@ -72,12 +72,12 @@ function createEmployeeFromUser(user: any): Employee {
     },
     can_access_inventory: user.can_access_inventory ?? true,
     can_access_add: user.can_access_add ?? true,
-    can_access_vintedTools: user.can_access_vintedTools ?? false,
+    can_access_vintedtools: user.can_access_vintedtools ?? false,
     can_access_employees: user.can_access_employees ?? false,
     can_access_logs: user.can_access_logs ?? false,
     can_access_game: user.can_access_game ?? true,
-    can_access_multiChannel: user.can_access_multiChannel ?? false,
-    can_access_analyticsMarketing: user.can_access_analyticsMarketing ?? false,
+    can_access_multichannel: user.can_access_multichannel ?? false,
+    can_access_analyticsmarketing: user.can_access_analyticsmarketing ?? false,
   };
 }
 
@@ -113,12 +113,12 @@ export default function ManagementPanel() {
         },
         can_access_inventory: true,
         can_access_add: true,
-        can_access_vintedTools: true,
+        can_access_vintedtools: true,
         can_access_employees: true,
         can_access_logs: true,
         can_access_game: true,
-        can_access_multiChannel: true,
-        can_access_analyticsMarketing: true,
+        can_access_multichannel: true,
+        can_access_analyticsmarketing: true,
       });
     } else if (savedAuth === 'employee' && savedUser) {
       try {
@@ -167,12 +167,12 @@ export default function ManagementPanel() {
           },
           can_access_inventory: true,
           can_access_add: true,
-          can_access_vintedTools: true,
+          can_access_vintedtools: true,
           can_access_employees: true,
           can_access_logs: true,
           can_access_game: true,
-          can_access_multiChannel: true,
-          can_access_analyticsMarketing: true,
+          can_access_multichannel: true,
+          can_access_analyticsmarketing: true,
         });
       } else if (user) {
         setCurrentUser(createEmployeeFromUser(user));
