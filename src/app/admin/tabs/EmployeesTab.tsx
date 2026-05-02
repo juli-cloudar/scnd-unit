@@ -19,78 +19,65 @@ interface Employee {
     canViewStats: boolean;
     canManageEmployees: boolean;
   };
-  tabPermissions?: {
-    inventory?: boolean;
-    add?: boolean;
-    vintedTools?: boolean;
-    employees?: boolean;
-    logs?: boolean;
-    game?: boolean;
-    multiChannel?: boolean;
-    analyticsMarketing?: boolean;
-  };
+  // Tab-Berechtigungen als separate Spalten in Supabase
+  can_access_inventory: boolean;
+  can_access_add: boolean;
+  can_access_vintedTools: boolean;
+  can_access_employees: boolean;
+  can_access_logs: boolean;
+  can_access_game: boolean;
+  can_access_multiChannel: boolean;
+  can_access_analyticsMarketing: boolean;
 }
 
-// Vollständige Tab-Berechtigungen (alle Properties required)
-const ALL_TABS = {
-  inventory: false,
-  add: false,
-  vintedTools: false,
-  employees: false,
-  logs: false,
-  game: false,
-  multiChannel: false,
-  analyticsMarketing: false,
-};
-
 // Standard-Tab-Berechtigungen für verschiedene Rollen
-const getDefaultTabPermissions = (role: string): Employee['tabPermissions'] => {
+const getDefaultTabPermissions = (role: string) => {
   if (role === 'Admin') {
     return {
-      inventory: true,
-      add: true,
-      vintedTools: true,
-      employees: true,
-      logs: true,
-      game: true,
-      multiChannel: true,
-      analyticsMarketing: true,
+      can_access_inventory: true,
+      can_access_add: true,
+      can_access_vintedTools: true,
+      can_access_employees: true,
+      can_access_logs: true,
+      can_access_game: true,
+      can_access_multiChannel: true,
+      can_access_analyticsMarketing: true,
     };
   } else if (role === 'Manager') {
     return {
-      inventory: true,
-      add: true,
-      vintedTools: true,
-      employees: false,
-      logs: false,
-      game: true,
-      multiChannel: true,
-      analyticsMarketing: true,
+      can_access_inventory: true,
+      can_access_add: true,
+      can_access_vintedTools: true,
+      can_access_employees: false,
+      can_access_logs: false,
+      can_access_game: true,
+      can_access_multiChannel: true,
+      can_access_analyticsMarketing: true,
     };
   } else {
     // Mitarbeiter
     return {
-      inventory: true,
-      add: true,
-      vintedTools: false,
-      employees: false,
-      logs: false,
-      game: true,
-      multiChannel: false,
-      analyticsMarketing: false,
+      can_access_inventory: true,
+      can_access_add: true,
+      can_access_vintedTools: false,
+      can_access_employees: false,
+      can_access_logs: false,
+      can_access_game: true,
+      can_access_multiChannel: false,
+      can_access_analyticsMarketing: false,
     };
   }
 };
 
 const TabList = [
-  { key: 'inventory' as const, label: 'Inventar', icon: Package },
-  { key: 'add' as const, label: 'Hinzufügen', icon: Plus },
-  { key: 'vintedTools' as const, label: 'Vinted Tools', icon: Globe },
-  { key: 'employees' as const, label: 'Team', icon: Users },
-  { key: 'logs' as const, label: 'Logs', icon: Clock },
-  { key: 'game' as const, label: 'SCND DROP', icon: Gamepad2 },
-  { key: 'multiChannel' as const, label: 'Multi-Channel', icon: Share2 },
-  { key: 'analyticsMarketing' as const, label: 'Analytics & Marketing', icon: TrendingUp },
+  { key: 'inventory' as const, dbField: 'can_access_inventory', label: 'Inventar', icon: Package },
+  { key: 'add' as const, dbField: 'can_access_add', label: 'Hinzufügen', icon: Plus },
+  { key: 'vintedTools' as const, dbField: 'can_access_vintedTools', label: 'Vinted Tools', icon: Globe },
+  { key: 'employees' as const, dbField: 'can_access_employees', label: 'Team', icon: Users },
+  { key: 'logs' as const, dbField: 'can_access_logs', label: 'Logs', icon: Clock },
+  { key: 'game' as const, dbField: 'can_access_game', label: 'SCND DROP', icon: Gamepad2 },
+  { key: 'multiChannel' as const, dbField: 'can_access_multiChannel', label: 'Multi-Channel', icon: Share2 },
+  { key: 'analyticsMarketing' as const, dbField: 'can_access_analyticsMarketing', label: 'Analytics & Marketing', icon: TrendingUp },
 ];
 
 export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Employee, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
@@ -110,18 +97,35 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       canViewStats: false,
       canManageEmployees: false,
     },
-    tabPermissions: getDefaultTabPermissions('Mitarbeiter')
+    ...getDefaultTabPermissions('Mitarbeiter')
   });
 
   useEffect(() => {
     const loadEmployees = async () => {
-      const { data } = await supabase.from('employees').select('*').order('id');
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .order('id');
+      
+      if (error) {
+        console.error('Fehler beim Laden:', error);
+        return;
+      }
+      
       if (data) {
-        const employeesWithTabs = data.map(emp => ({
+        // Stelle sicher, dass alle Mitarbeiter die Tab-Berechtigungsfelder haben
+        const employeesWithDefaults = data.map(emp => ({
           ...emp,
-          tabPermissions: emp.tabPermissions || getDefaultTabPermissions(emp.role)
+          can_access_inventory: emp.can_access_inventory ?? true,
+          can_access_add: emp.can_access_add ?? true,
+          can_access_vintedTools: emp.can_access_vintedTools ?? false,
+          can_access_employees: emp.can_access_employees ?? false,
+          can_access_logs: emp.can_access_logs ?? false,
+          can_access_game: emp.can_access_game ?? true,
+          can_access_multiChannel: emp.can_access_multiChannel ?? false,
+          can_access_analyticsMarketing: emp.can_access_analyticsMarketing ?? false,
         }));
-        setEmployees(employeesWithTabs);
+        setEmployees(employeesWithDefaults);
       }
     };
     loadEmployees();
@@ -133,12 +137,15 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       return;
     }
     setIsAdding(true);
+    
+    const { username, password, role, permissions, ...tabPermissions } = newEmployee;
+    
     supabase.from('employees').insert({
-      username: newEmployee.username,
-      password: newEmployee.password,
-      role: newEmployee.role,
-      permissions: newEmployee.permissions,
-      tabPermissions: newEmployee.tabPermissions,
+      username,
+      password,
+      role,
+      permissions,
+      ...tabPermissions,
       login_count: 0,
       total_work_hours: 0,
       online: false
@@ -159,7 +166,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
             canViewStats: false,
             canManageEmployees: false,
           },
-          tabPermissions: getDefaultTabPermissions('Mitarbeiter')
+          ...getDefaultTabPermissions('Mitarbeiter')
         });
         const loadEmployees = async () => {
           const { data } = await supabase.from('employees').select('*').order('id');
@@ -171,10 +178,19 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     });
   };
 
-  const updateTabPermissions = async (employee: Employee, tabPermissions: Employee['tabPermissions']) => {
+  const updateTabPermissions = async (employee: Employee, tabPermissions: {
+    can_access_inventory: boolean;
+    can_access_add: boolean;
+    can_access_vintedTools: boolean;
+    can_access_employees: boolean;
+    can_access_logs: boolean;
+    can_access_game: boolean;
+    can_access_multiChannel: boolean;
+    can_access_analyticsMarketing: boolean;
+  }) => {
     const { error } = await supabase
       .from('employees')
-      .update({ tabPermissions })
+      .update(tabPermissions)
       .eq('id', employee.id);
     
     if (error) {
@@ -182,9 +198,25 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     } else {
       toast(`Tab-Berechtigungen für ${employee.username} aktualisiert`, 'success');
       logActivity(currentUser.id, currentUser.username, 'Tab-Berechtigungen geändert', `für "${employee.username}"`);
-      setEmployees(prev => prev.map(e => e.id === employee.id ? { ...e, tabPermissions } : e));
+      setEmployees(prev => prev.map(e => e.id === employee.id ? { ...e, ...tabPermissions } : e));
       setEditingPermissions(null);
     }
+  };
+
+  // Hilfsfunktion: Prüft ob ein Mitarbeiter Zugriff auf einen Tab hat
+  const hasTabAccess = (employee: Employee, tabKey: string) => {
+    const fieldMap: Record<string, keyof Employee> = {
+      inventory: 'can_access_inventory',
+      add: 'can_access_add',
+      vintedTools: 'can_access_vintedTools',
+      employees: 'can_access_employees',
+      logs: 'can_access_logs',
+      game: 'can_access_game',
+      multiChannel: 'can_access_multiChannel',
+      analyticsMarketing: 'can_access_analyticsMarketing',
+    };
+    const field = fieldMap[tabKey];
+    return employee[field] === true;
   };
 
   return (
@@ -201,7 +233,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
             setNewEmployee({
               ...newEmployee,
               role,
-              tabPermissions: getDefaultTabPermissions(role)
+              ...getDefaultTabPermissions(role)
             });
           }} className="bg-[#1A1A1A] border border-yellow-400/30 px-4 py-3 text-sm">
             <option>Mitarbeiter</option>
@@ -228,10 +260,15 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {TabList.map(tab => (
               <label key={tab.key} className="flex items-center gap-2 text-xs cursor-pointer">
-                <input type="checkbox" checked={newEmployee.tabPermissions?.[tab.key] || false} onChange={e => setNewEmployee({
-                  ...newEmployee,
-                  tabPermissions: { ...newEmployee.tabPermissions, [tab.key]: e.target.checked }
-                })} className="accent-yellow-400"/>
+                <input 
+                  type="checkbox" 
+                  checked={newEmployee[tab.dbField as keyof typeof newEmployee] as boolean || false} 
+                  onChange={e => setNewEmployee({
+                    ...newEmployee,
+                    [tab.dbField]: e.target.checked
+                  })} 
+                  className="accent-yellow-400"
+                />
                 <tab.icon className="w-3 h-3 text-gray-400"/>
                 <span className="text-gray-400">{tab.label}</span>
               </label>
@@ -281,11 +318,11 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               <label key={tab.key} className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-[#1A1A1A] rounded">
                 <input
                   type="checkbox"
-                  checked={editingPermissions.tabPermissions?.[tab.key] || false}
+                  checked={editingPermissions[tab.dbField as keyof Employee] as boolean || false}
                   onChange={e => setEditingPermissions({
                     ...editingPermissions,
-                    tabPermissions: { ...editingPermissions.tabPermissions, [tab.key]: e.target.checked }
-                  })}
+                    [tab.dbField]: e.target.checked
+                  } as Employee)}
                   className="accent-purple-400"
                 />
                 <tab.icon className="w-4 h-4 text-purple-400"/>
@@ -294,7 +331,19 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
             ))}
           </div>
           <div className="flex gap-2">
-            <button onClick={() => updateTabPermissions(editingPermissions, editingPermissions.tabPermissions)} className="px-6 py-3 bg-purple-500 text-white font-bold uppercase text-xs">Speichern</button>
+            <button onClick={() => {
+              const updates = {
+                can_access_inventory: editingPermissions.can_access_inventory,
+                can_access_add: editingPermissions.can_access_add,
+                can_access_vintedTools: editingPermissions.can_access_vintedTools,
+                can_access_employees: editingPermissions.can_access_employees,
+                can_access_logs: editingPermissions.can_access_logs,
+                can_access_game: editingPermissions.can_access_game,
+                can_access_multiChannel: editingPermissions.can_access_multiChannel,
+                can_access_analyticsMarketing: editingPermissions.can_access_analyticsMarketing,
+              };
+              updateTabPermissions(editingPermissions, updates);
+            }} className="px-6 py-3 bg-purple-500 text-white font-bold uppercase text-xs">Speichern</button>
             <button onClick={() => setEditingPermissions(null)} className="px-6 py-3 border border-gray-600 text-gray-400 uppercase text-xs">Abbrechen</button>
           </div>
         </div>
@@ -325,11 +374,11 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                   <td className="px-4 py-3 text-gray-500 text-xs">{emp.last_login ? new Date(emp.last_login).toLocaleString('de-DE') : 'Nie'}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
-                      {TabList.filter(tab => emp.tabPermissions?.[tab.key]).slice(0, 3).map(tab => (
+                      {TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).slice(0, 3).map(tab => (
                         <span key={tab.key} className="text-xs text-purple-400" title={tab.label}><tab.icon className="w-3 h-3"/></span>
                       ))}
-                      {Object.values(emp.tabPermissions || {}).filter(v => v === true).length > 3 && (
-                        <span className="text-xs text-gray-500">+{Object.values(emp.tabPermissions || {}).filter(v => v === true).length - 3}</span>
+                      {TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).length > 3 && (
+                        <span className="text-xs text-gray-500">+{TabList.filter(tab => emp[tab.dbField as keyof Employee] === true).length - 3}</span>
                       )}
                     </div>
                   </td>
@@ -349,7 +398,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                 </tr>
               ))}
             </tbody>
-          </table>
+          <tr>
         </div>
       </div>
     </div>
