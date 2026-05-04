@@ -154,10 +154,8 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
   };
 
   // ============================================================
-  // VERBESSERTE EXPORT FUNKTIONEN
+  // EXPORT FUNKTIONEN
   // ============================================================
-  
-  // Bild direkt von URL herunterladen
   const downloadImageFromUrl = async (url: string, filename: string) => {
     try {
       const response = await fetch(url);
@@ -177,7 +175,6 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     }
   };
 
-  // Einzelnes Bild herunterladen
   const exportSingleImage = async (imageUrl: string, index: number) => {
     if (!imageUrl) {
       toast('Kein Bild verfügbar', 'error');
@@ -192,30 +189,25 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     }
   };
 
-  // Alle Bilder als ZIP (mehrere Bilder einzeln, Browser speichert nativ mehrere Downloads)
   const exportAllImages = async () => {
     if (selectedImages.length === 0) {
       toast('Keine Bilder zum Exportieren', 'error');
       return;
     }
-    
     toast(`Starte Download von ${selectedImages.length} Bildern...`, 'info');
-    
     for (let i = 0; i < selectedImages.length; i++) {
       const img = selectedImages[i];
       if (img) {
         setTimeout(() => {
           downloadImageFromUrl(`/api/image-proxy?url=${encodeURIComponent(img)}`, `scnd_unit_image_${i + 1}.jpg`);
-        }, i * 500); // 500ms Verzögerung zwischen Downloads
+        }, i * 500);
       }
     }
-    
     setTimeout(() => {
       toast(`${selectedImages.length} Bilder werden heruntergeladen`, 'success');
     }, 1000);
   };
 
-  // Text exportieren (Caption + Hashtags)
   const exportText = () => {
     const fullText = `${editableCaption}\n\n${editableHashtags.join(' ')}`;
     const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
@@ -230,7 +222,6 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     toast('Text als TXT heruntergeladen!', 'success');
   };
 
-  // Komplette Export als JSON
   const exportComplete = () => {
     const content = {
       caption: editableCaption,
@@ -255,6 +246,46 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     toast('Kompletter Post exportiert!', 'success');
+  };
+
+  const copyToClipboard = () => {
+    const fullText = `${editableCaption}\n\n${editableHashtags.join(' ')}`;
+    navigator.clipboard.writeText(fullText);
+    toast('In Zwischenablage kopiert!', 'success');
+  };
+
+  // ============================================================
+  // SCHEDULER FUNKTIONEN
+  // ============================================================
+  const saveSchedule = () => {
+    if (!generatedPost) return;
+    if (!scheduleDate) {
+      toast('Bitte Datum und Uhrzeit auswählen', 'error');
+      return;
+    }
+    const newPost: ScheduledPost = {
+      id: Date.now().toString(),
+      title: generatedPost.products[0]?.name || 'Neuer Post',
+      caption: editableCaption,
+      hashtags: editableHashtags,
+      images: selectedImages,
+      scheduledDate: scheduleDate,
+      platform: schedulePlatform,
+      status: 'pending'
+    };
+    const updated = [...scheduledPosts, newPost];
+    setScheduledPosts(updated);
+    localStorage.setItem('scnd_scheduled_posts', JSON.stringify(updated));
+    setShowScheduleModal(false);
+    setScheduleDate('');
+    toast('Post wurde geplant!', 'success');
+  };
+
+  const deleteScheduledPost = (id: string) => {
+    const updated = scheduledPosts.filter(p => p.id !== id);
+    setScheduledPosts(updated);
+    localStorage.setItem('scnd_scheduled_posts', JSON.stringify(updated));
+    toast('Post gelöscht', 'info');
   };
 
   // ============================================================
@@ -351,12 +382,6 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     toast('Template gespeichert!', 'success');
   };
 
-  const copyToClipboard = () => {
-    const fullText = `${editableCaption}\n\n${editableHashtags.join(' ')}`;
-    navigator.clipboard.writeText(fullText);
-    toast('In Zwischenablage kopiert!', 'success');
-  };
-
   if (loading) return <div className="text-center py-20 text-gray-500">Lade Produkte...</div>;
 
   return (
@@ -371,7 +396,7 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
       {/* Generator Tab */}
       {activeTab === 'generator' && (
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Linke Seite - Konfiguration */}
+          {/* Linke Seite */}
           <div className="space-y-4">
             <div className="bg-[#111] border border-[#FF4400]/20 rounded-lg p-4">
               <label className="text-xs text-gray-400 uppercase tracking-wider mb-3 block">Post Typ</label>
@@ -397,43 +422,33 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
               </label>
               <div className="flex items-center justify-between">
                 <div className="flex gap-2 flex-wrap max-w-[70%]">
-                  {selectedProducts.length === 0 ? (
-                    <span className="text-gray-500 text-sm">Keine Produkte ausgewählt</span>
-                  ) : (
-                    selectedProducts.map(p => (
-                      <span key={p.id} className="px-2 py-1 bg-[#FF4400]/20 text-[#FF4400] text-xs rounded-full flex items-center gap-1">
-                        {p.name.substring(0, 20)}{p.name.length > 20 ? '...' : ''}
-                        <button onClick={() => setSelectedProducts(prev => prev.filter(prod => prod.id !== p.id))} className="hover:text-white">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))
-                  )}
+                  {selectedProducts.length === 0 ? <span className="text-gray-500 text-sm">Keine Produkte ausgewählt</span> : selectedProducts.map(p => (
+                    <span key={p.id} className="px-2 py-1 bg-[#FF4400]/20 text-[#FF4400] text-xs rounded-full flex items-center gap-1">
+                      {p.name.substring(0, 20)}{p.name.length > 20 ? '...' : ''}
+                      <button onClick={() => setSelectedProducts(prev => prev.filter(prod => prod.id !== p.id))} className="hover:text-white"><X className="w-3 h-3" /></button>
+                    </span>
+                  ))}
                 </div>
-                <button onClick={() => setShowProductSelector(true)} className="px-3 py-1.5 bg-[#FF4400] text-white rounded text-sm hover:bg-[#FF4400]/80 transition-colors">
-                  <Plus className="w-3 h-3 inline mr-1" /> Auswählen
-                </button>
+                <button onClick={() => setShowProductSelector(true)} className="px-3 py-1.5 bg-[#FF4400] text-white rounded text-sm hover:bg-[#FF4400]/80 transition-colors"><Plus className="w-3 h-3 inline mr-1" /> Auswählen</button>
               </div>
             </div>
 
             <div className="bg-[#111] border border-[#FF4400]/20 rounded-lg p-4">
               <label className="text-xs text-gray-400 uppercase tracking-wider mb-3 block">Sprache & Stil</label>
               <div className="flex gap-2 mb-3">
-                <button onClick={() => setConfig(prev => ({ ...prev, language: 'de' }))} className={`px-3 py-1.5 rounded text-sm transition-all ${config.language === 'de' ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] text-gray-400 hover:text-[#FF4400]'}`}>🇩🇪 Deutsch</button>
-                <button onClick={() => setConfig(prev => ({ ...prev, language: 'en' }))} className={`px-3 py-1.5 rounded text-sm transition-all ${config.language === 'en' ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] text-gray-400 hover:text-[#FF4400]'}`}>🇬🇧 English</button>
-                <button onClick={() => setConfig(prev => ({ ...prev, language: 'de-mixed' }))} className={`px-3 py-1.5 rounded text-sm transition-all ${config.language === 'de-mixed' ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] text-gray-400 hover:text-[#FF4400]'}`}>🌐 Mixed</button>
+                <button onClick={() => setConfig(prev => ({ ...prev, language: 'de' }))} className={`px-3 py-1.5 rounded text-sm ${config.language === 'de' ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] text-gray-400'}`}>🇩🇪 Deutsch</button>
+                <button onClick={() => setConfig(prev => ({ ...prev, language: 'en' }))} className={`px-3 py-1.5 rounded text-sm ${config.language === 'en' ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] text-gray-400'}`}>🇬🇧 English</button>
+                <button onClick={() => setConfig(prev => ({ ...prev, language: 'de-mixed' }))} className={`px-3 py-1.5 rounded text-sm ${config.language === 'de-mixed' ? 'bg-[#FF4400] text-white' : 'bg-[#1A1A1A] text-gray-400'}`}>🌐 Mixed</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'storytelling', name: 'Storytelling', icon: '📖', desc: 'Emotionale Geschichte' },
-                  { id: 'technical', name: 'Technisch', icon: '📏', desc: 'Details & Fakten' },
-                  { id: 'emotional', name: 'Emotional', icon: '🔥', desc: 'Dringlichkeit / FOMO' },
-                  { id: 'hashtag-heavy', name: 'Hashtag-lastig', icon: '#️⃣', desc: 'SEO & Reichweite' }
+                  { id: 'storytelling', name: 'Storytelling', icon: '📖' },
+                  { id: 'technical', name: 'Technisch', icon: '📏' },
+                  { id: 'emotional', name: 'Emotional', icon: '🔥' },
+                  { id: 'hashtag-heavy', name: 'Hashtag-lastig', icon: '#️⃣' }
                 ].map(style => (
-                  <button key={style.id} onClick={() => setConfig(prev => ({ ...prev, captionStyle: style.id as any }))} 
-                    className={`p-2 rounded-lg text-left text-sm transition-all ${config.captionStyle === style.id ? 'bg-[#FF4400]/20 border border-[#FF4400]' : 'bg-[#1A1A1A] border border-transparent hover:border-[#FF4400]/50'}`}>
-                    <div className="flex items-center gap-2"><span>{style.icon}</span><span className="font-medium">{style.name}</span></div>
-                    <p className="text-[10px] text-gray-500 mt-0.5">{style.desc}</p>
+                  <button key={style.id} onClick={() => setConfig(prev => ({ ...prev, captionStyle: style.id as any }))} className={`p-2 rounded-lg text-left text-sm ${config.captionStyle === style.id ? 'bg-[#FF4400]/20 border border-[#FF4400]' : 'bg-[#1A1A1A] border border-transparent'}`}>
+                    <div className="flex items-center gap-2"><span>{style.icon}</span><span>{style.name}</span></div>
                   </button>
                 ))}
               </div>
@@ -441,80 +456,45 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
 
             <div className="bg-[#111] border border-[#FF4400]/20 rounded-lg p-4">
               <div className="flex flex-wrap gap-4 mb-4">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.includePrice} onChange={e => setConfig(prev => ({ ...prev, includePrice: e.target.checked }))} className="w-4 h-4 rounded accent-[#FF4400]" />
-                  <span>💰 Preis anzeigen</span>
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.includeSize} onChange={e => setConfig(prev => ({ ...prev, includeSize: e.target.checked }))} className="w-4 h-4 rounded accent-[#FF4400]" />
-                  <span>📏 Größe anzeigen</span>
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={config.includeBrand} onChange={e => setConfig(prev => ({ ...prev, includeBrand: e.target.checked }))} className="w-4 h-4 rounded accent-[#FF4400]" />
-                  <span>🏷️ Marke anzeigen</span>
-                </label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={config.includePrice} onChange={e => setConfig(prev => ({ ...prev, includePrice: e.target.checked }))} className="accent-[#FF4400]" /><span>💰 Preis</span></label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={config.includeSize} onChange={e => setConfig(prev => ({ ...prev, includeSize: e.target.checked }))} className="accent-[#FF4400]" /><span>📏 Größe</span></label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={config.includeBrand} onChange={e => setConfig(prev => ({ ...prev, includeBrand: e.target.checked }))} className="accent-[#FF4400]" /><span>🏷️ Marke</span></label>
               </div>
               <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>🎨 Kreativität / Varianz</span>
-                  <span className="text-[#FF4400] font-bold">{config.variance}/10</span>
-                </div>
-                <input type="range" min={1} max={10} value={config.variance} onChange={e => setConfig(prev => ({ ...prev, variance: parseInt(e.target.value) }))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#FF4400]" />
+                <div className="flex justify-between text-sm mb-2"><span>🎨 Kreativität</span><span className="text-[#FF4400]">{config.variance}/10</span></div>
+                <input type="range" min={1} max={10} value={config.variance} onChange={e => setConfig(prev => ({ ...prev, variance: parseInt(e.target.value) }))} className="w-full accent-[#FF4400]" />
               </div>
             </div>
 
-            <button onClick={generatePost} disabled={isGenerating || selectedProducts.length === 0} 
-              className="w-full py-3 bg-[#FF4400] text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-[#FF4400]/80 transition-all disabled:opacity-50">
+            <button onClick={generatePost} disabled={isGenerating || selectedProducts.length === 0} className="w-full py-3 bg-[#FF4400] text-white font-bold rounded-lg flex items-center justify-center gap-2">
               {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {isGenerating ? 'Generiere...' : 'Post Generieren'}
             </button>
           </div>
 
-          {/* Rechte Seite - Preview & Export */}
+          {/* Rechte Seite */}
           <div className="bg-[#111] border border-[#FF4400]/20 rounded-lg overflow-hidden">
             <div className="p-3 border-b border-[#FF4400]/20 flex justify-between items-center">
-              <h3 className="font-bold flex items-center gap-2"><Eye className="w-4 h-4 text-[#FF4400]" />Post Editor</h3>
-              
-              {/* Export Dropdown Menu */}
+              <h3 className="font-bold"><Eye className="w-4 h-4 inline mr-1 text-[#FF4400]" />Post Editor</h3>
               <div className="relative">
-                <button 
-                  onClick={() => setShowExportMenu(!showExportMenu)} 
-                  className="px-3 py-1.5 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm hover:border-[#FF4400] transition-colors flex items-center gap-1"
-                >
-                  <Download className="w-3.5 h-3.5" /> Export
-                </button>
+                <button onClick={() => setShowExportMenu(!showExportMenu)} className="px-3 py-1.5 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm hover:border-[#FF4400] flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Export</button>
                 {showExportMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-[#1A1A1A] border border-gray-700 rounded-lg shadow-xl z-10">
-                    <button onClick={exportText} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2">
-                      <FileText className="w-3.5 h-3.5" /> Text (.txt)
-                    </button>
-                    <button onClick={() => exportSingleImage(selectedImages[0], 0)} disabled={selectedImages.length === 0} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2 disabled:opacity-50">
-                      <Image className="w-3.5 h-3.5" /> Einzelnes Bild
-                    </button>
-                    {selectedImages.length > 1 && (
-                      <button onClick={exportAllImages} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2">
-                        <Image className="w-3.5 h-3.5" /> Alle Bilder ({selectedImages.length})
-                      </button>
-                    )}
+                    <button onClick={exportText} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2"><FileText className="w-3.5 h-3.5" /> Text (.txt)</button>
+                    <button onClick={() => exportSingleImage(selectedImages[0], 0)} disabled={selectedImages.length === 0} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2 disabled:opacity-50"><Image className="w-3.5 h-3.5" /> Einzelnes Bild</button>
+                    {selectedImages.length > 1 && <button onClick={exportAllImages} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2"><Image className="w-3.5 h-3.5" /> Alle Bilder ({selectedImages.length})</button>}
                     <div className="border-t border-gray-700 my-1"></div>
-                    <button onClick={exportComplete} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2">
-                      <Download className="w-3.5 h-3.5" /> Komplett (JSON)
-                    </button>
-                    <button onClick={copyToClipboard} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2 border-t border-gray-700 mt-1 pt-2">
-                      <Copy className="w-3.5 h-3.5" /> Caption kopieren
-                    </button>
+                    <button onClick={exportComplete} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2"><Download className="w-3.5 h-3.5" /> Komplett (JSON)</button>
+                    <button onClick={copyToClipboard} className="w-full px-4 py-2 text-left text-sm hover:bg-[#FF4400]/10 flex items-center gap-2 border-t border-gray-700 mt-1 pt-2"><Copy className="w-3.5 h-3.5" /> Caption kopieren</button>
                   </div>
                 )}
               </div>
             </div>
 
             <div className="p-4 space-y-4">
-              {/* Instagram Mockup Preview */}
+              {/* Instagram Mockup */}
               <div className="bg-black rounded-2xl overflow-hidden max-w-[320px] mx-auto">
-                <div className="px-3 pt-2 pb-1 flex justify-between text-xs text-white">
-                  <span>9:41</span>
-                  <span>📶 🔋 100%</span>
-                </div>
+                <div className="px-3 pt-2 pb-1 flex justify-between text-xs text-white"><span>9:41</span><span>📶 🔋 100%</span></div>
                 <div className="px-3 py-1 flex items-center gap-2 border-t border-gray-800">
                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold overflow-hidden" style={{ backgroundColor: brandSettings.primaryColor }}>
                     {logoPreview ? <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" /> : 'S'}
@@ -523,113 +503,46 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
                 </div>
                 <div className="aspect-square bg-gradient-to-br from-[#FF4400]/20 to-black flex items-center justify-center">
                   {selectedImages.length > 0 && selectedImages[0] ? (
-                    <div className="w-full h-full">
-                      <img src={`/api/image-proxy?url=${encodeURIComponent(selectedImages[0])}`} alt="Preview" className="w-full h-full object-cover" />
-                    </div>
+                    <img src={`/api/image-proxy?url=${encodeURIComponent(selectedImages[0])}`} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="text-center p-4">
-                      <ImagePlus className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                      <p className="text-xs text-gray-500">Bild Vorschau</p>
-                    </div>
+                    <div className="text-center p-4"><ImagePlus className="w-8 h-8 text-gray-500 mx-auto mb-2" /><p className="text-xs text-gray-500">Bild Vorschau</p></div>
                   )}
                 </div>
                 <div className="p-3">
-                  <div className="flex gap-3 mb-2">
-                    <Heart className="w-4 h-4 text-white" />
-                    <MessageCircle className="w-4 h-4 text-white" />
-                    <Share2 className="w-4 h-4 text-white" />
-                    <Bookmark className="w-4 h-4 text-white ml-auto" />
-                  </div>
+                  <div className="flex gap-3 mb-2"><Heart className="w-4 h-4 text-white" /><MessageCircle className="w-4 h-4 text-white" /><Share2 className="w-4 h-4 text-white" /><Bookmark className="w-4 h-4 text-white ml-auto" /></div>
                   <p className="text-xs font-bold text-white mb-1">scnd_unit</p>
                   <p className="text-[11px] text-gray-300 whitespace-pre-wrap line-clamp-3">{editableCaption.substring(0, 150)}...</p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {editableHashtags.slice(0, 5).map(tag => (
-                      <span key={tag} className="text-[10px] text-[#FF4400]">{tag}</span>
-                    ))}
-                  </div>
+                  <div className="flex flex-wrap gap-1 mt-2">{editableHashtags.slice(0, 5).map(tag => (<span key={tag} className="text-[10px] text-[#FF4400]">{tag}</span>))}</div>
                 </div>
               </div>
 
-              {/* Caption Editor */}
-              <div>
-                <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Caption bearbeiten</label>
-                <textarea 
-                  value={editableCaption} 
-                  onChange={(e) => setEditableCaption(e.target.value)} 
-                  rows={6} 
-                  className="w-full bg-[#1A1A1A] border border-gray-700 rounded-lg p-3 text-sm resize-none focus:outline-none focus:border-[#FF4400] transition-colors" 
-                  placeholder="Deine Caption erscheint hier..." 
-                />
-              </div>
+              <textarea value={editableCaption} onChange={(e) => setEditableCaption(e.target.value)} rows={6} className="w-full bg-[#1A1A1A] border border-gray-700 rounded-lg p-3 text-sm resize-none" placeholder="Caption..." />
 
-              {/* Hashtags */}
-              <div>
-                <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Hashtags</label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {editableHashtags.map(tag => (
-                    <span key={tag} className="px-2 py-1 bg-[#FF4400]/20 text-[#FF4400] text-xs rounded-full flex items-center gap-1">
-                      {tag}
-                      <button onClick={() => setEditableHashtags(prev => prev.filter(t => t !== tag))} className="hover:text-white">
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Neuen Hashtag hinzufügen (z.B. streetwear)" 
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.currentTarget.value) {
-                        const newTag = e.currentTarget.value.startsWith('#') ? e.currentTarget.value : `#${e.currentTarget.value}`;
-                        if (!editableHashtags.includes(newTag)) {
-                          setEditableHashtags([...editableHashtags, newTag]);
-                        }
-                        e.currentTarget.value = '';
-                      }
-                    }}
-                    className="flex-1 bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-[#FF4400]"
-                  />
-                </div>
-              </div>
+              <div className="flex flex-wrap gap-1.5 mb-2">{editableHashtags.map(tag => (<span key={tag} className="px-2 py-1 bg-[#FF4400]/20 text-[#FF4400] text-xs rounded-full flex items-center gap-1">{tag}<button onClick={() => setEditableHashtags(prev => prev.filter(t => t !== tag))}><X className="w-2.5 h-2.5" /></button></span>))}</div>
+              <div className="flex gap-2"><input type="text" placeholder="Neuen Hashtag hinzufügen" onKeyDown={(e) => { if (e.key === 'Enter' && e.currentTarget.value) { const newTag = e.currentTarget.value.startsWith('#') ? e.currentTarget.value : `#${e.currentTarget.value}`; if (!editableHashtags.includes(newTag)) setEditableHashtags([...editableHashtags, newTag]); e.currentTarget.value = ''; } }} className="flex-1 bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm" /></div>
 
-              {/* Aktionsbuttons */}
               <div className="flex gap-3 pt-2 border-t border-gray-800">
-                <button onClick={saveTemplate} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm hover:border-[#FF4400] transition-colors flex items-center justify-center gap-1">
-                  <Save className="w-3.5 h-3.5" /> Template
-                </button>
-                <button onClick={generatePost} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm hover:border-[#FF4400] transition-colors flex items-center justify-center gap-1">
-                  <RefreshCw className="w-3.5 h-3.5" /> Neu
-                </button>
+                <button onClick={saveTemplate} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm"><Save className="w-3.5 h-3.5 inline mr-1" /> Template</button>
+                <button onClick={generatePost} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm"><RefreshCw className="w-3.5 h-3.5 inline mr-1" /> Neu</button>
+                <button onClick={() => setShowScheduleModal(true)} disabled={!generatedPost} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm disabled:opacity-50"><Calendar className="w-3.5 h-3.5 inline mr-1" /> Planen</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Scheduler Tab - vereinfacht */}
+      {/* Scheduler Tab */}
       {activeTab === 'scheduler' && (
         <div className="bg-[#111] border border-[#FF4400]/20 rounded-lg p-6">
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-[#FF4400]" /> 
-            Geplante Posts ({scheduledPosts.length})
-          </h3>
+          <h3 className="text-lg font-bold mb-4"><Calendar className="w-5 h-5 inline mr-2 text-[#FF4400]" />Geplante Posts ({scheduledPosts.length})</h3>
           {scheduledPosts.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>Keine geplanten Posts</p>
-            </div>
+            <div className="text-center py-8 text-gray-500"><Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" /><p>Keine geplanten Posts</p></div>
           ) : (
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {scheduledPosts.map(post => (
                 <div key={post.id} className="bg-[#1A1A1A] rounded-lg p-3 flex justify-between items-center">
-                  <div className="flex-1">
-                    <p className="font-bold text-sm">{post.title}</p>
-                    <p className="text-xs text-gray-400">{new Date(post.scheduledDate).toLocaleString()} · {post.platform}</p>
-                  </div>
-                  <button onClick={() => { const updated = scheduledPosts.filter(p => p.id !== post.id); setScheduledPosts(updated); localStorage.setItem('scnd_scheduled_posts', JSON.stringify(updated)); toast('Gelöscht', 'info'); }} className="p-2 hover:bg-red-600/20 rounded">
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                  </button>
+                  <div><p className="font-bold text-sm">{post.title}</p><p className="text-xs text-gray-400">{new Date(post.scheduledDate).toLocaleString()} · {post.platform}</p></div>
+                  <button onClick={() => deleteScheduledPost(post.id)} className="p-2 hover:bg-red-600/20 rounded"><Trash2 className="w-4 h-4 text-red-400" /></button>
                 </div>
               ))}
             </div>
@@ -640,41 +553,12 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
       {/* Brand Assets Tab */}
       {activeTab === 'brand' && (
         <div className="bg-[#111] border border-[#FF4400]/20 rounded-lg p-6">
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Palette className="w-5 h-5 text-[#FF4400]" />Brand Assets</h3>
+          <h3 className="text-lg font-bold mb-4"><Palette className="w-5 h-5 inline mr-2 text-[#FF4400]" />Brand Assets</h3>
           <div className="space-y-4 max-w-md">
-            <div>
-              <label className="text-sm block mb-2">Primärfarbe</label>
-              <div className="flex gap-2">
-                <input type="color" value={brandSettings.primaryColor} onChange={(e) => updateBrandSetting('primaryColor', e.target.value)} className="w-12 h-12 rounded border border-gray-700 cursor-pointer" />
-                <input type="text" value={brandSettings.primaryColor} onChange={(e) => updateBrandSetting('primaryColor', e.target.value)} className="flex-1 bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm" />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm block mb-2">Watermark Text</label>
-              <input type="text" value={brandSettings.watermarkText} onChange={(e) => updateBrandSetting('watermarkText', e.target.value)} className="w-full bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="text-sm block mb-2">Logo</label>
-              <input type="file" ref={fileInputRef} accept="image/*" onChange={handleLogoUpload} className="hidden" />
-              <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-[#FF4400] transition-colors cursor-pointer">
-                {logoPreview ? (
-                  <div className="flex flex-col items-center">
-                    <img src={logoPreview} alt="Logo Preview" className="w-20 h-20 object-contain mb-2" />
-                    <p className="text-sm text-green-400">✓ Logo geladen</p>
-                    <p className="text-xs text-gray-500 mt-1">Klicken zum Ändern</p>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="w-8 h-8 mx-auto text-gray-500 mb-2" />
-                    <p className="text-sm text-gray-400">Logo hierher ziehen oder klicken</p>
-                    <p className="text-xs text-gray-500 mt-1">PNG, JPG, SVG (max. 2MB)</p>
-                  </>
-                )}
-              </div>
-            </div>
-            <button onClick={saveBrandSettings} className="px-4 py-2 bg-[#FF4400] text-white rounded-lg hover:bg-[#FF4400]/80 transition-colors">
-              Speichern
-            </button>
+            <div><label className="text-sm block mb-2">Primärfarbe</label><div className="flex gap-2"><input type="color" value={brandSettings.primaryColor} onChange={(e) => updateBrandSetting('primaryColor', e.target.value)} className="w-12 h-12 rounded" /><input type="text" value={brandSettings.primaryColor} onChange={(e) => updateBrandSetting('primaryColor', e.target.value)} className="flex-1 bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm" /></div></div>
+            <div><label className="text-sm block mb-2">Watermark Text</label><input type="text" value={brandSettings.watermarkText} onChange={(e) => updateBrandSetting('watermarkText', e.target.value)} className="w-full bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm" /></div>
+            <div><label className="text-sm block mb-2">Logo</label><input type="file" ref={fileInputRef} accept="image/*" onChange={handleLogoUpload} className="hidden" /><div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-[#FF4400] cursor-pointer">{logoPreview ? <div><img src={logoPreview} alt="Logo" className="w-20 h-20 object-contain mx-auto mb-2" /><p className="text-sm text-green-400">✓ Logo geladen</p></div> : <><Upload className="w-8 h-8 mx-auto text-gray-500 mb-2" /><p className="text-sm text-gray-400">Logo hierher ziehen oder klicken</p><p className="text-xs text-gray-500 mt-1">PNG, JPG, SVG (max. 2MB)</p></>}</div></div>
+            <button onClick={saveBrandSettings} className="px-4 py-2 bg-[#FF4400] text-white rounded-lg">Speichern</button>
           </div>
         </div>
       )}
@@ -683,45 +567,10 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
       {showProductSelector && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#111] border border-[#FF4400]/30 rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b border-[#FF4400]/20">
-              <h3 className="text-lg font-bold">Produkte auswählen {postType === 'collage' && '(max. 6)'}</h3>
-              <button onClick={() => setShowProductSelector(false)} className="p-1 hover:bg-[#FF4400]/10 rounded"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-3 border-b border-gray-800">
-              <input type="text" placeholder="Produkt suchen..." className="w-full bg-[#1A1A1A] border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#FF4400]" id="product-search" onChange={(e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                document.querySelectorAll('.product-item').forEach(item => {
-                  const name = item.getAttribute('data-name')?.toLowerCase() || '';
-                  (item as HTMLElement).style.display = name.includes(searchTerm) ? 'flex' : 'none';
-                });
-              }} />
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {availableProducts.slice(0, 100).map(product => {
-                  const isSelected = selectedProducts.find(p => p.id === product.id);
-                  const isDisabled = postType === 'collage' && !isSelected && selectedProducts.length >= 6;
-                  return (
-                    <div key={product.id} data-name={product.name} className={`product-item relative border rounded-lg p-2 cursor-pointer transition-all ${isSelected ? 'border-[#FF4400] bg-[#FF4400]/10' : 'border-gray-700 hover:border-[#FF4400]/50'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => { 
-                      if (isDisabled) { toast('Maximal 6 Produkte für Collage', 'error'); return; } 
-                      if (postType === 'single') { setSelectedProducts([product]); setShowProductSelector(false); } 
-                      else { setSelectedProducts(prev => isSelected ? prev.filter(p => p.id !== product.id) : [...prev, product]); } 
-                    }}>
-                      <div className="aspect-square bg-[#1A1A1A] rounded-md overflow-hidden">
-                        <img src={product.images?.[0] ? `/api/image-proxy?url=${encodeURIComponent(product.images[0])}` : ''} alt={product.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }} />
-                      </div>
-                      <p className="text-xs font-bold truncate mt-2">{product.name}</p>
-                      <p className="text-[10px] text-gray-400">{product.brand} · {product.price}</p>
-                      {isSelected && <div className="absolute top-2 right-2 bg-[#FF4400] rounded-full w-5 h-5 flex items-center justify-center"><Check className="w-3 h-3 text-white" /></div>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="p-4 border-t border-[#FF4400]/20 flex justify-between items-center">
-              <span className="text-sm text-gray-400">{selectedProducts.length} Produkt{selectedProducts.length !== 1 ? 'e' : ''} ausgewählt</span>
-              <button onClick={() => setShowProductSelector(false)} className="px-4 py-2 bg-[#FF4400] text-white rounded-lg font-bold hover:bg-[#FF4400]/80 transition-colors">Übernehmen</button>
-            </div>
+            <div className="flex justify-between items-center p-4 border-b"><h3 className="text-lg font-bold">Produkte auswählen {postType === 'collage' && '(max. 6)'}</h3><button onClick={() => setShowProductSelector(false)}><X className="w-5 h-5" /></button></div>
+            <div className="p-3 border-b border-gray-800"><input type="text" placeholder="Produkt suchen..." className="w-full bg-[#1A1A1A] border border-gray-700 rounded-lg px-4 py-2 text-sm" id="product-search" onChange={(e) => { const term = e.target.value.toLowerCase(); document.querySelectorAll('.product-item').forEach(item => { const name = item.getAttribute('data-name')?.toLowerCase() || ''; (item as HTMLElement).style.display = name.includes(term) ? 'flex' : 'none'; }); }} /></div>
+            <div className="flex-1 overflow-y-auto p-4"><div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{availableProducts.slice(0, 100).map(product => { const isSelected = selectedProducts.find(p => p.id === product.id); const isDisabled = postType === 'collage' && !isSelected && selectedProducts.length >= 6; return (<div key={product.id} data-name={product.name} className={`product-item relative border rounded-lg p-2 cursor-pointer ${isSelected ? 'border-[#FF4400] bg-[#FF4400]/10' : 'border-gray-700 hover:border-[#FF4400]/50'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => { if (isDisabled) { toast('Maximal 6 Produkte für Collage', 'error'); return; } if (postType === 'single') { setSelectedProducts([product]); setShowProductSelector(false); } else { setSelectedProducts(prev => isSelected ? prev.filter(p => p.id !== product.id) : [...prev, product]); } }}><div className="aspect-square bg-[#1A1A1A] rounded-md overflow-hidden"><img src={product.images?.[0] ? `/api/image-proxy?url=${encodeURIComponent(product.images[0])}` : ''} alt={product.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }} /></div><p className="text-xs font-bold truncate mt-2">{product.name}</p><p className="text-[10px] text-gray-400">{product.brand} · {product.price}</p>{isSelected && <div className="absolute top-2 right-2 bg-[#FF4400] rounded-full w-5 h-5 flex items-center justify-center"><Check className="w-3 h-3 text-white" /></div>}</div>); })}</div></div>
+            <div className="p-4 border-t flex justify-between"><span className="text-sm text-gray-400">{selectedProducts.length} Produkt{selectedProducts.length !== 1 ? 'e' : ''} ausgewählt</span><button onClick={() => setShowProductSelector(false)} className="px-4 py-2 bg-[#FF4400] text-white rounded-lg font-bold">Übernehmen</button></div>
           </div>
         </div>
       )}
@@ -730,14 +579,11 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
       {showScheduleModal && generatedPost && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#111] border border-[#FF4400]/30 rounded-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-4 border-b border-[#FF4400]/20">
-              <h3 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-[#FF4400]" />Post planen</h3>
-              <button onClick={() => setShowScheduleModal(false)} className="p-1 hover:bg-[#FF4400]/10 rounded"><X className="w-5 h-5" /></button>
-            </div>
+            <div className="flex justify-between items-center p-4 border-b"><h3 className="text-lg font-bold"><Calendar className="w-5 h-5 inline mr-2 text-[#FF4400]" />Post planen</h3><button onClick={() => setShowScheduleModal(false)}><X className="w-5 h-5" /></button></div>
             <div className="p-4 space-y-4">
               <div><label className="text-sm text-gray-400 block mb-2">Datum & Uhrzeit</label><input type="datetime-local" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="w-full bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm" /></div>
               <div><label className="text-sm text-gray-400 block mb-2">Plattform</label><select value={schedulePlatform} onChange={(e) => setSchedulePlatform(e.target.value)} className="w-full bg-[#1A1A1A] border border-gray-700 rounded px-3 py-2 text-sm"><option value="instagram">📸 Instagram</option><option value="tiktok">🎵 TikTok</option><option value="facebook">📘 Facebook</option><option value="pinterest">📌 Pinterest</option></select></div>
-              <button onClick={saveSchedule} className="w-full py-3 bg-[#FF4400] text-white font-bold rounded-lg hover:bg-[#FF4400]/80 transition-colors">Post planen</button>
+              <button onClick={saveSchedule} className="w-full py-3 bg-[#FF4400] text-white font-bold rounded-lg">Post planen</button>
             </div>
           </div>
         </div>
