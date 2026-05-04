@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Package, BarChart3, Plus, Globe, Users, Clock, LogOut, Gamepad2, Share2, TrendingUp
+  Package, BarChart3, Plus, Globe, Users, Clock, LogOut, Gamepad2, Share2, TrendingUp, Wand2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -24,6 +24,7 @@ import { EmployeesTab } from './tabs/EmployeesTab';
 import { LogsTab } from './tabs/LogsTab';
 import { MultiChannelTab } from './tabs/MultiChannelTab';
 import { AnalyticsMarketingTab } from './tabs/AnalyticsMarketingTab';
+import { MarketingStudio } from './tabs/MarketingStudio';
 
 interface Employee {
   id: number;
@@ -44,12 +45,13 @@ interface Employee {
   // Tab-Berechtigungen (korrekte Spaltennamen aus Supabase)
   can_access_inventory: boolean;
   can_access_add: boolean;
-  can_access_vintedtools: boolean;      // ← kleines t
+  can_access_vintedtools: boolean;
   can_access_employees: boolean;
   can_access_logs: boolean;
   can_access_game: boolean;
-  can_access_multichannel: boolean;     // ← kleines c
-  can_access_analyticsmarketing: boolean; // ← kleines m
+  can_access_multichannel: boolean;
+  can_access_analyticsmarketing: boolean;
+  can_access_marketingstudio: boolean; // NEU
 }
 
 // Helper um Employee zu erstellen
@@ -78,6 +80,7 @@ function createEmployeeFromUser(user: any): Employee {
     can_access_game: user.can_access_game ?? true,
     can_access_multichannel: user.can_access_multichannel ?? false,
     can_access_analyticsmarketing: user.can_access_analyticsmarketing ?? false,
+    can_access_marketingstudio: user.can_access_marketingstudio ?? false, // NEU
   };
 }
 
@@ -87,6 +90,7 @@ export default function ManagementPanel() {
   const [checking, setChecking] = useState(true);
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [activeTab, setActiveTab] = useState('inventory');
+  const [products, setProducts] = useState<any[]>([]); // NEU: Für Marketing Studio
   const { toasts, addToast, removeToast } = useToast();
   const { confirmOptions, showConfirm, closeConfirm } = useConfirm();
 
@@ -119,6 +123,7 @@ export default function ManagementPanel() {
         can_access_game: true,
         can_access_multichannel: true,
         can_access_analyticsmarketing: true,
+        can_access_marketingstudio: true, // NEU
       });
     } else if (savedAuth === 'employee' && savedUser) {
       try {
@@ -132,6 +137,16 @@ export default function ManagementPanel() {
     }
     setChecking(false);
   }, []);
+
+  // NEU: Produkte laden für Marketing Studio
+  useEffect(() => {
+    if (authed) {
+      fetch('/api/products')
+        .then(res => res.json())
+        .then(data => setProducts(data))
+        .catch(err => console.error('Fehler beim Laden der Produkte:', err));
+    }
+  }, [authed]);
 
   const handleLogout = async () => {
     if (currentUser && currentUser.id !== 0) {
@@ -173,6 +188,7 @@ export default function ManagementPanel() {
           can_access_game: true,
           can_access_multichannel: true,
           can_access_analyticsmarketing: true,
+          can_access_marketingstudio: true, // NEU
         });
       } else if (user) {
         setCurrentUser(createEmployeeFromUser(user));
@@ -181,6 +197,10 @@ export default function ManagementPanel() {
       if (user) sessionStorage.setItem('scnd_user', JSON.stringify(user));
     }} />;
   }
+
+  // Prüfe ob User Zugriff auf Marketing Studio hat
+  const canAccessMarketingStudio = currentUser?.role === 'Admin' || 
+    (currentUser?.can_access_marketingstudio === true);
 
   return (
     <div className="min-h-screen font-sans bg-[#0A0A0A] text-[#F5F5F5]">
@@ -263,6 +283,15 @@ export default function ManagementPanel() {
                 <TrendingUp className="w-4 h-4 inline mr-1"/>Analytics & Marketing
               </button>
             )}
+            {/* NEU: Marketing Studio Tab */}
+            {canAccessMarketingStudio && (
+              <button onClick={() => setActiveTab('marketing-studio')}
+                className={`px-4 py-2 text-xs uppercase font-bold transition-colors ${
+                  activeTab === 'marketing-studio' ? 'bg-pink-600 text-white' : 'border border-pink-600/30 text-pink-500 hover:bg-pink-600/10'
+                }`}>
+                <Wand2 className="w-4 h-4 inline mr-1"/>Marketing Studio
+              </button>
+            )}
             <button onClick={handleLogout}
               className="px-4 py-2 border border-red-500 text-red-500 hover:bg-red-500/10 text-xs uppercase font-bold">
               <LogOut className="w-4 h-4 inline mr-1"/>Logout
@@ -284,6 +313,11 @@ export default function ManagementPanel() {
         )}
         {activeTab === 'multichannel' && <MultiChannelTab user={currentUser} toast={addToast} />}
         {activeTab === 'analytics-marketing' && <AnalyticsMarketingTab user={currentUser} toast={addToast} />}
+        
+        {/* NEU: Marketing Studio Tab */}
+        {activeTab === 'marketing-studio' && canAccessMarketingStudio && (
+          <MarketingStudio products={products} toast={addToast} />
+        )}
       </main>
     </div>
   );
