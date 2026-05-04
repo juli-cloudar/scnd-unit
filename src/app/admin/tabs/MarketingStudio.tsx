@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import { 
   Sparkles, Instagram, Facebook, Globe, 
-  RefreshCw, Calendar, Send, Copy, Check, ImagePlus, 
+  RefreshCw, Calendar, Send, Copy, ImagePlus, 
   LayoutGrid, Layers, Wand2, Settings, ChevronLeft, ChevronRight,
   Heart, MessageCircle, Share2, Bookmark, Plus, X, Trash2,
   Languages, Palette, 
   Newspaper, ShoppingBag, TrendingUp, Clock, Star, Zap,
   AlertCircle, Upload, Save, Eye, EyeOff, Edit3,
   ThumbsUp, ThumbsDown, RotateCcw, FileText, BookOpen,
-  Bold, Italic, AlignLeft, Download, Filter
+  Bold, Italic, AlignLeft, Download, Filter, Check
 } from 'lucide-react';
 
 interface Product {
@@ -394,10 +394,3 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     </div>
   );
 }
-
-// Check Component
-const Check = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-  </svg>
-);
