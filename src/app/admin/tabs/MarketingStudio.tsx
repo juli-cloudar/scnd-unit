@@ -6,19 +6,12 @@ import {
   RefreshCw, Calendar, Send, Copy, Check, ImagePlus, 
   LayoutGrid, Layers, Wand2, Settings, ChevronLeft, ChevronRight,
   Heart, MessageCircle, Share2, Bookmark, Plus, X, Trash2,
-  Languages, Palette, Grid3x3, Grid4x4, 
+  Languages, Palette, 
   Newspaper, ShoppingBag, TrendingUp, Clock, Star, Zap,
-  AlertCircle, Upload, Save, Eye, EyeOff, Sliders, Edit3,
+  AlertCircle, Upload, Save, Eye, EyeOff, Edit3,
   ThumbsUp, ThumbsDown, RotateCcw, FileText, BookOpen,
   Bold, Italic, AlignLeft, Quote
 } from 'lucide-react';
-
-// Pinterest Icon (da lucide-react kein Pinterest hat)
-const PinterestIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-    <path d="M12 2C6.48 2 2 6.48 2 12c0 4.23 2.65 7.86 6.35 9.31-.08-.79-.16-2 .03-2.86.18-.78 1.15-4.87 1.15-4.87s-.29-.58-.29-1.44c0-1.35.78-2.36 1.76-2.36.83 0 1.23.62 1.23 1.36 0 .83-.53 2.07-.8 3.22-.23.96.48 1.75 1.43 1.75 1.71 0 3.03-1.8 3.03-4.4 0-2.3-1.65-3.91-4.01-3.91-2.73 0-4.33 2.05-4.33 4.17 0 .82.32 1.71.72 2.19.08.09.08.18.04.27-.07.31-.24.98-.27 1.12-.04.18-.14.22-.33.13-1.23-.57-2-2.36-2-3.8 0-3.09 2.24-5.93 6.48-5.93 3.4 0 6.04 2.42 6.04 5.66 0 3.38-2.13 6.1-5.09 6.1-.99 0-1.92-.52-2.24-1.13 0 0-.49 1.86-.61 2.32-.22.86-.81 1.73-1.31 2.38.99.3 2.03.46 3.1.46 5.52 0 10-4.48 10-10S17.52 2 12 2z"/>
-  </svg>
-);
 
 interface Product {
   id: number; name: string; brand: string; category: string; price: string;
