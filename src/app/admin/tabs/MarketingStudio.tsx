@@ -9,7 +9,7 @@ import {
   ShoppingBag, TrendingUp, Clock, Star, Zap,
   AlertCircle, Upload, Save, Eye, EyeOff, Edit3,
   ThumbsUp, ThumbsDown, RotateCcw, BookOpen,
-  Bold, Italic, AlignLeft, Download, Check, Grid
+  Bold, Italic, AlignLeft, Download, Check
 } from 'lucide-react';
 
 interface Product {
@@ -26,6 +26,12 @@ interface ScheduledPost {
   scheduledDate: string;
   platform: string;
   status: 'pending' | 'published' | 'failed';
+}
+
+interface SavedTemplate {
+  id: number;
+  caption: string;
+  hashtags: string[];
 }
 
 // ============================================================
@@ -51,6 +57,7 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [schedulePlatform, setSchedulePlatform] = useState('instagram');
+  const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]); // DEFINED!
 
   // Produkte laden
   useEffect(() => {
@@ -73,6 +80,13 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
         setScheduledPosts(JSON.parse(saved));
       } catch(e) {}
     }
+    // Gespeicherte Templates laden
+    const savedTemplatesData = localStorage.getItem('scnd_caption_templates');
+    if (savedTemplatesData) {
+      try {
+        setSavedTemplates(JSON.parse(savedTemplatesData));
+      } catch(e) {}
+    }
   }, [externalProducts]);
 
   // Verfügbare Produkte (nicht verkauft)
@@ -85,7 +99,6 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     const product = products[0];
     const productList = products.map(p => `${p.brand} ${p.name}`).join(' • ');
     
-    // Varianz-basierte Textbausteine
     const openers = variance >= 8 ? ['🔥🔥🔥', '🚨 EXKLUSIV 🚨', '✨ DROP DES TAGES ✨'] : 
                     variance >= 5 ? ['✨ Neu eingetroffen', '🔥 Fresh Drop', '💫 Just landed'] :
                     ['Neu im Shop', 'Frisch gelistet'];
@@ -106,13 +119,13 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
         storytelling: `${randomOpener}\n\n${productMention}\n\nDieses Piece hat eine Geschichte zu erzählen.\n\n${options.includeBrand ? `🏷️ Marke: ${product.brand}` : ''}${options.includeSize ? `\n📏 Größe: ${product.size}` : ''}${options.includePrice ? `\n💰 Preis: ${product.price}` : ''}\n\n${randomCloser}`,
         technical: `📸 SCND_UNIT Drop #${Math.floor(Math.random() * 500 + 1)}\n\n${productMention}\nZustand: 9/10${options.includeSize ? `\nGröße: ${product.size}` : ''}${options.includePrice ? `\n💰 ${product.price}` : ''}\n\n📏 Maße auf Anfrage\n\n${randomCloser}`,
         emotional: `${randomOpener}\n\n${product.brand} ${product.name} - ${variance >= 7 ? 'Das Must-Have!' : 'Perfekt für dich'}\n\n${options.includePrice ? `💸 ${product.price}` : ''}\n\n${randomCloser}`,
-        'hashtag-heavy': `NEU IM SHOP 🔥\n\n${productMention}\n\n${options.includeSize ? `📏 ${product.size}` : ''} ${options.includePrice ? `💰 ${product.price}` : ''}\n\n#vintage #streetwear #scndunit #${product.brand?.toLowerCase()} #vintagefashion #thrifted #secondhand`
+        'hashtag-heavy': `NEU IM SHOP 🔥\n\n${productMention}\n\n${options.includeSize ? `📏 ${product.size}` : ''} ${options.includePrice ? `💰 ${product.price}` : ''}\n\n#vintage #streetwear #scndunit #${product.brand?.toLowerCase()} #vintagefashion #thrifted`
       },
       en: {
         storytelling: `${randomOpener}\n\n${productMention}\n\nThis rare piece tells a story.\n\n${options.includeBrand ? `🏷️ Brand: ${product.brand}` : ''}${options.includeSize ? `\n📏 Size: ${product.size}` : ''}${options.includePrice ? `\n💰 Price: ${product.price}` : ''}\n\n${randomCloser}`,
         technical: `📸 SCND_UNIT Drop #${Math.floor(Math.random() * 500 + 1)}\n\n${productMention}\nCondition: 9/10${options.includeSize ? `\nSize: ${product.size}` : ''}${options.includePrice ? `\n💰 ${product.price}` : ''}\n\n📏 Measurements upon request\n\n${randomCloser}`,
         emotional: `${randomOpener}\n\n${product.brand} ${product.name} - ${variance >= 7 ? 'The must-have!' : 'Perfect for you'}\n\n${options.includePrice ? `💸 ${product.price}` : ''}\n\n${randomCloser}`,
-        'hashtag-heavy': `NEW DROP 🔥\n\n${productMention}\n\n${options.includeSize ? `📏 ${product.size}` : ''} ${options.includePrice ? `💰 ${product.price}` : ''}\n\n#vintage #streetwear #scndunit #${product.brand?.toLowerCase()} #vintagefashion #thrifted #secondhand`
+        'hashtag-heavy': `NEW DROP 🔥\n\n${productMention}\n\n${options.includeSize ? `📏 ${product.size}` : ''} ${options.includePrice ? `💰 ${product.price}` : ''}\n\n#vintage #streetwear #scndunit #${product.brand?.toLowerCase()} #vintagefashion #thrifted`
       },
       'de-mixed': {
         storytelling: `${randomOpener}\n\n${productMention}\n\nThis rare piece hat eine Geschichte.\n\n${options.includeBrand ? `🏷️ Brand: ${product.brand}` : ''}${options.includeSize ? `\n📏 Size: ${product.size}` : ''}${options.includePrice ? `\n💰 Price: ${product.price}` : ''}\n\n${randomCloser}`,
@@ -142,7 +155,6 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
       setEditableCaption(caption);
       setEditableHashtags(newHashtags);
       
-      // Bilder sammeln
       let images: string[] = [];
       if (postType === 'single' && selectedProducts[0]?.images) {
         images = selectedProducts[0].images.slice(0, 4);
@@ -209,6 +221,19 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
     setScheduledPosts(updated);
     localStorage.setItem('scnd_scheduled_posts', JSON.stringify(updated));
     toast('Post gelöscht', 'info');
+  };
+
+  const saveTemplate = () => {
+    if (!editableCaption) return;
+    const newTemplate: SavedTemplate = {
+      id: Date.now(),
+      caption: editableCaption,
+      hashtags: editableHashtags
+    };
+    const updated = [...savedTemplates, newTemplate];
+    setSavedTemplates(updated);
+    localStorage.setItem('scnd_caption_templates', JSON.stringify(updated));
+    toast('Template gespeichert!', 'success');
   };
 
   const copyToClipboard = () => {
@@ -444,10 +469,7 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
 
               {/* Aktionsbuttons */}
               <div className="flex gap-3 pt-2 border-t border-gray-800">
-                <button onClick={() => { 
-                  setSavedTemplates(prev => [...prev, { id: Date.now(), caption: editableCaption, hashtags: editableHashtags }]); 
-                  toast('Template gespeichert!', 'success'); 
-                }} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm hover:border-[#FF4400] transition-colors flex items-center justify-center gap-1">
+                <button onClick={saveTemplate} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm hover:border-[#FF4400] transition-colors flex items-center justify-center gap-1">
                   <Save className="w-3.5 h-3.5" /> Template
                 </button>
                 <button onClick={generatePost} className="flex-1 py-2 bg-[#1A1A1A] border border-gray-700 rounded-lg text-sm hover:border-[#FF4400] transition-colors flex items-center justify-center gap-1">
@@ -617,7 +639,7 @@ export function MarketingStudio({ products: externalProducts, toast }: { product
             {/* Produktliste */}
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {availableProducts.map(product => {
+                {availableProducts.slice(0, 100).map(product => {
                   const isSelected = selectedProducts.find(p => p.id === product.id);
                   const isDisabled = postType === 'collage' && !isSelected && selectedProducts.length >= 6;
                   return (
