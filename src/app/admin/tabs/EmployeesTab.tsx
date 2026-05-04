@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { UserPlus, Key, Trash2, Shield, Package, Plus, Globe, BarChart3, Users, Clock, Gamepad2, Share2, TrendingUp } from "lucide-react";
+import { UserPlus, Key, Trash2, Shield, Package, Plus, Globe, BarChart3, Users, Clock, Gamepad2, Share2, TrendingUp, Wand2 } from "lucide-react";
 import { logActivity } from "../utils/helpers";
 import { ToastType } from "../hooks/useToast";
 
@@ -27,6 +27,7 @@ interface Employee {
   can_access_game: boolean;
   can_access_multichannel: boolean;
   can_access_analyticsmarketing: boolean;
+  can_access_marketingstudio: boolean; // NEU
 }
 
 const getDefaultTabPermissions = (role: string) => {
@@ -40,6 +41,7 @@ const getDefaultTabPermissions = (role: string) => {
       can_access_game: true,
       can_access_multichannel: true,
       can_access_analyticsmarketing: true,
+      can_access_marketingstudio: true, // NEU
     };
   } else if (role === 'Manager') {
     return {
@@ -51,6 +53,7 @@ const getDefaultTabPermissions = (role: string) => {
       can_access_game: true,
       can_access_multichannel: true,
       can_access_analyticsmarketing: true,
+      can_access_marketingstudio: true, // NEU
     };
   } else {
     return {
@@ -62,6 +65,7 @@ const getDefaultTabPermissions = (role: string) => {
       can_access_game: true,
       can_access_multichannel: false,
       can_access_analyticsmarketing: false,
+      can_access_marketingstudio: false, // NEU
     };
   }
 };
@@ -75,6 +79,7 @@ const TabList = [
   { key: 'game', dbField: 'can_access_game', label: 'SCND DROP', icon: Gamepad2 },
   { key: 'multiChannel', dbField: 'can_access_multichannel', label: 'Multi-Channel', icon: Share2 },
   { key: 'analyticsMarketing', dbField: 'can_access_analyticsmarketing', label: 'Analytics & Marketing', icon: TrendingUp },
+  { key: 'marketingStudio', dbField: 'can_access_marketingstudio', label: 'Marketing Studio', icon: Wand2 }, // NEU
 ];
 
 export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Employee, toast: (msg: string, type?: ToastType) => void, confirm: (msg: string, onConfirm: () => void) => void }) {
@@ -102,6 +107,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     can_access_game: true,
     can_access_multichannel: false,
     can_access_analyticsmarketing: false,
+    can_access_marketingstudio: false, // NEU
   });
 
   const loadEmployees = async () => {
@@ -126,6 +132,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         can_access_game: emp.can_access_game ?? true,
         can_access_multichannel: emp.can_access_multichannel ?? false,
         can_access_analyticsmarketing: emp.can_access_analyticsmarketing ?? false,
+        can_access_marketingstudio: emp.can_access_marketingstudio ?? false, // NEU
       }));
       setEmployees(employeesWithDefaults);
     }
@@ -155,6 +162,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       can_access_game: newEmployee.can_access_game,
       can_access_multichannel: newEmployee.can_access_multichannel,
       can_access_analyticsmarketing: newEmployee.can_access_analyticsmarketing,
+      can_access_marketingstudio: newEmployee.can_access_marketingstudio, // NEU
       login_count: 0,
       total_work_hours: 0,
       online: false
@@ -183,6 +191,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
           can_access_game: true,
           can_access_multichannel: false,
           can_access_analyticsmarketing: false,
+          can_access_marketingstudio: false, // NEU
         });
         loadEmployees();
       }
@@ -199,6 +208,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
     can_access_game: boolean;
     can_access_multichannel: boolean;
     can_access_analyticsmarketing: boolean;
+    can_access_marketingstudio: boolean; // NEU
   }) => {
     const { error } = await supabase
       .from('employees')
@@ -238,10 +248,12 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               can_access_game: defaultPerms.can_access_game,
               can_access_multichannel: defaultPerms.can_access_multichannel,
               can_access_analyticsmarketing: defaultPerms.can_access_analyticsmarketing,
+              can_access_marketingstudio: defaultPerms.can_access_marketingstudio, // NEU
             });
           }} className="bg-[#1A1A1A] border border-yellow-400/30 px-4 py-3 text-sm">
             <option>Mitarbeiter</option>
             <option>Manager</option>
+            <option>Admin</option>
           </select>
         </div>
 
@@ -259,7 +271,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
 
         <div className="mb-4">
           <h4 className="text-xs text-yellow-400 mb-2">Tab-Berechtigungen</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             {TabList.map(tab => (
               <label key={tab.key} className="flex items-center gap-2 text-xs cursor-pointer">
                 <input 
@@ -283,7 +295,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
         </button>
       </div>
 
-      {/* Passwort ändern Modal - ADAPTIV */}
+      {/* Passwort ändern Modal */}
       {editingEmployee && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#111] border border-blue-500/30 rounded-lg w-full max-w-sm sm:max-w-md">
@@ -341,9 +353,9 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
             <h3 className="text-lg font-bold text-purple-400 flex items-center gap-2"><Shield className="w-5 h-5"/> Tab-Berechtigungen für {editingPermissions.username}</h3>
             <button onClick={() => setEditingPermissions(null)} className="text-gray-400 hover:text-white">✕</button>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
             {TabList.map(tab => (
-              <label key={tab.key} className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-[#1A1A1A] rounded">
+              <label key={tab.key} className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-[#1A1A1A] rounded hover:bg-[#FF4400]/10 transition-colors">
                 <input
                   type="checkbox"
                   checked={(editingPermissions as any)[tab.dbField] || false}
@@ -354,7 +366,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                   className="accent-purple-400"
                 />
                 <tab.icon className="w-4 h-4 text-purple-400"/>
-                <span>{tab.label}</span>
+                <span className="text-gray-300">{tab.label}</span>
               </label>
             ))}
           </div>
@@ -369,10 +381,11 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                 can_access_game: editingPermissions.can_access_game,
                 can_access_multichannel: editingPermissions.can_access_multichannel,
                 can_access_analyticsmarketing: editingPermissions.can_access_analyticsmarketing,
+                can_access_marketingstudio: editingPermissions.can_access_marketingstudio, // NEU
               };
               updateTabPermissions(editingPermissions, updates);
-            }} className="px-6 py-3 bg-purple-500 text-white font-bold uppercase text-xs">Speichern</button>
-            <button onClick={() => setEditingPermissions(null)} className="px-6 py-3 border border-gray-600 text-gray-400 uppercase text-xs">Abbrechen</button>
+            }} className="px-6 py-3 bg-purple-500 text-white font-bold uppercase text-xs rounded hover:bg-purple-600 transition-colors">Speichern</button>
+            <button onClick={() => setEditingPermissions(null)} className="px-6 py-3 border border-gray-600 text-gray-400 uppercase text-xs rounded hover:bg-gray-800 transition-colors">Abbrechen</button>
           </div>
         </div>
       )}
@@ -381,7 +394,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
       <div className="bg-[#111] border border-[#FF4400]/20 overflow-hidden">
         <div className="max-h-[400px] overflow-y-auto">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[600px]">
+            <table className="w-full text-sm min-w-[700px]">
               <thead className="bg-[#FF4400] text-white sticky top-0">
                 <tr>
                   <th className="px-4 py-3 text-left">Username</th>
@@ -395,7 +408,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
               </thead>
               <tbody>
                 {employees.map(emp => (
-                  <tr key={emp.id} className="border-t border-[#FF4400]/10">
+                  <tr key={emp.id} className="border-t border-[#FF4400]/10 hover:bg-[#FF4400]/5 transition-colors">
                     <td className="px-4 py-3 font-bold break-words max-w-[150px]">{emp.username}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 text-xs whitespace-nowrap ${emp.role === 'Admin' ? 'bg-yellow-400 text-black' : emp.role === 'Manager' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-600/20 text-gray-400'}`}>
@@ -415,24 +428,24 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <div className="flex flex-wrap gap-1">
-                        {TabList.filter(tab => (emp as any)[tab.dbField] === true).slice(0, 3).map(tab => (
-                          <span key={tab.key} className="text-xs text-purple-400" title={tab.label}>
+                        {TabList.filter(tab => (emp as any)[tab.dbField] === true).slice(0, 4).map(tab => (
+                          <span key={tab.key} className="text-purple-400" title={tab.label}>
                             <tab.icon className="w-3 h-3"/>
                           </span>
                         ))}
-                        {TabList.filter(tab => (emp as any)[tab.dbField] === true).length > 3 && (
+                        {TabList.filter(tab => (emp as any)[tab.dbField] === true).length > 4 && (
                           <span className="text-xs text-gray-500">
-                            +{TabList.filter(tab => (emp as any)[tab.dbField] === true).length - 3}
+                            +{TabList.filter(tab => (emp as any)[tab.dbField] === true).length - 4}
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        <button onClick={() => setEditingPermissions(emp)} className="p-1.5 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30" title="Tab-Berechtigungen">
+                        <button onClick={() => setEditingPermissions(emp)} className="p-1.5 bg-purple-500/20 text-purple-400 rounded hover:bg-purple-500/30 transition-colors" title="Tab-Berechtigungen">
                           <Shield className="w-3.5 h-3.5"/>
                         </button>
-                        <button onClick={() => setEditingEmployee(emp)} className="p-1.5 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30" title="Passwort ändern">
+                        <button onClick={() => setEditingEmployee(emp)} className="p-1.5 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 transition-colors" title="Passwort ändern">
                           <Key className="w-3.5 h-3.5"/>
                         </button>
                         <button onClick={() => confirm(`${emp.username} wirklich löschen?`, () => {
@@ -441,7 +454,7 @@ export function EmployeesTab({ currentUser, toast, confirm }: { currentUser: Emp
                             logActivity(currentUser.id, currentUser.username, 'Mitarbeiter gelöscht', `"${emp.username}"`);
                             loadEmployees();
                           });
-                        })} className="p-1.5 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30" title="Löschen">
+                        })} className="p-1.5 bg-red-500/20 text-red-400 rounded hover:bg-red-500/30 transition-colors" title="Löschen">
                           <Trash2 className="w-3.5 h-3.5"/>
                         </button>
                       </div>
